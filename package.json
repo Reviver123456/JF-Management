@@ -10,15 +10,19 @@
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.107.0",
     "lucide-react": "latest",
     "next": "latest",
     "react": "latest",
-    "react-dom": "latest"
+    "react-dom": "latest",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@types/ws": "^8.18.1",
     "eslint": "latest",
     "eslint-config-next": "latest",
     "typescript": "latest"

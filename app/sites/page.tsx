@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Building2,
   Check,
@@ -12,6 +12,7 @@ import {
   X
 } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
+import type { SystemUser } from "@/lib/auth/system-users";
 import { useUi } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
 import {
@@ -34,7 +35,8 @@ import {
   synapseSystem,
   type DiagCheck
 } from "@/lib/pm-checklist-data";
-import { regions, siteCatalog as sites, type SiteCatalogRecord } from "@/lib/mock-data";
+import type { SiteCatalogRecord } from "@/lib/pm-data";
+import { usePmData } from "@/lib/use-pm-data";
 
 type SiteTab = "customer" | "contract" | "synapse" | "server" | "switch" | "storage" | "environment" | "diag";
 type InspectionTab = PmChecklistKey;
@@ -82,6 +84,21 @@ const checklistItemsByInspectionTab: Record<InspectionTab, string[]> = {
   diag: []
 };
 
+const emptySite: SiteCatalogRecord = {
+  id: "",
+  site: "",
+  customer: "",
+  contact: "",
+  phone: "",
+  province: "",
+  region: "",
+  owner: "",
+  contract: "",
+  address: "",
+  department: "",
+  email: ""
+};
+
 function resolveSelectedChecklistItems(config: PmChecklistConfig): Record<InspectionTab, string[]> {
   return inspectionTabs.reduce((items, tab) => {
     const defaultItems = checklistItemsByInspectionTab[tab.id];
@@ -93,28 +110,66 @@ function resolveSelectedChecklistItems(config: PmChecklistConfig): Record<Inspec
 
 export default function SitesPage() {
   const { t } = useUi();
+  const { data, error, isLoading, reload } = usePmData();
+  const sites = data.siteCatalog;
+  const regions = data.regions;
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
+  const [usersError, setUsersError] = useState("");
   const [modalSite, setModalSite] = useState<SiteCatalogRecord | null>(null);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
   const [query, setQuery] = useState("");
   const [regionFilter, setRegionFilter] = useState("");
   const [siteStatusFilter, setSiteStatusFilter] = useState("");
 
+  useEffect(() => {
+    let isCurrent = true;
+
+    async function loadSystemUsers() {
+      try {
+        const response = await fetch("/api/auth/users", { cache: "no-store" });
+        const payload = await response.json() as { users?: SystemUser[]; message?: string };
+
+        if (!response.ok) {
+          throw new Error(payload.message ?? "Cannot load users.");
+        }
+
+        if (isCurrent) {
+          setSystemUsers(payload.users ?? []);
+          setUsersError("");
+        }
+      } catch (loadError) {
+        if (isCurrent) {
+          setUsersError(loadError instanceof Error ? loadError.message : "Cannot load users.");
+        }
+      }
+    }
+
+    loadSystemUsers();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
   const filteredSites = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
     return sites.filter((site) => {
+      const isActiveSite = site.owner.trim().length > 0;
       const searchableText = `${site.site} ${site.customer} ${site.province} ${site.owner} ${site.phone}`.toLowerCase();
       const matchesQuery = normalizedQuery ? searchableText.includes(normalizedQuery) : true;
       const matchesRegion = regionFilter ? site.region === regionFilter : true;
-      const matchesStatus = siteStatusFilter ? siteStatusFilter === "active" : true;
+      const matchesStatus = siteStatusFilter
+        ? siteStatusFilter === "active" ? isActiveSite : !isActiveSite
+        : true;
 
       return matchesQuery && matchesRegion && matchesStatus;
     });
-  }, [query, regionFilter, siteStatusFilter]);
+  }, [query, regionFilter, siteStatusFilter, sites]);
 
   const openAdd = () => {
     setModalMode("add");
-    setModalSite(sites[0]);
+    setModalSite(sites[0] ?? emptySite);
   };
 
   const openEdit = (site: SiteCatalogRecord) => {
@@ -125,6 +180,9 @@ export default function SitesPage() {
   return (
     <AppShell>
       <div className="sitesPage">
+      {error ? <p className="emptyState">{error}</p> : null}
+      {usersError ? <p className="emptyState">{usersError}</p> : null}
+      {isLoading ? <p className="emptyState">{t("pm.loadingSubtitle")}</p> : null}
       <PageTitle
         title={t("sites.title")}
         subtitle={`${sites.length} ${t("sites.countSubtitle")}`}
@@ -152,28 +210,37 @@ export default function SitesPage() {
       </section>
 
       <section className="rows">
-        {filteredSites.length > 0 ? filteredSites.map((site) => (
-          <button className="siteRow" key={site.id} type="button" onClick={() => openEdit(site)}>
-            <div>
-              <strong>{site.site}</strong>
-              <span className="statusPill success">{t("common.active")}</span>
-            </div>
-            <small>
-              <UserRound size={13} /> {site.customer}
-              <span>{t("common.phonePrefix")} {site.phone}</span>
-              <span>{t("common.provincePrefix")} {site.province}</span>
-              <span>{t("common.ownerPrefix")}: {site.owner}</span>
-            </small>
-            <ChevronRight size={18} />
-          </button>
-        )) : <EmptyState message={t("sites.noSites")} />}
+        {filteredSites.length > 0 ? filteredSites.map((site) => {
+          const isActiveSite = site.owner.trim().length > 0;
+
+          return (
+            <button className="siteRow" key={site.id} type="button" onClick={() => openEdit(site)}>
+              <div>
+                <strong>{site.site}</strong>
+                <span className={`statusPill ${isActiveSite ? "success" : "warning"}`}>
+                  {isActiveSite ? t("common.active") : t("common.inactive")}
+                </span>
+              </div>
+              <small>
+                <UserRound size={13} /> {site.customer}
+                <span>{t("common.phonePrefix")} {site.phone}</span>
+                <span>{t("common.provincePrefix")} {site.province}</span>
+                <span>{t("common.ownerPrefix")}: {site.owner || "-"}</span>
+              </small>
+              <ChevronRight size={18} />
+            </button>
+          );
+        }) : <EmptyState message={t("sites.noSites")} />}
       </section>
 
       {modalSite ? (
         <SiteModal
           mode={modalMode}
           site={modalSite}
+          regions={regions}
+          systemUsers={systemUsers}
           onClose={() => setModalSite(null)}
+          onSaved={reload}
         />
       ) : null}
       </div>
@@ -184,14 +251,22 @@ export default function SitesPage() {
 function SiteModal({
   mode,
   site,
-  onClose
+  regions,
+  systemUsers,
+  onClose,
+  onSaved
 }: {
   mode: "add" | "edit";
   site: SiteCatalogRecord;
+  regions: string[];
+  systemUsers: SystemUser[];
   onClose: () => void;
+  onSaved: () => Promise<void>;
 }) {
   const { t } = useUi();
   const [activeTab, setActiveTab] = useState<SiteTab>("customer");
+  const [selectedOwner, setSelectedOwner] = useState(site.owner);
+  const [saveError, setSaveError] = useState("");
   const [selectedInspectionTabs, setSelectedInspectionTabs] = useState<InspectionTab[]>(() => readSitePmChecklistConfig(site.id).selectedTabs);
   const [inspectionSetCounts, setInspectionSetCounts] = useState(() => readSitePmChecklistConfig(site.id).setCounts);
   const [selectedChecklistItems, setSelectedChecklistItems] = useState(() => resolveSelectedChecklistItems(readSitePmChecklistConfig(site.id)));
@@ -231,19 +306,45 @@ function SiteModal({
     });
   }, []);
 
-  const saveChecklistConfig = () => {
+  const saveChecklistConfig = async () => {
     writeSitePmChecklistConfig(site.id, {
       selectedTabs: selectedInspectionTabs,
       setCounts: inspectionSetCounts,
       selectedItems: selectedChecklistItems
     });
+
+    if (site.id && selectedOwner !== site.owner) {
+      const response = await fetch(`/api/sites/${encodeURIComponent(site.id)}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ owner: selectedOwner })
+      });
+      const payload = await response.json() as { message?: string };
+
+      if (!response.ok) {
+        setSaveError(payload.message ?? "Cannot update site owner.");
+        return;
+      }
+    }
+
+    await onSaved();
     onClose();
   };
 
   const content = useMemo(() => {
     switch (activeTab) {
       case "customer":
-        return <CustomerTab site={site} />;
+        return (
+          <CustomerTab
+            site={site}
+            regions={regions}
+            selectedOwner={selectedOwner}
+            systemUsers={systemUsers}
+            onOwnerChange={setSelectedOwner}
+          />
+        );
       case "contract":
         return (
           <ContractTab
@@ -266,7 +367,7 @@ function SiteModal({
       default:
         return null;
     }
-  }, [activeTab, addInspectionSet, inspectionSetCounts, selectedChecklistItems, selectedInspectionTabs, site, t, toggleChecklistItem, toggleInspectionTab]);
+  }, [activeTab, addInspectionSet, inspectionSetCounts, regions, selectedChecklistItems, selectedInspectionTabs, selectedOwner, site, systemUsers, t, toggleChecklistItem, toggleInspectionTab]);
 
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label={title}>
@@ -295,6 +396,7 @@ function SiteModal({
         </nav>
 
         <div className="modalBody">{content}</div>
+        {saveError ? <p className="emptyState">{saveError}</p> : null}
 
         <footer className="modalFooter">
           <button className="button ghost" type="button" onClick={onClose}>{t("common.cancel")}</button>
@@ -312,8 +414,21 @@ function EmptyState({ message }: { message: string }) {
   return <p className="emptyState">{message}</p>;
 }
 
-function CustomerTab({ site }: { site: SiteCatalogRecord }) {
+function CustomerTab({
+  site,
+  regions,
+  selectedOwner,
+  systemUsers,
+  onOwnerChange
+}: {
+  site: SiteCatalogRecord;
+  regions: string[];
+  selectedOwner: string;
+  systemUsers: SystemUser[];
+  onOwnerChange: (owner: string) => void;
+}) {
   const { t } = useUi();
+  const ownerExists = systemUsers.some((user) => user.name === selectedOwner);
 
   return (
     <div className="tabPane">
@@ -334,7 +449,17 @@ function CustomerTab({ site }: { site: SiteCatalogRecord }) {
             ))}
           </select>
         </label>
-        <Field label={t("fields.siteOwner")} value={site.owner} />
+        <label className="label">
+          {t("fields.siteOwner")}
+          <select className="select" value={ownerExists ? selectedOwner : ""} onChange={(event) => onOwnerChange(event.target.value)}>
+            <option value="" disabled>{t("fields.siteOwner")}</option>
+            {systemUsers.map((user) => (
+              <option key={user.id} value={user.name}>
+                {user.name}
+              </option>
+            ))}
+          </select>
+        </label>
         <Field label={t("fields.latitude")} value="13.7563" />
         <Field label={t("fields.longitude")} value="100.5018" />
       </div>

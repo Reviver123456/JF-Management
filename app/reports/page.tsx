@@ -5,12 +5,13 @@ import { CalendarDays, Eye, MapPin, Printer, UserRound, X } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
 import { useUi } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
-import { reportRows } from "@/lib/mock-data";
-
-type ReportRow = (typeof reportRows)[number];
+import type { ReportRow } from "@/lib/pm-data";
+import { usePmData } from "@/lib/use-pm-data";
 
 export default function ReportsPage() {
   const { lang, t } = useUi();
+  const { data, error, isLoading } = usePmData();
+  const reportRows = data.reportRows;
   const [activeReport, setActiveReport] = useState<ReportRow | null>(null);
   const [query, setQuery] = useState("");
   const [resultFilter, setResultFilter] = useState("");
@@ -31,6 +32,8 @@ export default function ReportsPage() {
   return (
     <AppShell>
       <div className="reportsPage">
+      {error ? <p className="emptyState">{error}</p> : null}
+      {isLoading ? <p className="emptyState">{t("pm.loadingSubtitle")}</p> : null}
       <PageTitle title={t("reports.title")} subtitle={t("reports.subtitle")} />
       <section className="toolbar">
         <SearchControl placeholder={`${t("common.search")}...`} value={query} onChange={setQuery} />

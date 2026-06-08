@@ -46,7 +46,9 @@ import {
   switchChecklist,
   synapseSystem
 } from "@/lib/pm-checklist-data";
-import { getDateString, getWorkSiteById, getWorkSitesByDate, statusMeta, type SiteRecord } from "@/lib/mock-data";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
+import { filterSitesByOwner, getDateString, getWorkSiteBySiteId, getWorkSitesByDate, statusMeta, type SiteRecord } from "@/lib/pm-data";
+import { usePmData } from "@/lib/use-pm-data";
 
 type CheckResult = "ok" | "bad";
 type FinalStatus = "normal" | "abnormal";
@@ -122,16 +124,19 @@ function PmWorkFallback() {
 
 function PmWorkContent() {
   const { t } = useUi();
+  const { data, error, isLoading } = usePmData();
+  const { error: userError, isLoading: isUserLoading, userName } = useCurrentUser();
   const router = useRouter();
   const searchParams = useSearchParams();
   const siteIdParam = searchParams.get("siteId");
   const todayDate = useMemo(() => getDateString(), []);
+  const ownedSites = useMemo(() => filterSitesByOwner(data.sites, userName), [data.sites, userName]);
 
   const [activeTab, setActiveTab] = useState<PmChecklistKey>("synapse");
 
   const selectedSite = useMemo(
-    () => siteIdParam ? getWorkSiteById(siteIdParam) : null,
-    [siteIdParam]
+    () => siteIdParam ? getWorkSiteBySiteId(ownedSites, siteIdParam) : null,
+    [ownedSites, siteIdParam]
   );
 
   const openSite = (site: SiteRecord) => {
@@ -142,11 +147,15 @@ function PmWorkContent() {
     router.push("/pm-work");
   };
 
-  const filteredSites = getWorkSitesByDate(todayDate);
+  const filteredSites = useMemo(() => getWorkSitesByDate(ownedSites, todayDate), [ownedSites, todayDate]);
+  const pageIsLoading = isLoading || isUserLoading;
 
   return (
     <AppShell>
       <div className="pmWorkPage">
+        {error ? <p className="emptyState">{error}</p> : null}
+        {userError ? <p className="emptyState">{userError}</p> : null}
+        {pageIsLoading ? <p className="emptyState">{t("pm.loadingSubtitle")}</p> : null}
         {selectedSite ? (
           <DetailView site={selectedSite} activeTab={activeTab} setActiveTab={setActiveTab} onBack={closeDetail} />
         ) : (

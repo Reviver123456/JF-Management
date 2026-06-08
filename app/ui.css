@@ -1570,6 +1570,9 @@
   align-items: center;
   gap: 10px;
 }
+.schedulePage .plannedItemReadOnly {
+  grid-template-columns: minmax(0, 1fr);
+}
 .schedulePage .plannedItem strong,
 .schedulePage .plannedItem span {
   display: block;
@@ -1689,6 +1692,32 @@
 .schedulePage .modalHeader button:hover {
   background: var(--field);
   color: var(--text);
+}
+.schedulePage .followerList {
+  max-height: 176px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--field);
+  padding: 7px;
+  display: grid;
+  gap: 6px;
+}
+.schedulePage .followerOption {
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 7px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+.schedulePage .followerOption:hover {
+  border-color: var(--border);
+  background: var(--panel-2);
 }
 .schedulePage .modalActions {
   display: flex;

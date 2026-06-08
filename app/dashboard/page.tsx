@@ -4,7 +4,8 @@ import Link from "next/link";
 import { Building2, CalendarCheck2, CheckCircle2, Clock3, ClipboardCheck, MapPin, Timer } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { useUi } from "@/lib/i18n";
-import { getDateString, getWorkSitesByDate, metrics, sites, statusMeta } from "@/lib/mock-data";
+import { getDateString, getWorkSitesByDate, statusMeta } from "@/lib/pm-data";
+import { usePmData } from "@/lib/use-pm-data";
 
 const metricIcons = {
   sites: Building2,
@@ -27,8 +28,10 @@ const statusLabelKeys = {
 
 export default function DashboardPage() {
   const { t } = useUi();
+  const { data, error, isLoading } = usePmData();
+  const { metrics, sites } = data;
   const todayDate = getDateString();
-  const today = getWorkSitesByDate(todayDate);
+  const today = getWorkSitesByDate(sites, todayDate);
   const completedCount = sites.filter((site) => site.status === "completed").length;
   const inProgressCount = sites.filter((site) => site.status === "inProgress").length;
   const backlogCount = sites.filter((site) => site.status === "pending").length;
@@ -39,6 +42,8 @@ export default function DashboardPage() {
     <AppShell>
       <div className="dashboardPage">
         <PageTitle title={t("dashboard.title")} subtitle={t("dashboard.subtitle")} />
+        {error ? <p className="emptyState">{error}</p> : null}
+        {isLoading ? <p className="emptyState">{t("pm.loadingSubtitle")}</p> : null}
 
         <section className="metrics">
           {metrics.map((metric) => {

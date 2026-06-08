@@ -16,20 +16,21 @@ import {
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
 import { useUi } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
-import { getWorkSiteByJobId, reportRows, type SiteRecord } from "@/lib/mock-data";
-
-type ReportRow = (typeof reportRows)[number];
+import { getWorkSiteByJobId, type ReportRow, type SiteRecord } from "@/lib/pm-data";
+import { usePmData } from "@/lib/use-pm-data";
 
 const checklistTabs = ["SYNAPSE", "Server", "Switch", "Storage", "Environment", "DIAG"] as const;
 
 export default function HistoryPage() {
   const { lang, t } = useUi();
+  const { data, error, isLoading } = usePmData();
+  const reportRows = data.reportRows;
   const [query, setQuery] = useState("");
   const [resultFilter, setResultFilter] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [activeReport, setActiveReport] = useState<ReportRow | null>(null);
-  const activeSite = activeReport ? getWorkSiteByJobId(activeReport.jobId) : null;
+  const activeSite = activeReport ? getWorkSiteByJobId(data.sites, activeReport.jobId) : null;
 
   const filteredRows = reportRows.filter((row) => {
     const searchableText = `${row.site} ${row.customer} ${row.inspector} ${row.province}`.toLowerCase();
@@ -54,6 +55,8 @@ export default function HistoryPage() {
         </div>
       ) : (
         <div className="historyPage">
+          {error ? <p className="emptyState">{error}</p> : null}
+          {isLoading ? <p className="emptyState">{t("pm.loadingSubtitle")}</p> : null}
           <PageTitle title={t("history.title")} subtitle={t("history.subtitle")} />
           <section className="toolbar">
             <SearchControl placeholder={`${t("common.search")}...`} value={query} onChange={setQuery} />

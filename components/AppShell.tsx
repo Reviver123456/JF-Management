@@ -21,6 +21,7 @@ import {
   X
 } from "lucide-react";
 import { useUi } from "@/lib/i18n";
+import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
   { href: "/dashboard", labelKey: "nav.dashboard", mobileKey: "navMobile.dashboard", icon: LayoutDashboard },
@@ -39,6 +40,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const closeMobileMenu = () => setMobileMenuOpen(false);
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.replace("/login");
+    router.refresh();
+  };
 
   useEffect(() => {
     if (!mobileMenuOpen) {
@@ -92,7 +99,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <PanelLeftClose size={17} />
             <span>{collapsed ? t("common.expandMenu") : t("common.collapseMenu")}</span>
           </button>
-          <button className="footerButton" type="button" onClick={() => router.push("/login")}>
+          <button className="footerButton" type="button" onClick={handleLogout}>
             <LogOut size={17} />
             <span>{t("common.logout")}</span>
           </button>
