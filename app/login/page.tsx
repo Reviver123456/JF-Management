@@ -3,15 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LockKeyhole, Shield, UserRound } from "lucide-react";
-import { defaultLoginUser } from "@/lib/auth/default-user";
 import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const router = useRouter();
   const { t } = useUi();
-  const [email, setEmail] = useState<string>(defaultLoginUser.email);
-  const [password, setPassword] = useState<string>(defaultLoginUser.password);
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
