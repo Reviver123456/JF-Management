@@ -13,7 +13,6 @@ import {
   Clock3,
   ClipboardCheck,
   MapPin,
-  MessageSquare,
   Navigation,
   PenLine,
   Plus,
@@ -26,6 +25,7 @@ import {
   X
 } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
+import { FeedbackPopups, LoadingPopup } from "@/components/AppPopup";
 import { useUi, type Lang } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
 import {
@@ -47,7 +47,17 @@ import {
   synapseSystem
 } from "@/lib/pm-checklist-data";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
-import { filterSitesByOwner, getDateString, getWorkSiteBySiteId, getWorkSitesByDate, statusMeta, type SiteRecord } from "@/lib/pm-data";
+import {
+  filterPmJobsByParticipant,
+  getDateString,
+  getSiteRecordJobKey,
+  getUniquePmJobs,
+  getWorkSiteBySiteId,
+  getWorkSitesByDate,
+  statusMeta,
+  type PmWorkDetails,
+  type SiteRecord
+} from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
 
 type CheckResult = "ok" | "bad";
@@ -102,6 +112,116 @@ const emptyPhotoState: PhotoState = {
   part: []
 };
 
+function mergePhotoState(value: PmWorkDetails["photos"] | undefined): PhotoState {
+  return {
+    device: value?.device ?? [],
+    overview: value?.overview ?? [],
+    issue: value?.issue ?? [],
+    part: value?.part ?? []
+  };
+}
+
+function normalizeSpareParts(value: PmWorkDetails["spareParts"] | undefined): SparePart[] {
+  return Array.isArray(value)
+    ? value.map((part) => ({
+      id: part.id,
+      name: part.name,
+      quantity: part.quantity,
+      note: part.note
+    }))
+    : [];
+}
+
+function trimRecordValues(value: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, item]) => item.trim().length > 0)
+  );
+}
+
+function fieldKey(groupKey: string, setTitle: string, blockIndex: number, label: string) {
+  return `${groupKey}:field:${setTitle}:${blockIndex}:${label}`;
+}
+
+function radioKey(groupKey: string, setTitle: string, blockIndex: number, label: string) {
+  return `${groupKey}:radio:${setTitle}:${blockIndex}:${label}`;
+}
+
+function checkKey(resultPrefix: string, title: string, item: string) {
+  return `${resultPrefix}:${title}:${item}`;
+}
+
+function diagKey(resultPrefix: string, device: string, column: string) {
+  return `${resultPrefix}:${device}:${column}`;
+}
+
+function getMissingRequiredCount({
+  checkResults,
+  fieldValues,
+  finalStatus,
+  groups,
+  inspector,
+  site,
+  signerName,
+  startTime,
+  endTime
+}: {
+  checkResults: Record<string, CheckResult>;
+  fieldValues: Record<string, string>;
+  finalStatus: FinalStatus | null;
+  groups: ConfiguredChecklistGroup[];
+  inspector: string;
+  site: SiteRecord;
+  signerName: string;
+  startTime: string;
+  endTime: string;
+}) {
+  let missingCount = 0;
+
+  if (!startTime.trim()) missingCount += 1;
+  if (!endTime.trim()) missingCount += 1;
+  if (!inspector.trim()) missingCount += 1;
+  if (!signerName.trim()) missingCount += 1;
+  if (!finalStatus) missingCount += 1;
+
+  groups.forEach((group) => {
+    group.sets.forEach((set) => {
+      set.blocks.forEach((block, blockIndex) => {
+        const resultPrefix = `${group.key}:${set.title}:${blockIndex}`;
+
+        if (block.type === "fields") {
+          block.fields.forEach((field) => {
+            const key = fieldKey(group.key, set.title, blockIndex, field.label);
+            const value = fieldValues[key] ?? resolveFieldValue(field, site) ?? "";
+            if (!value.trim()) {
+              missingCount += 1;
+            }
+          });
+        }
+
+        if (block.type === "checks") {
+          block.items.forEach((item) => {
+            if (!checkResults[checkKey(resultPrefix, block.title, item)]) {
+              missingCount += 1;
+            }
+          });
+        }
+
+        if (block.type === "diagTable") {
+          diagDevices.forEach((device) => {
+            diagColumns.forEach((column) => {
+              if (!checkResults[diagKey(resultPrefix, device, column)]) {
+                missingCount += 1;
+              }
+            });
+          });
+        }
+      });
+    });
+  });
+
+  return missingCount;
+}
+
 export default function PmWorkPage() {
   return (
     <Suspense fallback={<PmWorkFallback />}>
@@ -115,6 +235,7 @@ function PmWorkFallback() {
 
   return (
     <AppShell>
+      <LoadingPopup open message={t("pm.loadingSubtitle")} />
       <div className="pmWorkPage">
         <PageTitle title={t("pm.title")} subtitle={t("pm.loadingSubtitle")} />
       </div>
@@ -124,19 +245,24 @@ function PmWorkFallback() {
 
 function PmWorkContent() {
   const { t } = useUi();
-  const { data, error, isLoading } = usePmData();
+  const { data, error, isLoading, reload } = usePmData();
   const { error: userError, isLoading: isUserLoading, userName } = useCurrentUser();
   const router = useRouter();
   const searchParams = useSearchParams();
   const siteIdParam = searchParams.get("siteId");
   const todayDate = useMemo(() => getDateString(), []);
-  const ownedSites = useMemo(() => filterSitesByOwner(data.sites, userName), [data.sites, userName]);
+  const visibleSites = useMemo(() => {
+    const visibleJobs = getUniquePmJobs(filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, userName));
+    const visibleJobKeys = new Set(visibleJobs.map((job) => `${job.siteId}:${job.visitDate}:${job.visitTime}`));
+
+    return data.sites.filter((site) => visibleJobKeys.has(getSiteRecordJobKey(site)));
+  }, [data.pmJobs, data.siteCatalog, data.sites, userName]);
 
   const [activeTab, setActiveTab] = useState<PmChecklistKey>("synapse");
 
   const selectedSite = useMemo(
-    () => siteIdParam ? getWorkSiteBySiteId(ownedSites, siteIdParam) : null,
-    [ownedSites, siteIdParam]
+    () => siteIdParam ? getWorkSiteBySiteId(visibleSites, siteIdParam) : null,
+    [visibleSites, siteIdParam]
   );
 
   const openSite = (site: SiteRecord) => {
@@ -147,17 +273,19 @@ function PmWorkContent() {
     router.push("/pm-work");
   };
 
-  const filteredSites = useMemo(() => getWorkSitesByDate(ownedSites, todayDate), [ownedSites, todayDate]);
+  const filteredSites = useMemo(() => getWorkSitesByDate(visibleSites, todayDate), [visibleSites, todayDate]);
   const pageIsLoading = isLoading || isUserLoading;
 
   return (
     <AppShell>
       <div className="pmWorkPage">
-        {error ? <p className="emptyState">{error}</p> : null}
-        {userError ? <p className="emptyState">{userError}</p> : null}
-        {pageIsLoading ? <p className="emptyState">{t("pm.loadingSubtitle")}</p> : null}
+        <FeedbackPopups
+          loading={pageIsLoading}
+          loadingMessage={t("pm.loadingSubtitle")}
+          alertMessage={error ?? userError}
+        />
         {selectedSite ? (
-          <DetailView site={selectedSite} activeTab={activeTab} setActiveTab={setActiveTab} onBack={closeDetail} />
+          <DetailView key={selectedSite.jobId} site={selectedSite} activeTab={activeTab} setActiveTab={setActiveTab} onBack={closeDetail} onSaved={reload} />
         ) : (
           <>
             <PageTitle title={t("pm.title")} subtitle={`${t("pm.todayOnlySubtitle")} · ${todayDate}`} />
@@ -192,27 +320,67 @@ function DetailView({
   site,
   activeTab,
   setActiveTab,
-  onBack
+  onBack,
+  onSaved
 }: {
   site: SiteRecord;
   activeTab: PmChecklistKey;
   setActiveTab: (value: PmChecklistKey) => void;
   onBack: () => void;
+  onSaved: () => Promise<void>;
 }) {
   const { lang, t } = useUi();
   const status = statusMeta[site.status];
-  const [checkResults, setCheckResults] = useState<Record<string, CheckResult>>({});
+  const savedDetails = site.workDetails;
+  const [checkResults, setCheckResults] = useState<Record<string, CheckResult>>(savedDetails?.checkResults ?? {});
+  const [checkNotes, setCheckNotes] = useState<Record<string, string>>(savedDetails?.checkNotes ?? {});
   const [checklistConfig, setChecklistConfig] = useState<PmChecklistConfig>(() => readSitePmChecklistConfig(site.id));
-  const [photos, setPhotos] = useState<PhotoState>(emptyPhotoState);
-  const [spareParts, setSpareParts] = useState<SparePart[]>([]);
-  const [suggestion, setSuggestion] = useState("");
-  const [additionalDetail, setAdditionalDetail] = useState("");
-  const [inspectorNote, setInspectorNote] = useState("");
-  const [finalStatus, setFinalStatus] = useState<FinalStatus | null>(null);
-  const [summaryNote, setSummaryNote] = useState("");
-  const [signerName, setSignerName] = useState("");
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>(savedDetails?.fieldValues ?? {});
+  const [radioValues, setRadioValues] = useState<Record<string, string>>(savedDetails?.radioValues ?? {});
+  const [photos, setPhotos] = useState<PhotoState>(() => mergePhotoState(savedDetails?.photos));
+  const [spareParts, setSpareParts] = useState<SparePart[]>(() => normalizeSpareParts(savedDetails?.spareParts));
+  const [startTime, setStartTime] = useState(savedDetails?.startTime ?? site.startTime ?? site.visitTime);
+  const [endTime, setEndTime] = useState(savedDetails?.endTime ?? site.endTime ?? "");
+  const [inspector, setInspector] = useState(savedDetails?.inspector ?? site.owner);
+  const [finalStatus, setFinalStatus] = useState<FinalStatus | null>(() => {
+    if (savedDetails?.finalStatus) {
+      return savedDetails.finalStatus;
+    }
+
+    if (site.status === "completed") {
+      return "normal";
+    }
+
+    if (site.status === "abnormal") {
+      return "abnormal";
+    }
+
+    return null;
+  });
+  const [summaryNote, setSummaryNote] = useState(savedDetails?.summaryNote ?? "");
+  const [signerName, setSignerName] = useState(savedDetails?.signerName ?? "");
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState("");
   const configuredGroups = useMemo(() => buildConfiguredChecklistGroups(checklistConfig, lang), [checklistConfig, lang]);
   const group = configuredGroups.find((item) => item.key === activeTab) ?? configuredGroups[0];
+  const missingRequiredCount = useMemo(() => getMissingRequiredCount({
+    checkResults,
+    fieldValues,
+    finalStatus,
+    groups: configuredGroups,
+    inspector,
+    site,
+    signerName,
+    startTime,
+    endTime
+  }), [checkResults, configuredGroups, endTime, fieldValues, finalStatus, inspector, signerName, site, startTime]);
+  const canSubmit = missingRequiredCount === 0;
+  const draftSuccessMessage = lang === "th" ? "\u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01\u0e23\u0e48\u0e32\u0e07\u0e41\u0e25\u0e49\u0e27" : "Draft saved.";
+  const requiredMessage = lang === "th"
+    ? `\u0e22\u0e31\u0e07\u0e02\u0e32\u0e14\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25 ${missingRequiredCount} \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23`
+    : `${missingRequiredCount} required items remaining`;
+  const saveSuccessMessage = lang === "th" ? "บันทึกข้อมูลงาน PM แล้ว" : "PM job saved.";
 
   useEffect(() => {
     const refreshConfig = () => setChecklistConfig(readSitePmChecklistConfig(site.id));
@@ -243,6 +411,24 @@ function DetailView({
       return next;
     });
   };
+  const setCheckNote = (item: string, value: string) => {
+    setCheckNotes((current) => ({
+      ...current,
+      [item]: value
+    }));
+  };
+  const setFieldValue = (item: string, value: string) => {
+    setFieldValues((current) => ({
+      ...current,
+      [item]: value
+    }));
+  };
+  const setRadioValue = (item: string, value: string) => {
+    setRadioValues((current) => ({
+      ...current,
+      [item]: value
+    }));
+  };
   const addPhotoFiles = (key: PhotoKey, fileList: FileList | null) => {
     const names = Array.from(fileList ?? []).map((file) => file.name);
     if (names.length === 0) {
@@ -268,9 +454,78 @@ function DetailView({
   const removeSparePart = (id: number) => {
     setSpareParts((current) => current.filter((part) => part.id !== id));
   };
+  const buildWorkDetails = (draftStatus: PmWorkDetails["draftStatus"]): PmWorkDetails => ({
+    checkNotes: trimRecordValues(checkNotes),
+    checkResults,
+    checklistSnapshot: configuredGroups,
+    draftStatus,
+    fieldValues: trimRecordValues(fieldValues),
+    finalStatus,
+    inspector,
+    photos,
+    radioValues: trimRecordValues(radioValues),
+    savedAt: new Date().toISOString(),
+    signerName,
+    spareParts,
+    startTime,
+    endTime,
+    summaryNote
+  });
+  const saveWork = async (mode: "draft" | "submit") => {
+    setSaveError("");
+    setSaveSuccess("");
+
+    if (mode === "submit" && !canSubmit) {
+      setSaveError(requiredMessage);
+      return;
+    }
+
+    const nextStatus = mode === "draft"
+      ? "inProgress"
+      : finalStatus === "abnormal" ? "abnormal" : "completed";
+    const nextResult = mode === "draft"
+      ? null
+      : finalStatus === "abnormal" ? "ผิดปกติ" : "ปกติ";
+
+    setIsSaving(true);
+
+    try {
+      const response = await fetch(`/api/pm-jobs/${encodeURIComponent(site.jobId)}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          details: buildWorkDetails(mode === "draft" ? "draft" : "submitted"),
+          status: nextStatus,
+          startTime,
+          endTime,
+          result: nextResult
+        })
+      });
+      const payload = await response.json() as { message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Cannot save PM job.");
+      }
+
+      await onSaved();
+      setSaveSuccess(mode === "draft" ? draftSuccessMessage : saveSuccessMessage);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Cannot save PM job.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="detailPage">
+      <FeedbackPopups
+        loading={isSaving}
+        loadingMessage={t("pm.loadingSubtitle")}
+        alertMessage={saveError || saveSuccess}
+        alertTone={saveSuccess ? "success" : "error"}
+      />
       <div className="detailTitle">
         <button className="backButton" type="button" onClick={onBack} aria-label={t("common.back")}>
           <ArrowLeft size={20} />
@@ -309,15 +564,15 @@ function DetailView({
         <div className="formGrid">
           <label className="label">
             {t("fields.startTime")}
-            <input className="field" type="time" />
+            <input className="field" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
           </label>
           <label className="label">
             {t("fields.endTime")}
-            <input className="field" type="time" />
+            <input className="field" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
           </label>
           <label className="label">
             {t("common.inspector")}
-            <input className="field" defaultValue={site.owner} />
+            <input className="field" value={inspector} onChange={(event) => setInspector(event.target.value)} />
           </label>
         </div>
       </section>
@@ -340,10 +595,19 @@ function DetailView({
                   <ChecklistBlockView
                     key={`${set.title}-${blockIndex}`}
                     block={block}
+                    blockIndex={blockIndex}
+                    groupKey={group.key}
                     resultPrefix={`${group.key}:${set.title}:${blockIndex}`}
+                    setTitle={set.title}
                     site={site}
+                    fieldValues={fieldValues}
+                    setFieldValue={setFieldValue}
+                    radioValues={radioValues}
+                    setRadioValue={setRadioValue}
                     checkResults={checkResults}
                     setCheckResult={setCheckResult}
+                    checkNotes={checkNotes}
+                    setCheckNote={setCheckNote}
                   />
                 ))}
               </section>
@@ -361,6 +625,7 @@ function DetailView({
             <PhotoUploadButton
               key={item.key}
               label={t(item.labelKey)}
+              capture={item.key === "device" || item.key === "overview"}
               fileNames={photos[item.key]}
               onChange={(fileList) => addPhotoFiles(item.key, fileList)}
             />
@@ -413,24 +678,6 @@ function DetailView({
       </section>
 
       <section className="card">
-        <h2><MessageSquare size={17} /> {t("pm.suggestions")}</h2>
-        <div className="noteStack">
-          <label className="label">
-            {t("pm.suggestions")}
-            <textarea className="textarea" value={suggestion} onChange={(event) => setSuggestion(event.target.value)} />
-          </label>
-          <label className="label">
-            {t("fields.additionalDetail")}
-            <textarea className="textarea" value={additionalDetail} onChange={(event) => setAdditionalDetail(event.target.value)} />
-          </label>
-          <label className="label">
-            {t("fields.inspectorNote")}
-            <textarea className="textarea" value={inspectorNote} onChange={(event) => setInspectorNote(event.target.value)} />
-          </label>
-        </div>
-      </section>
-
-      <section className="card">
         <h2><CircleCheck size={17} /> {t("pm.result")}</h2>
         <div className="summaryChoices">
           <button
@@ -466,9 +713,10 @@ function DetailView({
       </section>
 
       <div className="stickyActions">
+        {!canSubmit ? <span className="requiredHint">{requiredMessage}</span> : null}
         <button className="button ghost" type="button" onClick={onBack}>{t("common.back")}</button>
-        <button className="button subtle" type="button" onClick={onBack}>{t("common.saveDraft")}</button>
-        <button className="button primary" type="button" onClick={onBack}>
+        <button className="button subtle" type="button" onClick={() => saveWork("draft")} disabled={isSaving}>{t("common.saveDraft")}</button>
+        <button className="button primary" type="button" onClick={() => saveWork("submit")} disabled={isSaving || !canSubmit}>
           <Save size={16} />
           {t("common.save")}
         </button>
@@ -487,10 +735,12 @@ function Info({ label, value }: { label: string; value: string }) {
 }
 
 function PhotoUploadButton({
+  capture = false,
   label,
   fileNames,
   onChange
 }: {
+  capture?: boolean;
   label: string;
   fileNames: string[];
   onChange: (fileList: FileList | null) => void;
@@ -507,7 +757,8 @@ function PhotoUploadButton({
       <input
         type="file"
         accept="image/*"
-        multiple
+        capture={capture ? "environment" : undefined}
+        multiple={!capture}
         onChange={(event) => {
           onChange(event.target.files);
           event.target.value = "";
@@ -625,16 +876,34 @@ function SignaturePad() {
 
 function ChecklistBlockView({
   block,
+  blockIndex,
+  groupKey,
   resultPrefix,
+  setTitle,
   site,
+  fieldValues,
+  setFieldValue,
+  radioValues,
+  setRadioValue,
   checkResults,
-  setCheckResult
+  setCheckResult,
+  checkNotes,
+  setCheckNote
 }: {
   block: ChecklistBlock;
+  blockIndex: number;
+  groupKey: PmChecklistKey;
   resultPrefix: string;
+  setTitle: string;
   site: SiteRecord;
+  fieldValues: Record<string, string>;
+  setFieldValue: (item: string, value: string) => void;
+  radioValues: Record<string, string>;
+  setRadioValue: (item: string, value: string) => void;
   checkResults: Record<string, CheckResult>;
   setCheckResult: (item: string, result: CheckResult) => void;
+  checkNotes: Record<string, string>;
+  setCheckNote: (item: string, value: string) => void;
 }) {
   const { lang, t } = useUi();
 
@@ -643,30 +912,44 @@ function ChecklistBlockView({
       <section className="templateBlock">
         <h4>{localizeLabel(block.title, lang)}</h4>
         <div className={`templateGrid ${block.columns === "three" ? "threeCols" : block.columns === "four" ? "fourCols" : ""}`}>
-          {block.fields.map((field) => (
-            <label className="label" key={`${block.title}-${field.label}`}>
-              {localizeLabel(field.label, lang)}
-              <input
-                className="field"
-                defaultValue={resolveFieldValue(field, site)}
-                placeholder={localizeLabel(field.placeholder ?? field.label, lang)}
-              />
-            </label>
-          ))}
+          {block.fields.map((field) => {
+            const key = fieldKey(groupKey, setTitle, blockIndex, field.label);
+            const value = fieldValues[key] ?? resolveFieldValue(field, site) ?? "";
+
+            return (
+              <label className="label" key={`${block.title}-${field.label}`}>
+                {localizeLabel(field.label, lang)}
+                <input
+                  className="field"
+                  value={value}
+                  placeholder={localizeLabel(field.placeholder ?? field.label, lang)}
+                  onChange={(event) => setFieldValue(key, event.target.value)}
+                />
+              </label>
+            );
+          })}
         </div>
       </section>
     );
   }
 
   if (block.type === "radios") {
+    const key = radioKey(groupKey, setTitle, blockIndex, block.label);
+    const selectedValue = radioValues[key] ?? block.items[0] ?? "";
+
     return (
       <section className="templateBlock">
         <div className="radioGroup">
           <strong>{localizeLabel(block.label, lang)}</strong>
           <div>
-            {block.items.map((item, index) => (
+            {block.items.map((item) => (
               <label key={item}>
-                <input name={`${resultPrefix}-${block.label}`} type="radio" defaultChecked={index === 0} />
+                <input
+                  name={`${resultPrefix}-${block.label}`}
+                  type="radio"
+                  checked={selectedValue === item}
+                  onChange={() => setRadioValue(key, item)}
+                />
                 <span />
                 {localizeLabel(item, lang)}
               </label>
@@ -678,6 +961,15 @@ function ChecklistBlockView({
   }
 
   if (block.type === "diagTable") {
+    const selectedDiagKeys = diagDevices.flatMap((device) => (
+      diagColumns
+        .map((column) => ({
+          key: diagKey(resultPrefix, device, column),
+          label: `${device} ${column}`
+        }))
+        .filter((item) => checkResults[item.key])
+    ));
+
     return (
       <section className="templateBlock">
         <h4>{localizeLabel(block.title, lang)}</h4>
@@ -696,6 +988,20 @@ function ChecklistBlockView({
             />
           ))}
         </div>
+        {selectedDiagKeys.length > 0 ? (
+          <div className="checkNotesGrid">
+            {selectedDiagKeys.map((item) => (
+              <label className="label" key={item.key}>
+                {t("common.note")}: {item.label}
+                <textarea
+                  className="textarea compactTextarea"
+                  value={checkNotes[item.key] ?? ""}
+                  onChange={(event) => setCheckNote(item.key, event.target.value)}
+                />
+              </label>
+            ))}
+          </div>
+        ) : null}
       </section>
     );
   }
@@ -708,9 +1014,11 @@ function ChecklistBlockView({
           <ChecklistResultRow
             key={item}
             item={item}
-            resultKey={`${resultPrefix}:${block.title}:${item}`}
+            resultKey={checkKey(resultPrefix, block.title, item)}
             checkResults={checkResults}
             setCheckResult={setCheckResult}
+            checkNotes={checkNotes}
+            setCheckNote={setCheckNote}
           />
         ))}
       </div>
@@ -722,38 +1030,53 @@ function ChecklistResultRow({
   item,
   resultKey,
   checkResults,
-  setCheckResult
+  setCheckResult,
+  checkNotes,
+  setCheckNote
 }: {
   item: string;
   resultKey: string;
   checkResults: Record<string, CheckResult>;
   setCheckResult: (item: string, result: CheckResult) => void;
+  checkNotes: Record<string, string>;
+  setCheckNote: (item: string, value: string) => void;
 }) {
   const { lang, t } = useUi();
+  const result = checkResults[resultKey];
 
   return (
     <div className="checkRow">
       <strong>{localizeLabel(item, lang)}</strong>
       <div className="vx">
         <button
-          className={checkResults[resultKey] === "ok" ? "resultDot resultOk" : "resultDot resultChoiceOk"}
+          className={result === "ok" ? "resultDot resultOk" : "resultDot resultChoiceOk"}
           type="button"
           aria-label={`${t("pm.pass")}: ${localizeLabel(item, lang)}`}
-          aria-pressed={checkResults[resultKey] === "ok"}
+          aria-pressed={result === "ok"}
           onClick={() => setCheckResult(resultKey, "ok")}
         >
           <Check size={13} />
         </button>
         <button
-          className={checkResults[resultKey] === "bad" ? "resultDot resultBad" : "resultDot resultChoiceBad"}
+          className={result === "bad" ? "resultDot resultBad" : "resultDot resultChoiceBad"}
           type="button"
           aria-label={`${t("pm.fail")}: ${localizeLabel(item, lang)}`}
-          aria-pressed={checkResults[resultKey] === "bad"}
+          aria-pressed={result === "bad"}
           onClick={() => setCheckResult(resultKey, "bad")}
         >
           <X size={13} />
         </button>
       </div>
+      {result ? (
+        <label className="label checkNoteField">
+          {t("common.note")}
+          <textarea
+            className="textarea compactTextarea"
+            value={checkNotes[resultKey] ?? ""}
+            onChange={(event) => setCheckNote(resultKey, event.target.value)}
+          />
+        </label>
+      ) : null}
     </div>
   );
 }
@@ -820,9 +1143,11 @@ function buildConfiguredChecklistGroups(config: PmChecklistConfig, lang: Lang): 
     }));
 }
 
-function getSelectedItems(config: PmChecklistConfig, key: PmChecklistKey, items: string[]) {
+function getSelectedItems(config: PmChecklistConfig, key: PmChecklistKey, items: string[], includeCustomItems = false) {
   const selectedItems = config.selectedItems[key];
-  return selectedItems ? items.filter((item) => selectedItems.includes(item)) : items;
+  const configuredItems = selectedItems ? items.filter((item) => selectedItems.includes(item)) : items;
+
+  return includeCustomItems ? [...configuredItems, ...(config.customItems[key] ?? [])] : configuredItems;
 }
 
 function hideEmptyChecklistBlocks(blocks: ChecklistBlock[]) {
@@ -858,7 +1183,7 @@ function buildChecklistSet(key: PmChecklistKey, setId: number, config: PmCheckli
               { label: "Warm DB Total (GB)" }
             ]
           },
-          { type: "checks", title: "SYNAPSE SYSTEM CHECKLIST", items: getSelectedItems(config, "synapse", synapseSystem) },
+          { type: "checks", title: "SYNAPSE SYSTEM CHECKLIST", items: getSelectedItems(config, "synapse", synapseSystem, true) },
           { type: "checks", title: "CONFIGURATION BACKUP CHECKLIST", items: getSelectedItems(config, "synapse", configurationBackup) },
           { type: "fields", title: "CONFIGURATION BACKUP PATH", fields: [{ label: "Configuration Backup Path" }] },
           { type: "radios", label: "Backup Type", items: ["DR Site", "S", "Other"] },
@@ -877,7 +1202,7 @@ function buildChecklistSet(key: PmChecklistKey, setId: number, config: PmCheckli
             title: "SERVER INFORMATION",
             fields: ["Location", "Manufacturer", "Host Name", "Model", "S/N or S/T", "IP Address", "ESX Version", "MT"].map((label) => ({ label }))
           },
-          { type: "checks", title: "SERVER CHECKLIST", items: getSelectedItems(config, "server", serverChecklist) }
+          { type: "checks", title: "SERVER CHECKLIST", items: getSelectedItems(config, "server", serverChecklist, true) }
         ])
       };
     case "switch":
@@ -889,7 +1214,7 @@ function buildChecklistSet(key: PmChecklistKey, setId: number, config: PmCheckli
             title: "SWITCH INFORMATION",
             fields: ["Customer Name", "Location", "Brand", "Model", "S/N", "Host Name", "IP Address"].map((label) => ({ label }))
           },
-          { type: "checks", title: "SWITCH CHECKLIST", items: getSelectedItems(config, "switch", switchChecklist) }
+          { type: "checks", title: "SWITCH CHECKLIST", items: getSelectedItems(config, "switch", switchChecklist, true) }
         ])
       };
     case "storage":
@@ -901,7 +1226,7 @@ function buildChecklistSet(key: PmChecklistKey, setId: number, config: PmCheckli
             title: "STORAGE INFORMATION",
             fields: ["Customer Name", "Location", "Model", "Manufacturer", "S/N or S/T", "MT"].map((label) => ({ label }))
           },
-          { type: "checks", title: "STORAGE CHECKLIST", items: getSelectedItems(config, "storage", storageChecklist) }
+          { type: "checks", title: "STORAGE CHECKLIST", items: getSelectedItems(config, "storage", storageChecklist, true) }
         ])
       };
     case "environment":
@@ -913,7 +1238,7 @@ function buildChecklistSet(key: PmChecklistKey, setId: number, config: PmCheckli
             title: "CUSTOMER INFORMATION",
             fields: [{ label: "Customer Name" }, { label: "Location" }]
           },
-          { type: "checks", title: "ENVIRONMENT CHECKLIST: สภาพแวดล้อม", items: getSelectedItems(config, "environment", environmentMain) },
+          { type: "checks", title: "ENVIRONMENT CHECKLIST: สภาพแวดล้อม", items: getSelectedItems(config, "environment", environmentMain, true) },
           { type: "checks", title: "ENVIRONMENT CHECKLIST: ระบบสายสัญญาณและระบบไฟฟ้า", items: getSelectedItems(config, "environment", environmentPower) },
           { type: "checks", title: "SECURITY CHECKLIST", items: getSelectedItems(config, "environment", environmentSecurity) }
         ])

@@ -3,6 +3,7 @@ export const pmChecklistKeys = ["synapse", "server", "switch", "storage", "envir
 export type PmChecklistKey = (typeof pmChecklistKeys)[number];
 
 export type PmChecklistConfig = {
+  customItems: Partial<Record<PmChecklistKey, string[]>>;
   selectedTabs: PmChecklistKey[];
   setCounts: Record<PmChecklistKey, number>;
   selectedItems: Partial<Record<PmChecklistKey, string[]>>;
@@ -11,6 +12,7 @@ export type PmChecklistConfig = {
 const storageKey = "pm-site-checklist-configs";
 
 export const defaultPmChecklistConfig: PmChecklistConfig = {
+  customItems: {},
   selectedTabs: [...pmChecklistKeys],
   setCounts: {
     synapse: 1,
@@ -35,8 +37,17 @@ function normalizeConfig(value: Partial<PmChecklistConfig> | undefined): PmCheck
 
     return items;
   }, {} as Partial<Record<PmChecklistKey, string[]>>);
+  const customItems = pmChecklistKeys.reduce((items, key) => {
+    const currentItems = value?.customItems?.[key];
+    if (Array.isArray(currentItems)) {
+      items[key] = [...new Set(currentItems.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim()))];
+    }
+
+    return items;
+  }, {} as Partial<Record<PmChecklistKey, string[]>>);
 
   return {
+    customItems,
     selectedTabs,
     setCounts: pmChecklistKeys.reduce((counts, key) => {
       const count = value?.setCounts?.[key];

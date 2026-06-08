@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Languages, LockKeyhole, Moon, Save, Sun, UserRound } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
+import { FeedbackPopups } from "@/components/AppPopup";
 import { defaultLoginUser } from "@/lib/auth/default-user";
 import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
@@ -98,6 +99,10 @@ export default function SettingsPage() {
   return (
     <AppShell>
       <div className="settingsPage">
+      <FeedbackPopups
+        alertMessage={message || (saved ? t("settings.saved") : "")}
+        alertTone={message ? "error" : "success"}
+      />
       <PageTitle
         title={t("settings.title")}
         subtitle={t("settings.subtitle")}
@@ -108,9 +113,6 @@ export default function SettingsPage() {
           </button>
         }
       />
-      {saved ? <p className="settingsNotice">{t("settings.saved")}</p> : null}
-      {message ? <p className="emptyState">{message}</p> : null}
-
       <section className="grid">
         <article className="card">
           <h2><UserRound size={17} /> {t("settings.profile")}</h2>

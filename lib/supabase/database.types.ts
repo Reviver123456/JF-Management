@@ -14,6 +14,7 @@ export type Database = {
           region: string;
           owner: string;
           contract: string;
+          contract_details: Json;
           address: string;
           department: string;
           email: string;
@@ -30,6 +31,7 @@ export type Database = {
           region?: string;
           owner?: string;
           contract?: string;
+          contract_details?: Json;
           address?: string;
           department?: string;
           email?: string;
@@ -46,6 +48,7 @@ export type Database = {
           region?: string;
           owner?: string;
           contract?: string;
+          contract_details?: Json;
           address?: string;
           department?: string;
           email?: string;
@@ -66,6 +69,7 @@ export type Database = {
           start_time: string | null;
           end_time: string | null;
           result: string | null;
+          work_details: Json;
           created_at: string;
           updated_at: string;
         };
@@ -80,6 +84,7 @@ export type Database = {
           start_time?: string | null;
           end_time?: string | null;
           result?: string | null;
+          work_details?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -94,6 +99,7 @@ export type Database = {
           start_time?: string | null;
           end_time?: string | null;
           result?: string | null;
+          work_details?: Json;
           created_at?: string;
           updated_at?: string;
         };

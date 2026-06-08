@@ -47,6 +47,8 @@ export function usePmData(): PmDataState {
   useEffect(() => {
     let isCurrent = true;
 
+    // Fetches remote data once after mount; state updates happen after the async request resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData(() => isCurrent);
 
     return () => {

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CalendarDays, Eye, MapPin, Printer, UserRound, X } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
+import { FeedbackPopups } from "@/components/AppPopup";
 import { useUi } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
 import type { ReportRow } from "@/lib/pm-data";
@@ -32,8 +33,7 @@ export default function ReportsPage() {
   return (
     <AppShell>
       <div className="reportsPage">
-      {error ? <p className="emptyState">{error}</p> : null}
-      {isLoading ? <p className="emptyState">{t("pm.loadingSubtitle")}</p> : null}
+      <FeedbackPopups loading={isLoading} loadingMessage={t("pm.loadingSubtitle")} alertMessage={error} />
       <PageTitle title={t("reports.title")} subtitle={t("reports.subtitle")} />
       <section className="toolbar">
         <SearchControl placeholder={`${t("common.search")}...`} value={query} onChange={setQuery} />

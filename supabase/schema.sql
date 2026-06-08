@@ -10,6 +10,7 @@ create table public.sites (
   region text not null default '',
   owner text not null default '',
   contract text not null default '',
+  contract_details jsonb not null default '{}'::jsonb,
   address text not null default '',
   department text not null default '',
   email text not null default '',
@@ -28,6 +29,7 @@ create table public.pm_jobs (
   start_time time,
   end_time time,
   result text,
+  work_details jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

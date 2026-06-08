@@ -1,6 +1,63 @@
 export type WorkStatus = "completed" | "inProgress" | "pending" | "abnormal";
 
 type StatusClassName = "success" | "info" | "warning" | "danger";
+export type CheckResult = "ok" | "bad";
+export type FinalStatus = "normal" | "abnormal";
+
+export type SiteContractDetails = {
+  contractEndMonth?: string;
+  contractNote?: string;
+  contractStartMonth?: string;
+  pmCycle?: string;
+};
+
+export type SavedSparePart = {
+  id: number;
+  name: string;
+  quantity: string;
+  note: string;
+};
+
+export type SavedChecklistField = {
+  label: string;
+  placeholder?: string;
+  value?: string;
+};
+
+export type SavedChecklistBlock =
+  | { type: "fields"; title: string; fields: SavedChecklistField[]; columns?: "two" | "three" | "four" }
+  | { type: "checks"; title: string; items: string[] }
+  | { type: "radios"; label: string; items: string[] }
+  | { type: "diagTable"; title: string };
+
+export type SavedChecklistSet = {
+  title: string;
+  blocks: SavedChecklistBlock[];
+};
+
+export type SavedChecklistGroup = {
+  key: string;
+  title: string;
+  sets: SavedChecklistSet[];
+};
+
+export type PmWorkDetails = {
+  checkNotes?: Record<string, string>;
+  checkResults?: Record<string, CheckResult>;
+  checklistSnapshot?: SavedChecklistGroup[];
+  draftStatus?: "draft" | "submitted";
+  fieldValues?: Record<string, string>;
+  finalStatus?: FinalStatus | null;
+  inspector?: string;
+  photos?: Record<string, string[]>;
+  radioValues?: Record<string, string>;
+  savedAt?: string;
+  signerName?: string;
+  spareParts?: SavedSparePart[];
+  startTime?: string;
+  endTime?: string;
+  summaryNote?: string;
+};
 
 export type SiteCatalogRecord = {
   id: string;
@@ -12,6 +69,7 @@ export type SiteCatalogRecord = {
   region: string;
   owner: string;
   contract: string;
+  contractDetails?: SiteContractDetails;
   address: string;
   department: string;
   email: string;
@@ -27,6 +85,7 @@ export type PmJobRecord = {
   owner: string;
   startTime?: string;
   endTime?: string;
+  workDetails?: PmWorkDetails;
   result?: "ปกติ" | "ผิดปกติ";
 };
 
@@ -39,6 +98,7 @@ export type SiteRecord = SiteCatalogRecord & {
   owner: string;
   startTime?: string;
   endTime?: string;
+  workDetails?: PmWorkDetails;
   result?: "ปกติ" | "ผิดปกติ";
 };
 
@@ -53,6 +113,7 @@ export type ReportRow = {
   province: string;
   startTime: string;
   endTime: string;
+  workDetails?: PmWorkDetails;
   result: "ปกติ" | "ผิดปกติ";
 };
 
@@ -153,6 +214,29 @@ export function filterPmJobsByParticipant(pmJobs: PmJobRecord[], siteCatalog: Si
   return pmJobs.filter((job) => ownedSiteIds.has(job.siteId) || normalizeOwnerName(job.owner) === normalizedOwner);
 }
 
+export function getPmJobKey(job: Pick<PmJobRecord, "siteId" | "visitDate" | "visitTime">) {
+  return `${job.siteId}:${job.visitDate}:${job.visitTime}`;
+}
+
+export function getSiteRecordJobKey(site: Pick<SiteRecord, "id" | "visitDate" | "visitTime">) {
+  return `${site.id}:${site.visitDate}:${site.visitTime}`;
+}
+
+export function getUniquePmJobs(pmJobs: PmJobRecord[]) {
+  const jobsByKey = new Map<string, PmJobRecord>();
+
+  pmJobs.forEach((job) => {
+    const key = getPmJobKey(job);
+    const currentJob = jobsByKey.get(key);
+
+    if (!currentJob || getStatusWeight(job.status) > getStatusWeight(currentJob.status)) {
+      jobsByKey.set(key, job);
+    }
+  });
+
+  return Array.from(jobsByKey.values());
+}
+
 export function getScheduleDaysForSites(pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecord[]) {
   const siteById = new Map(siteCatalog.map((site) => [site.id, site]));
   const seenJobs = new Set<string>();
@@ -173,6 +257,19 @@ export function getScheduleDaysForSites(pmJobs: PmJobRecord[], siteCatalog: Site
   ).map(([day, jobs]) => ({ day, jobs }));
 }
 
+function getStatusWeight(status: WorkStatus) {
+  switch (status) {
+    case "abnormal":
+      return 4;
+    case "completed":
+      return 3;
+    case "inProgress":
+      return 2;
+    case "pending":
+      return 1;
+  }
+}
+
 function formatReportDate(date: string) {
   const [year, month, day] = date.split("-");
   return `${day}/${month}/${year}`;
@@ -187,7 +284,7 @@ export function buildPmAppData({
   pmJobs: PmJobRecord[];
   sites: SiteRecord[];
 }): PmAppData {
-  const siteById = new Map(siteCatalog.map((site) => [site.id, site]));
+  const uniquePmJobs = getUniquePmJobs(pmJobs);
 
   return {
     siteCatalog,
@@ -195,21 +292,37 @@ export function buildPmAppData({
     sites,
     metrics: [
       { id: "sites", value: String(siteCatalog.length), trend: "+0", color: "blue" },
-      { id: "monthly", value: String(pmJobs.filter((job) => job.visitDate.startsWith("2026-06")).length), trend: "+0", color: "purple" },
-      { id: "done", value: String(pmJobs.filter((job) => job.status === "completed").length), trend: "+0", color: "green" },
-      { id: "backlog", value: String(pmJobs.filter((job) => job.status === "pending" || job.status === "inProgress").length), trend: "", color: "orange" }
+      { id: "monthly", value: String(uniquePmJobs.filter((job) => job.visitDate.startsWith("2026-06")).length), trend: "+0", color: "purple" },
+      { id: "done", value: String(uniquePmJobs.filter((job) => job.status === "completed").length), trend: "+0", color: "green" },
+      { id: "backlog", value: String(uniquePmJobs.filter((job) => job.status === "pending" || job.status === "inProgress").length), trend: "", color: "orange" }
     ],
     scheduleDays: getScheduleDaysForSites(pmJobs, siteCatalog),
-    reportRows: pmJobs
-      .filter((job) => job.status === "completed" || job.status === "abnormal")
-      .flatMap((job) => {
-        const site = siteById.get(job.siteId);
+    reportRows: buildReportRows(pmJobs, siteCatalog),
+    provinces: Array.from(new Set(siteCatalog.map((site) => site.province))),
+    owners: Array.from(new Set(pmJobs.map((job) => job.owner))),
+    regions: Array.from(new Set(siteCatalog.map((site) => site.region)))
+  };
+}
 
-        if (!site) {
-          return [];
-        }
+function buildReportRows(pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecord[]) {
+  const siteById = new Map(siteCatalog.map((site) => [site.id, site]));
+  const reportRows = new Map<string, ReportRow>();
 
-        return {
+  pmJobs
+    .filter((job) => job.status === "completed" || job.status === "abnormal")
+    .forEach((job) => {
+      const site = siteById.get(job.siteId);
+
+      if (!site) {
+        return;
+      }
+
+      const key = getPmJobKey(job);
+      const currentRow = reportRows.get(key);
+      const result = job.result ?? (job.status === "abnormal" ? "ผิดปกติ" : "ปกติ");
+
+      if (!currentRow) {
+        reportRows.set(key, {
           id: job.id.replace("PM-", "R-"),
           jobId: job.id,
           siteId: site.id,
@@ -220,11 +333,24 @@ export function buildPmAppData({
           province: site.province,
           startTime: job.startTime ?? job.visitTime,
           endTime: job.endTime ?? "",
-          result: job.result ?? (job.status === "abnormal" ? "ผิดปกติ" : "ปกติ")
-        };
-      }),
-    provinces: Array.from(new Set(siteCatalog.map((site) => site.province))),
-    owners: Array.from(new Set(pmJobs.map((job) => job.owner))),
-    regions: Array.from(new Set(siteCatalog.map((site) => site.region)))
-  };
+          workDetails: job.workDetails,
+          result
+        });
+        return;
+      }
+
+      if (!currentRow.inspector.split(", ").some((inspector) => normalizeOwnerName(inspector) === normalizeOwnerName(job.owner))) {
+        currentRow.inspector = `${currentRow.inspector}, ${job.owner}`;
+      }
+
+      if (job.status === "abnormal") {
+        currentRow.result = result;
+      }
+
+      currentRow.startTime = currentRow.startTime || job.startTime || job.visitTime;
+      currentRow.endTime = currentRow.endTime || job.endTime || "";
+      currentRow.workDetails = currentRow.workDetails ?? job.workDetails;
+    });
+
+  return Array.from(reportRows.values()).sort((first, second) => second.date.localeCompare(first.date));
 }

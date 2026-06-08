@@ -1,11 +1,19 @@
-import { buildPmAppData, type PmJobRecord, type SiteCatalogRecord, type SiteRecord } from "@/lib/pm-data";
+import { buildPmAppData, type PmJobRecord, type PmWorkDetails, type SiteCatalogRecord, type SiteContractDetails, type SiteRecord } from "@/lib/pm-data";
 import { createClient } from "@/lib/supabase/server";
-import type { Database } from "@/lib/supabase/database.types";
+import type { Database, Json } from "@/lib/supabase/database.types";
 
 type SiteRow = Database["public"]["Tables"]["sites"]["Row"];
 type PmJobRow = Database["public"]["Tables"]["pm_jobs"]["Row"];
 type PmJobWithSiteRow = PmJobRow & { sites: SiteRow | null };
 type WorkResult = NonNullable<PmJobRecord["result"]>;
+
+function toWorkDetails(value: Json | undefined): PmWorkDetails | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as PmWorkDetails : undefined;
+}
+
+function toContractDetails(value: Json | undefined): SiteContractDetails | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as SiteContractDetails : undefined;
+}
 
 function toWorkResult(value: string | null): PmJobRecord["result"] {
   return value === "ปกติ" || value === "ผิดปกติ" ? value as WorkResult : undefined;
@@ -22,6 +30,7 @@ function toSiteCatalogRecord(row: SiteRow): SiteCatalogRecord {
     region: row.region,
     owner: row.owner,
     contract: row.contract,
+    contractDetails: toContractDetails(row.contract_details),
     address: row.address,
     department: row.department,
     email: row.email
@@ -39,6 +48,7 @@ function toPmJobRecord(row: PmJobRow): PmJobRecord {
     owner: row.owner,
     startTime: row.start_time ?? undefined,
     endTime: row.end_time ?? undefined,
+    workDetails: toWorkDetails(row.work_details),
     result: toWorkResult(row.result)
   };
 }
@@ -60,6 +70,7 @@ function toSiteRecord(row: PmJobWithSiteRow): SiteRecord | null {
     owner: site.owner,
     startTime: row.start_time ?? undefined,
     endTime: row.end_time ?? undefined,
+    workDetails: toWorkDetails(row.work_details),
     result: toWorkResult(row.result)
   };
 }
@@ -183,6 +194,7 @@ export async function listReportRowsFromDb() {
       province: site.province,
       startTime: row.start_time ?? row.visit_time,
       endTime: row.end_time ?? "",
+      workDetails: toWorkDetails(row.work_details),
       result: row.result ?? (row.status === "abnormal" ? "ผิดปกติ" : "ปกติ")
     };
   });

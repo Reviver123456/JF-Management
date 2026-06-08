@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LockKeyhole, Shield, UserRound } from "lucide-react";
+import { FeedbackPopups } from "@/components/AppPopup";
 import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 
@@ -38,6 +39,7 @@ export default function LoginPage() {
 
   return (
     <main className="loginPage">
+      <FeedbackPopups loading={isSubmitting} loadingMessage={t("pm.loadingSubtitle")} alertMessage={message} />
       <section className="card">
         <div className="brand">
           <span><Shield size={24} /></span>
@@ -81,9 +83,8 @@ export default function LoginPage() {
               />
             </span>
           </label>
-          {message ? <p className="emptyState">{message}</p> : null}
           <button className="button primary" type="submit" disabled={isSubmitting}>
-            {isSubmitting ? t("pm.loadingSubtitle") : t("login.signIn")}
+            {t("login.signIn")}
           </button>
         </form>
       </section>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { normalizeOwnerName } from "@/lib/pm-data";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 
 type PmJobInsert = Database["public"]["Tables"]["pm_jobs"]["Insert"];
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Missing site, date, or time." }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { data: site, error: siteError } = await supabase
       .from("sites")
       .select("id, owner")

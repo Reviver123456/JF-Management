@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, MapPin, Plus, UserRound, X } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
+import { AlertPopup, FeedbackPopups } from "@/components/AppPopup";
 import type { SystemUser } from "@/lib/auth/system-users";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { useUi, type Lang } from "@/lib/i18n";
@@ -153,10 +154,11 @@ export default function SchedulePage() {
   return (
     <AppShell>
       <div className="schedulePage">
-        {error ? <p className="emptyState">{error}</p> : null}
-        {userError ? <p className="emptyState">{userError}</p> : null}
-        {usersError ? <p className="emptyState">{usersError}</p> : null}
-        {pageIsLoading ? <p className="emptyState">{t("pm.loadingSubtitle")}</p> : null}
+        <FeedbackPopups
+          loading={pageIsLoading}
+          loadingMessage={t("pm.loadingSubtitle")}
+          alertMessage={error ?? userError ?? usersError}
+        />
         <PageTitle title={t("schedule.title")} subtitle={t("schedule.subtitle")} />
         <section className="layout">
           <article className="calendarPanel">
@@ -367,7 +369,7 @@ function AddPlanModal({
             ))}
           </div>
         </label>
-        {saveError ? <p className="emptyState">{saveError}</p> : null}
+        <AlertPopup open={Boolean(saveError)} tone="error" message={saveError} onClose={() => setSaveError("")} />
         <footer className="modalActions">
           <button className="button ghost" type="button" onClick={onClose}>{t("common.cancel")}</button>
           <button className="button primary" type="submit" disabled={!selectedSiteId || isSaving}>{t("schedule.addJob")}</button>

@@ -14,9 +14,10 @@ import {
   Wrench
 } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
+import { FeedbackPopups } from "@/components/AppPopup";
 import { useUi } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
-import { getWorkSiteByJobId, type ReportRow, type SiteRecord } from "@/lib/pm-data";
+import { getWorkSiteByJobId, type ReportRow, type SavedChecklistGroup, type SiteRecord } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
 
 const checklistTabs = ["SYNAPSE", "Server", "Switch", "Storage", "Environment", "DIAG"] as const;
@@ -30,7 +31,10 @@ export default function HistoryPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [activeReport, setActiveReport] = useState<ReportRow | null>(null);
-  const activeSite = activeReport ? getWorkSiteByJobId(data.sites, activeReport.jobId) : null;
+  const activeSite = activeReport
+    ? data.sites.find((site) => site.id === activeReport.siteId && site.visitDate === toInputDate(activeReport.date))
+      ?? getWorkSiteByJobId(data.sites, activeReport.jobId)
+    : null;
 
   const filteredRows = reportRows.filter((row) => {
     const searchableText = `${row.site} ${row.customer} ${row.inspector} ${row.province}`.toLowerCase();
@@ -55,8 +59,7 @@ export default function HistoryPage() {
         </div>
       ) : (
         <div className="historyPage">
-          {error ? <p className="emptyState">{error}</p> : null}
-          {isLoading ? <p className="emptyState">{t("pm.loadingSubtitle")}</p> : null}
+          <FeedbackPopups loading={isLoading} loadingMessage={t("pm.loadingSubtitle")} alertMessage={error} />
           <PageTitle title={t("history.title")} subtitle={t("history.subtitle")} />
           <section className="toolbar">
             <SearchControl placeholder={`${t("common.search")}...`} value={query} onChange={setQuery} />
@@ -186,7 +189,7 @@ function HistoryDetailView({
         <div className="templateList">
           <section className="templateSet">
             <h3 className="checkSectionTitle">{activeTab}</h3>
-            <p className="emptyChecklist">{t("reports.resultPrefix")}: {localizeLabel(report.result, lang)}</p>
+            <HistoryChecklistDetails activeTab={activeTab} report={report} />
           </section>
         </div>
       </section>
@@ -210,6 +213,173 @@ function Info({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function HistoryChecklistDetails({
+  activeTab,
+  report
+}: {
+  activeTab: (typeof checklistTabs)[number];
+  report: ReportRow;
+}) {
+  const { lang, t } = useUi();
+  const groupKey = toChecklistGroupKey(activeTab);
+  const group = report.workDetails?.checklistSnapshot?.find((item) => item.key === groupKey);
+
+  if (!group) {
+    return <p className="emptyChecklist">{t("reports.resultPrefix")}: {localizeLabel(report.result, lang)}</p>;
+  }
+
+  return (
+    <div className="historyChecklistDetail">
+      {group.sets.map((set) => (
+        <section className="templateSet" key={set.title}>
+          <h3 className="checkSectionTitle">{set.title}</h3>
+          {set.blocks.map((block, blockIndex) => (
+            <HistoryChecklistBlock
+              key={`${set.title}-${blockIndex}`}
+              block={block}
+              blockIndex={blockIndex}
+              group={group}
+              report={report}
+              setTitle={set.title}
+            />
+          ))}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function HistoryChecklistBlock({
+  block,
+  blockIndex,
+  group,
+  report,
+  setTitle
+}: {
+  block: SavedChecklistGroup["sets"][number]["blocks"][number];
+  blockIndex: number;
+  group: SavedChecklistGroup;
+  report: ReportRow;
+  setTitle: string;
+}) {
+  const { lang, t } = useUi();
+  const details = report.workDetails;
+  const resultPrefix = `${group.key}:${setTitle}:${blockIndex}`;
+
+  if (block.type === "fields") {
+    return (
+      <section className="templateBlock">
+        <h4>{localizeLabel(block.title, lang)}</h4>
+        <div className="savedDetailGrid">
+          {block.fields.map((field) => {
+            const key = historyFieldKey(group.key, setTitle, blockIndex, field.label);
+            const value = details?.fieldValues?.[key] ?? field.value ?? "-";
+
+            return <Info key={key} label={localizeLabel(field.label, lang)} value={value || "-"} />;
+          })}
+        </div>
+      </section>
+    );
+  }
+
+  if (block.type === "radios") {
+    const key = historyRadioKey(group.key, setTitle, blockIndex, block.label);
+    const value = details?.radioValues?.[key] ?? block.items[0] ?? "-";
+
+    return (
+      <section className="templateBlock">
+        <Info label={localizeLabel(block.label, lang)} value={localizeLabel(value, lang)} />
+      </section>
+    );
+  }
+
+  if (block.type === "diagTable") {
+    const rows = ["Monitor", "Mouse", "Keyboard", "PC", "UPS"].flatMap((device) => (
+      ["Cleaning", "Availability", "Abnormal", "Repaired"].map((column) => {
+        const key = `${resultPrefix}:${device}:${column}`;
+        return {
+          key,
+          label: `${device} ${column}`,
+          result: details?.checkResults?.[key],
+          note: details?.checkNotes?.[key]
+        };
+      })
+    ));
+
+    return (
+      <section className="templateBlock">
+        <h4>{localizeLabel(block.title, lang)}</h4>
+        <div className="savedChecklistRows">
+          {rows.map((row) => (
+            <SavedChecklistRow
+              key={row.key}
+              label={row.label}
+              note={row.note}
+              result={row.result}
+            />
+          ))}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="templateBlock">
+      <h4>{localizeLabel(block.title, lang)}</h4>
+      <div className="savedChecklistRows">
+        {block.items.map((item) => {
+          const key = `${resultPrefix}:${block.title}:${item}`;
+          return (
+            <SavedChecklistRow
+              key={key}
+              label={localizeLabel(item, lang)}
+              note={details?.checkNotes?.[key]}
+              result={details?.checkResults?.[key]}
+            />
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function SavedChecklistRow({
+  label,
+  note,
+  result
+}: {
+  label: string;
+  note?: string;
+  result?: "ok" | "bad";
+}) {
+  const { t } = useUi();
+  const resultLabel = result === "ok"
+    ? t("pm.pass")
+    : result === "bad" ? t("pm.fail") : "-";
+
+  return (
+    <div className="savedChecklistRow">
+      <strong>{label}</strong>
+      <span className={result === "bad" ? "statusPill danger" : result === "ok" ? "statusPill success" : "statusPill warning"}>
+        {resultLabel}
+      </span>
+      {note ? <p>{t("common.note")}: {note}</p> : null}
+    </div>
+  );
+}
+
+function toChecklistGroupKey(tab: (typeof checklistTabs)[number]) {
+  return tab.toLowerCase();
+}
+
+function historyFieldKey(groupKey: string, setTitle: string, blockIndex: number, label: string) {
+  return `${groupKey}:field:${setTitle}:${blockIndex}:${label}`;
+}
+
+function historyRadioKey(groupKey: string, setTitle: string, blockIndex: number, label: string) {
+  return `${groupKey}:radio:${setTitle}:${blockIndex}:${label}`;
 }
 
 function toInputDate(date: string) {

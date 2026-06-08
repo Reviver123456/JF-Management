@@ -3,8 +3,19 @@
 import Link from "next/link";
 import { Building2, CalendarCheck2, CheckCircle2, Clock3, ClipboardCheck, MapPin, Timer } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
+import { FeedbackPopups } from "@/components/AppPopup";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { useUi } from "@/lib/i18n";
-import { getDateString, getWorkSitesByDate, statusMeta } from "@/lib/pm-data";
+import {
+  filterPmJobsByParticipant,
+  filterSitesByOwner,
+  getDateString,
+  getSiteRecordJobKey,
+  getUniquePmJobs,
+  getWorkSitesByDate,
+  statusMeta,
+  type Metric
+} from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
 
 const metricIcons = {
@@ -29,8 +40,18 @@ const statusLabelKeys = {
 export default function DashboardPage() {
   const { t } = useUi();
   const { data, error, isLoading } = usePmData();
-  const { metrics, sites } = data;
+  const { error: userError, isLoading: isUserLoading, userName } = useCurrentUser();
   const todayDate = getDateString();
+  const assignedSites = filterSitesByOwner(data.siteCatalog, userName);
+  const visiblePmJobs = getUniquePmJobs(filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, userName));
+  const visiblePmJobKeys = new Set(visiblePmJobs.map((job) => `${job.siteId}:${job.visitDate}:${job.visitTime}`));
+  const sites = data.sites.filter((site) => visiblePmJobKeys.has(getSiteRecordJobKey(site)));
+  const metrics: Metric[] = [
+    { id: "sites", value: String(assignedSites.length), trend: "+0", color: "blue" },
+    { id: "monthly", value: String(visiblePmJobs.filter((job) => job.visitDate.startsWith("2026-06")).length), trend: "+0", color: "purple" },
+    { id: "done", value: String(visiblePmJobs.filter((job) => job.status === "completed").length), trend: "+0", color: "green" },
+    { id: "backlog", value: String(visiblePmJobs.filter((job) => job.status === "pending" || job.status === "inProgress").length), trend: "", color: "orange" }
+  ];
   const today = getWorkSitesByDate(sites, todayDate);
   const completedCount = sites.filter((site) => site.status === "completed").length;
   const inProgressCount = sites.filter((site) => site.status === "inProgress").length;
@@ -41,9 +62,8 @@ export default function DashboardPage() {
   return (
     <AppShell>
       <div className="dashboardPage">
+        <FeedbackPopups loading={isLoading || isUserLoading} loadingMessage={t("pm.loadingSubtitle")} alertMessage={error ?? userError} />
         <PageTitle title={t("dashboard.title")} subtitle={t("dashboard.subtitle")} />
-        {error ? <p className="emptyState">{error}</p> : null}
-        {isLoading ? <p className="emptyState">{t("pm.loadingSubtitle")}</p> : null}
 
         <section className="metrics">
           {metrics.map((metric) => {
@@ -82,7 +102,9 @@ export default function DashboardPage() {
                       </small>
                       <span className={`statusPill ${status.className}`}>{t(statusLabelKeys[site.status])}</span>
                     </div>
-                    <Link className="button primary" href={`/pm-work?siteId=${site.id}`}>{t("common.startWork")}</Link>
+                    {site.status !== "completed" ? (
+                      <Link className="button primary" href={`/pm-work?siteId=${site.id}`}>{t("common.startWork")}</Link>
+                    ) : null}
                   </div>
                 );
               })}
