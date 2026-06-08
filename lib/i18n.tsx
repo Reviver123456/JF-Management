@@ -1,0 +1,649 @@
+"use client";
+
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode
+} from "react";
+
+export type Lang = "th" | "en";
+export type ThemeMode = "light" | "dark";
+
+type DictionaryValue = string | Dictionary;
+
+interface Dictionary {
+  [key: string]: DictionaryValue;
+}
+
+const dictionaries: Record<Lang, Dictionary> = {
+  th: {
+    app: {
+      name: "PM Site",
+      fullName: "ระบบบริหารจัดการงาน PM Site",
+      tagline: "วางแผน ติดตาม ตรวจสอบ และรายงานงาน PM ในที่เดียว"
+    },
+    nav: {
+      login: "เข้าสู่ระบบ",
+      dashboard: "แดชบอร์ด",
+      pmWork: "ปฏิบัติงาน PM",
+      sites: "จัดการไซต์",
+      schedule: "แผนงาน",
+      history: "ประวัติ",
+      reports: "รายงาน",
+      settings: "ตั้งค่า"
+    },
+    navMobile: {
+      dashboard: "แดชบอร์ด",
+      pmWork: "งาน PM",
+      sites: "ไซต์",
+      schedule: "แผนงาน",
+      history: "ประวัติ",
+      reports: "รายงาน",
+      settings: "ตั้งค่า"
+    },
+    common: {
+      search: "ค้นหา",
+      filter: "ตัวกรอง",
+      add: "เพิ่ม",
+      save: "บันทึก",
+      saveDraft: "บันทึกร่าง",
+      submit: "บันทึกข้อมูล",
+      back: "ย้อนกลับ",
+      cancel: "ยกเลิก",
+      close: "ปิด",
+      download: "ดาวน์โหลด",
+      view: "ดูรายละเอียด",
+      edit: "แก้ไข",
+      startWork: "เริ่มงาน",
+      print: "พิมพ์",
+      openMap: "เปิดแผนที่นำทาง",
+      language: "ภาษา",
+      theme: "ธีม",
+      light: "สว่าง",
+      dark: "มืด",
+      system: "ตามระบบ",
+      all: "ทั้งหมด",
+      normal: "ปกติ",
+      abnormal: "ผิดปกติ",
+      pending: "คงค้าง",
+      completed: "เสร็จแล้ว",
+      inProgress: "กำลังดำเนินการ",
+      scheduled: "ลงแผนแล้ว",
+      unscheduled: "ยังไม่ลงแผน",
+      today: "วันนี้",
+      month: "เดือน",
+      year: "ปี",
+      owner: "ผู้รับผิดชอบ",
+      region: "ภาค / เขต",
+      status: "สถานะ",
+      dateRange: "ช่วงวันที่",
+      customer: "ลูกค้า",
+      phone: "เบอร์โทรศัพท์",
+      province: "จังหวัด",
+      site: "ไซต์",
+      inspector: "ผู้ตรวจสอบ",
+      note: "หมายเหตุ",
+      result: "ผลการดำเนินงาน",
+      jobs: "งาน",
+      files: "ไฟล์",
+      active: "ใช้งาน",
+      inactive: "ไม่ใช้งาน",
+      datePlaceholder: "วว/ดด/ปปปป",
+      phonePrefix: "โทร",
+      provincePrefix: "จังหวัด",
+      inspectorPrefix: "ผู้ตรวจ",
+      ownerPrefix: "ผู้รับผิดชอบ",
+      menu: "เมนู",
+      closeMenu: "ปิดเมนู",
+      collapseMenu: "ย่อเมนู",
+      expandMenu: "ขยายเมนู",
+      logout: "ออกจากระบบ",
+      role: "ผู้ดูแลระบบ PM"
+    },
+    workStatus: {
+      completed: "เสร็จแล้ว",
+      inProgress: "กำลังดำเนินการ",
+      pending: "รอดำเนินการ",
+      abnormal: "ผิดปกติ"
+    },
+    fields: {
+      username: "ชื่อผู้ใช้งาน",
+      email: "อีเมล",
+      phone: "เบอร์โทรศัพท์",
+      contactOther: "ข้อมูลติดต่ออื่น ๆ",
+      siteName: "ชื่อไซต์",
+      customerName: "ชื่อลูกค้า",
+      contactName: "ชื่อผู้ติดต่อ",
+      department: "แผนก",
+      regionArea: "ภาค / เขตพื้นที่",
+      selectRegion: "เลือกภาค",
+      siteOwner: "ผู้รับผิดชอบไซต์",
+      latitude: "ละติจูด",
+      longitude: "ลองจิจูด",
+      pmCycle: "รอบการ PM",
+      contractNumber: "เลขที่สัญญา",
+      contractNote: "หมายเหตุสัญญา",
+      startTime: "เวลาเริ่มงาน",
+      endTime: "เวลาเสร็จงาน",
+      signerName: "ชื่อผู้ลงนาม",
+      sparePart: "อะไหล่",
+      sparePartName: "ชื่ออะไหล่",
+      quantity: "จำนวน",
+      additionalDetail: "รายละเอียดเพิ่มเติม",
+      inspectorNote: "หมายเหตุจากผู้ตรวจสอบ",
+      siteSelect: "เลือกไซต์",
+      operationTime: "เวลาเข้าดำเนินงาน",
+      date: "วันที่"
+    },
+    login: {
+      title: "เข้าสู่ระบบ PM Site",
+      subtitle: "แดชบอร์ดสำหรับทีม Preventive Maintenance หน้างานและผู้จัดการไซต์",
+      email: "อีเมลหรือชื่อผู้ใช้",
+      password: "รหัสผ่าน",
+      remember: "จดจำอุปกรณ์นี้",
+      signIn: "เข้าสู่ระบบ",
+      username: "ชื่อผู้ใช้งาน",
+      fieldReady: "พร้อมใช้งานภาคสนาม",
+      secure: "ยืนยันตัวตนแบบปลอดภัย",
+      device: "ออกแบบสำหรับ Web, iPad และโทรศัพท์"
+    },
+    dashboard: {
+      title: "แดชบอร์ด",
+      subtitle: "ภาพรวมไซต์ งานประจำเดือน และรายการที่ต้องเข้าดำเนินการ",
+      overview: "ภาพรวมงาน PM",
+      todayWork: "งานวันนี้",
+      fieldMap: "แผนที่ไซต์วันนี้",
+      workload: "สถานะงาน",
+      totalSites: "ไซต์ทั้งหมด",
+      monthlyJobs: "งานเดือนนี้",
+      doneJobs: "เสร็จแล้ว",
+      backlog: "คงค้าง",
+      nextSite: "ไซต์ถัดไป",
+      urgent: "ต้องติดตาม"
+    },
+    pm: {
+      title: "ปฏิบัติงาน PM",
+      subtitle: "บันทึกเวลา ตรวจสอบเช็กลิสต์ แนบรูป และสรุปผลหน้างาน",
+      siteSummary: "ข้อมูลสรุปของไซต์",
+      map: "แผนที่นำทางไปยังไซต์",
+      workTime: "เวลาปฏิบัติงาน",
+      siteDetail: "รายละเอียดข้อมูลของไซต์",
+      checklist: "รายการเช็กลิสต์",
+      photos: "รูปถ่ายอุปกรณ์และภาพหน้างาน",
+      suggestions: "ข้อเสนอแนะและหมายเหตุ",
+      parts: "อะไหล่ที่เปลี่ยน",
+      result: "สรุปผลการดำเนินงาน",
+      signature: "ลายเซ็นลูกค้า",
+      addDiag: "เพิ่มชุด DIAG",
+      photoCaption: "คำอธิบายรูปภาพ",
+      customerSigner: "ชื่อผู้ลงนาม",
+      listSubtitle: "รายการงาน PM ทั้งหมด",
+      loadingSubtitle: "กำลังโหลดข้อมูลงาน PM",
+      allStatuses: "ทุกสถานะ",
+      searchSites: "ค้นหาไซต์...",
+      todayOnlySubtitle: "งาน PM ของวันนี้เท่านั้น",
+      noTodayJobs: "ไม่มีงาน PM สำหรับวันนี้",
+      siteInfo: "ข้อมูลไซต์",
+      phoneShort: "โทร",
+      region: "ภาค",
+      pmCycle: "รอบ PM",
+      navigateGoogleMaps: "นำทางไป Google Maps",
+      noChecklist: "ไซต์นี้ยังไม่ได้เลือกหมวดเช็กลิสต์",
+      addPart: "เพิ่มอะไหล่",
+      normalCondition: "สภาพปกติ",
+      signaturePad: "ลายเซ็น",
+      clearSignature: "ล้างลายเซ็น",
+      device: "อุปกรณ์",
+      pass: "ผ่าน",
+      fail: "ไม่ผ่าน",
+      devicePhoto: "รูปอุปกรณ์",
+      overviewPhoto: "รูปภาพรวม",
+      issuePhoto: "รูปจุดที่พบปัญหา",
+      partPhoto: "รูปอะไหล่"
+    },
+    sites: {
+      title: "จัดการไซต์",
+      subtitle: "เพิ่ม แก้ไข ค้นหา และกำหนดรายการตรวจสอบของแต่ละไซต์",
+      addSite: "เพิ่มไซต์",
+      customerInfo: "ข้อมูลลูกค้าและไซต์",
+      contract: "ข้อมูลสัญญา",
+      checklistSetup: "รายการที่ต้องตรวจสอบ",
+      allSites: "รายการไซต์ทั้งหมด",
+      searchSites: "ค้นหาไซต์",
+      contractFile: "ไฟล์หนังสือสัญญา PDF",
+      selectedItems: "หัวข้อที่เลือก",
+      countSubtitle: "ไซต์ในระบบ",
+      searchPlaceholder: "ค้นหาไซต์หรือลูกค้า...",
+      allRegions: "ทั้งหมด",
+      allStatuses: "ทุกสถานะ",
+      noSites: "ไม่พบไซต์ตามเงื่อนไขที่เลือก",
+      addModalTitle: "เพิ่มไซต์ใหม่",
+      editModalTitle: "แก้ไขข้อมูลไซต์",
+      saveSite: "บันทึกไซต์",
+      customerTab: "ข้อมูลลูกค้า",
+      contractTab: "ข้อมูลสัญญา",
+      attachContract: "แนบไฟล์สัญญา (PDF)",
+      uploadPdf: "คลิกเพื่ออัปโหลด PDF",
+      inspectionCategories: "รายการที่ต้องตรวจสอบ (เลือกหมวดหมู่)",
+      addSynapseSet: "เพิ่ม SYNAPSE ชุดใหม่",
+      addDeviceSet: "เพิ่ม {device} ชุดใหม่",
+      addEnvironmentSet: "เพิ่ม Environment ชุดใหม่",
+      addDiagSet: "เพิ่ม DIAG ชุดใหม่",
+      diagSetTitle: "DIAG ชุดที่",
+      deviceInspectionList: "รายการตรวจสอบอุปกรณ์",
+      environmentChecklist: "ENVIRONMENT CHECKLIST: สภาพแวดล้อม",
+      cablingPowerChecklist: "ENVIRONMENT CHECKLIST: ระบบสายสัญญาณและระบบไฟฟ้า"
+    },
+    schedule: {
+      title: "แผนงาน",
+      subtitle: "วางแผนการเข้าดำเนินงาน PM ในรูปแบบปฏิทิน",
+      calendar: "ปฏิทินแผนงาน",
+      unplanned: "ไซต์ที่ยังไม่ได้ลงแผนประจำเดือน",
+      assign: "จัดตาราง",
+      previousMonth: "เดือนก่อนหน้า",
+      nextMonth: "เดือนถัดไป",
+      chooseDate: "เลือกวันที่",
+      noWorkToday: "ไม่มีงานในวันนี้",
+      chooseDateToAddJob: "เลือกวันที่ในปฏิทินเพื่อเพิ่มงาน",
+      addJob: "เพิ่มงาน",
+      siteUnit: "ไซต์",
+      addModalTitle: "เพิ่มงาน PM",
+      deleteJob: "ลบงาน"
+    },
+    history: {
+      title: "ประวัติการดำเนินงาน",
+      subtitle: "ค้นหาและดูข้อมูลย้อนหลังของไซต์ที่ดำเนินงาน PM แล้ว",
+      searchHistory: "ค้นหาประวัติ",
+      list: "รายการประวัติการดำเนินงาน",
+      detail: "รายละเอียดงานที่ดำเนินการ",
+      empty: "ไม่พบประวัติตามเงื่อนไขที่เลือก"
+    },
+    reports: {
+      title: "รายงาน",
+      subtitle: "ค้นหา ดูรายละเอียด และดาวน์โหลดรายงาน PM",
+      searchReports: "ค้นหารายงาน",
+      reportList: "รายการรายงาน",
+      export: "บันทึกหรือดาวน์โหลดรายงาน",
+      daily: "รายงานตามวันที่",
+      range: "รายงานตามช่วงวันที่",
+      bySite: "รายงานตามไซต์",
+      byOwner: "รายงานตามผู้รับผิดชอบ",
+      empty: "ไม่พบรายงานตามเงื่อนไขที่เลือก",
+      modalTitle: "รายงาน PM",
+      siteInfo: "ข้อมูลไซต์",
+      summary: "สรุปผล",
+      resultPrefix: "ผลการดำเนินงาน",
+      startTime: "เวลาเริ่ม",
+      endTime: "เวลาเสร็จ"
+    },
+    settings: {
+      title: "ตั้งค่า",
+      subtitle: "จัดการข้อมูลผู้ใช้งาน ภาษา และธีมของระบบ",
+      profile: "ข้อมูลส่วนตัว",
+      password: "เปลี่ยนรหัสผ่าน",
+      language: "ตั้งค่าภาษา",
+      theme: "ตั้งค่าธีมการแสดงผล",
+      oldPassword: "รหัสผ่านเดิม",
+      newPassword: "รหัสผ่านใหม่",
+      confirmPassword: "ยืนยันรหัสผ่านใหม่",
+      saved: "บันทึกการตั้งค่าแล้ว",
+      thai: "ภาษาไทย",
+      english: "English",
+      darkTheme: "ธีมมืด",
+      lightTheme: "ธีมสว่าง"
+    }
+  },
+  en: {
+    app: {
+      name: "PM Site",
+      fullName: "PM Site Management",
+      tagline: "Plan, track, inspect, and report PM operations in one place"
+    },
+    nav: {
+      login: "Login",
+      dashboard: "Dashboard",
+      pmWork: "PM Work",
+      sites: "Site Management",
+      schedule: "Schedule",
+      history: "History",
+      reports: "Reports",
+      settings: "Settings"
+    },
+    navMobile: {
+      dashboard: "Home",
+      pmWork: "PM",
+      sites: "Sites",
+      schedule: "Plan",
+      history: "History",
+      reports: "Reports",
+      settings: "Settings"
+    },
+    common: {
+      search: "Search",
+      filter: "Filter",
+      add: "Add",
+      save: "Save",
+      saveDraft: "Save draft",
+      submit: "Submit",
+      back: "Back",
+      cancel: "Cancel",
+      close: "Close",
+      download: "Download",
+      view: "View details",
+      edit: "Edit",
+      startWork: "Start",
+      print: "Print",
+      openMap: "Open navigation",
+      language: "Language",
+      theme: "Theme",
+      light: "Light",
+      dark: "Dark",
+      system: "System",
+      all: "All",
+      normal: "Normal",
+      abnormal: "Abnormal",
+      pending: "Pending",
+      completed: "Completed",
+      inProgress: "In progress",
+      scheduled: "Scheduled",
+      unscheduled: "Unscheduled",
+      today: "Today",
+      month: "Month",
+      year: "Year",
+      owner: "Owner",
+      region: "Region",
+      status: "Status",
+      dateRange: "Date range",
+      customer: "Customer",
+      phone: "Phone",
+      province: "Province",
+      site: "Site",
+      inspector: "Inspector",
+      note: "Note",
+      result: "Result",
+      jobs: "jobs",
+      files: "files",
+      active: "Active",
+      inactive: "Inactive",
+      datePlaceholder: "dd/mm/yyyy",
+      phonePrefix: "Phone",
+      provincePrefix: "Province",
+      inspectorPrefix: "Inspector",
+      ownerPrefix: "Owner",
+      menu: "Menu",
+      closeMenu: "Close menu",
+      collapseMenu: "Collapse menu",
+      expandMenu: "Expand menu",
+      logout: "Logout",
+      role: "PM Administrator"
+    },
+    workStatus: {
+      completed: "Completed",
+      inProgress: "In progress",
+      pending: "Pending",
+      abnormal: "Abnormal"
+    },
+    fields: {
+      username: "Username",
+      email: "Email",
+      phone: "Phone",
+      contactOther: "Other contact",
+      siteName: "Site name",
+      customerName: "Customer name",
+      contactName: "Contact name",
+      department: "Department",
+      regionArea: "Region / Area",
+      selectRegion: "Select region",
+      siteOwner: "Site owner",
+      latitude: "Latitude",
+      longitude: "Longitude",
+      pmCycle: "PM cycle",
+      contractNumber: "Contract number",
+      contractNote: "Contract note",
+      startTime: "Start time",
+      endTime: "Finish time",
+      signerName: "Signer name",
+      sparePart: "Part",
+      sparePartName: "Part name",
+      quantity: "Quantity",
+      additionalDetail: "Additional detail",
+      inspectorNote: "Inspector note",
+      siteSelect: "Select site",
+      operationTime: "Operation time",
+      date: "Date"
+    },
+    login: {
+      title: "Sign in to PM Site",
+      subtitle: "A field-ready Preventive Maintenance dashboard for site teams and managers",
+      email: "Email or username",
+      password: "Password",
+      remember: "Remember this device",
+      signIn: "Sign in",
+      username: "Username",
+      fieldReady: "Field-ready workflow",
+      secure: "Secure authentication",
+      device: "Designed for web, iPad, and phones"
+    },
+    dashboard: {
+      title: "Dashboard",
+      subtitle: "Overview of sites, monthly jobs, and today’s field work",
+      overview: "PM Overview",
+      todayWork: "Today’s Work",
+      fieldMap: "Today’s Site Map",
+      workload: "Work Status",
+      totalSites: "Total sites",
+      monthlyJobs: "This month",
+      doneJobs: "Completed",
+      backlog: "Backlog",
+      nextSite: "Next site",
+      urgent: "Needs follow-up"
+    },
+    pm: {
+      title: "PM Work",
+      subtitle: "Record time, complete checklists, attach photos, and summarize field results",
+      siteSummary: "Site Summary",
+      map: "Navigation Map",
+      workTime: "Work Time",
+      siteDetail: "Site Details",
+      checklist: "Checklist",
+      photos: "Equipment and Field Photos",
+      suggestions: "Suggestions and Notes",
+      parts: "Changed Parts",
+      result: "Operation Summary",
+      signature: "Customer Signature",
+      addDiag: "Add DIAG set",
+      photoCaption: "Photo caption",
+      customerSigner: "Signer name",
+      listSubtitle: "All PM jobs",
+      loadingSubtitle: "Loading PM jobs",
+      allStatuses: "All statuses",
+      searchSites: "Search sites...",
+      todayOnlySubtitle: "PM jobs scheduled for today only",
+      noTodayJobs: "No PM jobs scheduled for today",
+      siteInfo: "Site information",
+      phoneShort: "Phone",
+      region: "Region",
+      pmCycle: "PM cycle",
+      navigateGoogleMaps: "Open Google Maps",
+      noChecklist: "No checklist category selected for this site",
+      addPart: "Add part",
+      normalCondition: "Normal condition",
+      signaturePad: "Signature",
+      clearSignature: "Clear signature",
+      device: "Device",
+      pass: "Pass",
+      fail: "Fail",
+      devicePhoto: "Device photo",
+      overviewPhoto: "Overview photo",
+      issuePhoto: "Issue photo",
+      partPhoto: "Part photo"
+    },
+    sites: {
+      title: "Site Management",
+      subtitle: "Add, edit, search, and configure inspection items per site",
+      addSite: "Add site",
+      customerInfo: "Customer and Site Info",
+      contract: "Contract Info",
+      checklistSetup: "Inspection Items",
+      allSites: "All Sites",
+      searchSites: "Search Sites",
+      contractFile: "Contract PDF",
+      selectedItems: "Selected items",
+      countSubtitle: "sites in the system",
+      searchPlaceholder: "Search site or customer...",
+      allRegions: "All regions",
+      allStatuses: "All statuses",
+      noSites: "No sites match the selected filters",
+      addModalTitle: "Add new site",
+      editModalTitle: "Edit site details",
+      saveSite: "Save site",
+      customerTab: "Customer info",
+      contractTab: "Contract info",
+      attachContract: "Attach contract file (PDF)",
+      uploadPdf: "Click to upload PDF",
+      inspectionCategories: "Inspection items (select categories)",
+      addSynapseSet: "Add SYNAPSE set",
+      addDeviceSet: "Add {device} set",
+      addEnvironmentSet: "Add Environment set",
+      addDiagSet: "Add DIAG set",
+      diagSetTitle: "DIAG set",
+      deviceInspectionList: "Device inspection list",
+      environmentChecklist: "ENVIRONMENT CHECKLIST: Environment",
+      cablingPowerChecklist: "ENVIRONMENT CHECKLIST: Cabling and power systems"
+    },
+    schedule: {
+      title: "Schedule",
+      subtitle: "Plan site PM operations in calendar view",
+      calendar: "Schedule Calendar",
+      unplanned: "Unscheduled sites this month",
+      assign: "Assign",
+      previousMonth: "Previous month",
+      nextMonth: "Next month",
+      chooseDate: "Select date",
+      noWorkToday: "No jobs today",
+      chooseDateToAddJob: "Select a calendar date to add a job",
+      addJob: "Add job",
+      siteUnit: "sites",
+      addModalTitle: "Add PM job",
+      deleteJob: "Delete job"
+    },
+    history: {
+      title: "Operation History",
+      subtitle: "Search and review completed PM operations",
+      searchHistory: "Search history",
+      list: "History list",
+      detail: "Completed operation details",
+      empty: "No history matches the selected filters"
+    },
+    reports: {
+      title: "Reports",
+      subtitle: "Search, review, save, and download PM reports",
+      searchReports: "Search reports",
+      reportList: "Report list",
+      export: "Save or download report",
+      daily: "By operation date",
+      range: "By date range",
+      bySite: "By site",
+      byOwner: "By owner",
+      empty: "No reports match the selected filters",
+      modalTitle: "PM report",
+      siteInfo: "Site information",
+      summary: "Summary",
+      resultPrefix: "Operation result",
+      startTime: "Start time",
+      endTime: "Finish time"
+    },
+    settings: {
+      title: "Settings",
+      subtitle: "Manage profile, language, and display theme",
+      profile: "Profile",
+      password: "Change Password",
+      language: "Language Settings",
+      theme: "Display Theme",
+      oldPassword: "Current password",
+      newPassword: "New password",
+      confirmPassword: "Confirm new password",
+      saved: "Settings saved",
+      thai: "Thai",
+      english: "English",
+      darkTheme: "Dark theme",
+      lightTheme: "Light theme"
+    }
+  }
+};
+
+type UiContextValue = {
+  lang: Lang;
+  theme: ThemeMode;
+  setLang: (lang: Lang) => void;
+  setTheme: (theme: ThemeMode) => void;
+  toggleLang: () => void;
+  toggleTheme: () => void;
+  t: (key: string) => string;
+};
+
+const UiContext = createContext<UiContextValue | null>(null);
+
+function getValue(dictionary: Dictionary, key: string): string {
+  const value = key.split(".").reduce<string | Dictionary | undefined>((current, part) => {
+    if (!current || typeof current === "string") {
+      return undefined;
+    }
+    return current[part];
+  }, dictionary);
+
+  return typeof value === "string" ? value : key;
+}
+
+export function ThemeLanguageProvider({ children }: { children: ReactNode }) {
+  const [lang, setLangState] = useState<Lang>("th");
+  const [theme, setThemeState] = useState<ThemeMode>("dark");
+
+  useEffect(() => {
+    const savedLang = window.localStorage.getItem("pm-site-lang") as Lang | null;
+    const savedTheme = window.localStorage.getItem("pm-site-theme") as ThemeMode | null;
+    if (savedLang === "th" || savedLang === "en") {
+      // Restores user preference after hydration to avoid server/client text mismatch.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLangState(savedLang);
+    }
+    if (savedTheme === "light" || savedTheme === "dark") {
+      setThemeState(savedTheme);
+    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      setThemeState("dark");
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.lang = lang;
+    window.localStorage.setItem("pm-site-theme", theme);
+    window.localStorage.setItem("pm-site-lang", lang);
+  }, [theme, lang]);
+
+  const value = useMemo<UiContextValue>(
+    () => ({
+      lang,
+      theme,
+      setLang: setLangState,
+      setTheme: setThemeState,
+      toggleLang: () => setLangState((current) => (current === "th" ? "en" : "th")),
+      toggleTheme: () => setThemeState((current) => (current === "light" ? "dark" : "light")),
+      t: (key: string) => getValue(dictionaries[lang], key)
+    }),
+    [lang, theme]
+  );
+
+  return <UiContext.Provider value={value}>{children}</UiContext.Provider>;
+}
+
+export function useUi() {
+  const context = useContext(UiContext);
+  if (!context) {
+    throw new Error("useUi must be used inside ThemeLanguageProvider");
+  }
+  return context;
+}

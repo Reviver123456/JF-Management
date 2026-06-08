@@ -1,0 +1,252 @@
+@font-face {
+  font-family: "Prompt";
+  src: url("/fonts/Prompt-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+  --bg: #080d19;
+  --bg-deep: #060a13;
+  --sidebar: #070b14;
+  --panel: #101728;
+  --panel-2: #111a2e;
+  --panel-3: #0b1120;
+  --field: #0d1424;
+  --text: #f7f9ff;
+  --text-soft: #aab5c8;
+  --text-muted: #6f7b91;
+  --border: #1f2b43;
+  --border-strong: #2a3b5d;
+  --primary: #2f7df6;
+  --primary-strong: #5da0ff;
+  --primary-soft: rgba(47, 125, 246, 0.18);
+  --success: #22c55e;
+  --success-soft: rgba(34, 197, 94, 0.16);
+  --warning: #eab308;
+  --warning-soft: rgba(234, 179, 8, 0.16);
+  --danger: #ef4444;
+  --danger-soft: rgba(239, 68, 68, 0.16);
+  --purple: #6157f6;
+  --orange: #f59e0b;
+  --shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+  --radius: 10px;
+  --radius-sm: 7px;
+  --sidebar-width: 224px;
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f7fb;
+  --bg-deep: #edf2f8;
+  --sidebar: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f8fbff;
+  --panel-3: #f3f6fb;
+  --field: #ffffff;
+  --text: #111827;
+  --text-soft: #4b5563;
+  --text-muted: #7b8494;
+  --border: #d7deea;
+  --border-strong: #bdc9dc;
+  --primary-soft: rgba(47, 125, 246, 0.12);
+  --shadow: 0 16px 38px rgba(15, 23, 42, 0.09);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    "Prompt",
+    "Noto Sans Thai",
+    "Segoe UI",
+    Arial,
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.button {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--field);
+  color: var(--text);
+  padding: 0 13px;
+  font-weight: 800;
+  font-size: 13px;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.button:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.button.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(47, 125, 246, 0.28);
+}
+
+.button.subtle {
+  background: var(--panel-3);
+}
+
+.button.ghost {
+  background: transparent;
+}
+
+.iconButton {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--field);
+  color: var(--text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconButton:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.field,
+.select,
+.textarea {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--field);
+  color: var(--text);
+  padding: 8px 11px;
+  outline: none;
+}
+
+.field::placeholder,
+.textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.field:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.textarea {
+  min-height: 86px;
+  resize: vertical;
+}
+
+.label {
+  display: grid;
+  gap: 7px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.statusPill {
+  min-height: 22px;
+  width: max-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.statusPill.success {
+  background: var(--success-soft);
+  color: #34d399;
+}
+
+.statusPill.warning {
+  background: var(--warning-soft);
+  color: #facc15;
+}
+
+.statusPill.info {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+.statusPill.danger {
+  background: var(--danger-soft);
+  color: #fb7185;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.emptyState {
+  min-height: 92px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: rgba(17, 26, 46, 0.56);
+  color: var(--text-muted);
+  font-weight: 900;
+  text-align: center;
+  padding: 18px;
+}
+
+@media (max-width: 760px) {
+  body {
+    font-size: 13px;
+  }
+}
