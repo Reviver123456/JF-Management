@@ -211,12 +211,12 @@ a {
   line-height: 1;
 }
 
-.missingRequired .field,
+/* .missingRequired .field,
 .missingRequired .select,
 .missingRequired .textarea {
   border-color: rgba(239, 68, 68, 0.78);
   box-shadow: 0 0 0 3px var(--danger-soft);
-}
+} */
 
 .statusPill {
   min-height: 22px;
@@ -353,7 +353,7 @@ a {
   padding: 18px;
 }
 
-.alertPopupCard header > span {
+.alertPopupCard header>span {
   width: 38px;
   height: 38px;
   border-radius: 999px;
@@ -363,12 +363,12 @@ a {
   color: var(--primary-strong);
 }
 
-.alertPopupCard.error header > span {
+.alertPopupCard.error header>span {
   background: var(--danger-soft);
   color: #fb7185;
 }
 
-.alertPopupCard.success header > span {
+.alertPopupCard.success header>span {
   background: var(--success-soft);
   color: #34d399;
 }
@@ -405,6 +405,7 @@ a {
 }
 
 @keyframes loadingPopupPulse {
+
   0%,
   100% {
     opacity: 0.28;
