@@ -791,10 +791,10 @@ function ContractTab({
           {t("fields.contractNumber")}
           <input className="field" value={contractNumber} placeholder={t("fields.contractNumber")} onChange={(event) => onContractNumberChange(event.target.value)} />
         </label>
-        <label className="label">
+        {/* <label className="label">
           {t("fields.visitCount")}
           <input className="field" min={0} max={12} readOnly type="number" value={visitLimit || ""} placeholder={t("fields.visitCount")} />
-        </label>
+        </label> */}
         <label className="label">
           {t("fields.contractStartDate")}
           <input className="field" type="date" value={contractStartDate} onChange={(event) => updateContractDetails("contractStartDate", event.target.value)} />
