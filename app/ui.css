@@ -1458,12 +1458,12 @@
   justify-content: flex-end;
 }
 
-.pmWorkPage .missingRequiredChoice {
+/* .pmWorkPage {
   border: 1px solid rgba(239, 68, 68, 0.78);
   border-radius: var(--radius-sm);
   padding: 8px;
   box-shadow: 0 0 0 3px var(--danger-soft);
-}
+} */
 
 .pmWorkPage .photoUploadButton span {
   display: inline-flex;
@@ -1973,23 +1973,23 @@
 
 .reportsPage .templateHeader {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) 240px;
+  grid-template-columns: 160px minmax(0, 1fr) 220px;
   align-items: start;
-  gap: 14px;
-  min-height: 76px;
-  margin-bottom: 8px;
+  gap: 12px;
+  min-height: 82px;
+  margin-bottom: 10px;
 }
 
 .reportsPage .templateHeader img {
-  width: 122px;
+  width: 132px;
   height: auto;
   display: block;
 }
 
 .reportsPage .templateHeader>strong {
-  justify-self: center;
+  justify-self: start;
   color: #111827;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.2;
   margin-top: 8px;
 }
@@ -1997,10 +1997,10 @@
 .reportsPage .templateHeader>div {
   display: grid;
   justify-items: end;
-  gap: 5px;
+  gap: 3px;
   color: #111827;
   text-align: right;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .reportsPage .templateHeader span {
@@ -2008,8 +2008,8 @@
 }
 
 .reportsPage .templateHeader b {
-  max-width: 240px;
-  font-size: 11px;
+  max-width: 220px;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -2024,7 +2024,7 @@
 .reportsPage .templateTable td {
   border: 1px solid #334155;
   height: 24px;
-  padding: 3px 7px;
+  padding: 5px 8px;
   color: #111827;
   vertical-align: middle;
   overflow-wrap: anywhere;
@@ -2037,12 +2037,29 @@
 }
 
 .reportsPage .infoTemplateTable {
-  margin-top: 6px;
+  margin-top: 10px;
+}
+
+/* Remove borders for the top info fields to match PDF layout */
+.reportsPage .infoTemplateTable th,
+.reportsPage .infoTemplateTable td,
+.reportsPage .coverInfoTable th,
+.reportsPage .coverInfoTable td,
+.reportsPage .referenceTable th,
+.reportsPage .referenceTable td {
+  border: 0;
+  background: transparent;
+  padding: 4px 6px;
+}
+
+.reportsPage .infoTemplateTable td {
+  padding: 6px 8px;
+  height: 32px;
 }
 
 .reportsPage .fieldCell {
   width: 50%;
-  padding: 0;
+  padding: 0 8px 0 0;
 }
 
 .reportsPage .fieldCell span,
@@ -2050,27 +2067,38 @@
 .reportsPage .dualMonitorRow span,
 .reportsPage .backupChoiceRow span {
   color: #111827;
-  font-weight: 800;
+  font-weight: 700;
+}
+
+.reportsPage .fieldLabel {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.reportsPage .fieldCell span {
+  min-width: 130px;
 }
 
 .reportsPage .fieldCell i,
 .reportsPage .lineRow i,
 .reportsPage .dualMonitorRow i {
-  display: inline-block;
-  min-width: 120px;
-  border-bottom: 1px solid #111827;
+  display: block;
+  width: 100%;
+  border-bottom: 0;
+  /* removed underline across report pages */
   height: 12px;
 }
 
 .reportsPage .fieldCell i {
-  width: calc(100% - 120px);
-  margin-left: 6px;
+  margin-top: 2px;
 }
 
 .reportsPage .referenceTable {
-  width: 42%;
+  width: 40%;
   margin-left: auto;
-  margin-top: 6px;
+  margin-top: 8px;
 }
 
 .reportsPage .referenceTable td:first-child {
@@ -2079,7 +2107,8 @@
 }
 
 .reportsPage .checklistTemplateTable {
-  margin-top: 8px;
+  margin-top: 10px;
+  border-spacing: 0;
 }
 
 .reportsPage .checklistTemplateTable th:first-child {
@@ -2089,18 +2118,28 @@
 
 .reportsPage .checklistTemplateTable th:nth-child(2) {
   width: 18%;
+  text-align: center;
 }
 
 .reportsPage .checklistTemplateTable th:nth-child(3) {
   width: 30%;
+  text-align: center;
+}
+
+.reportsPage .checklistTemplateTable tbody tr td {
+  padding: 6px 8px;
 }
 
 .reportsPage .checklistTemplateTable tbody tr:nth-child(odd) td {
-  background: #eaf2fb;
+  background: #f3f6fb;
 }
 
 .reportsPage .checklistTemplateTable tbody tr:nth-child(even) td {
   background: #ffffff;
+}
+
+.reportsPage .checklistTemplateTable td {
+  min-height: 28px;
 }
 
 .reportsPage .templateBlockBox {
@@ -2134,65 +2173,199 @@
   font-weight: 700;
 }
 
+.reportsPage .choiceItem,
+.reportsPage .statusOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.reportsPage .checkbox {
+  width: 14px;
+  height: 14px;
+  border: 1px solid #334155;
+  display: inline-block;
+  border-radius: 2px;
+}
+
 .reportsPage .templateFooter {
   margin-top: auto;
   display: grid;
-  gap: 7px;
+  gap: 8px;
   padding-top: 8px;
+}
+
+.reportsPage .footerTopGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
+.reportsPage .statusBlock {
+  display: grid;
+  gap: 6px;
+}
+
+.reportsPage .statusRow {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  align-items: center;
+}
+
+.reportsPage .statusRow span,
+.reportsPage .statusRow .statusOption {
+  padding: 4px 6px;
+}
+
+.reportsPage .statusRow span {
+  font-weight: 700;
+}
+
+.reportsPage .noteLine {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+}
+
+.reportsPage .noteLine span {
+  padding: 4px 6px;
+  display: flex;
+  align-items: center;
+}
+
+.reportsPage .noteLine span:first-child {
+  font-weight: 700;
+}
+
+.reportsPage .noteLine span:last-child {
+  min-height: 28px;
 }
 
 .reportsPage .compactFooter {
   margin-top: 10px;
 }
 
-.reportsPage .suggestionBox,
-.reportsPage .noteBox,
-.reportsPage .partsBox,
-.reportsPage .summaryGrid,
+.reportsPage .footerTopGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 10px;
+}
+
 .reportsPage .workTimeGrid {
   border: 1px solid #334155;
 }
 
+/* Remove borders for suggestion and parts boxes to match PDF */
+.reportsPage .suggestionBox,
+.reportsPage .partsBox {
+  border: 0;
+}
+
 .reportsPage .suggestionBox {
-  min-height: 56px;
-  padding: 6px 8px;
+  min-height: 58px;
+  padding: 8px 9px;
 }
 
-.reportsPage .summaryGrid {
+.reportsPage .checkedByBox {
   display: grid;
-  grid-template-columns: 1.1fr 1.4fr 0.9fr 1.1fr;
+  align-items: start;
+  padding: 0;
 }
 
-.reportsPage .summaryGrid span,
-.reportsPage .partsBox span,
-.reportsPage .workTimeGrid span,
-.reportsPage .workTimeGrid strong,
-.reportsPage .noteBox {
-  min-height: 24px;
-  border-right: 1px solid #334155;
+.reportsPage .checkedByTitle {
+  font-weight: 800;
+  margin-bottom: 6px;
+  padding: 4px 0;
+}
+
+.reportsPage .checkedByValue {
+  min-height: 28px;
+  border-bottom: 1px solid #334155;
+}
+
+.reportsPage .summaryNoteGrid {
+  display: grid;
+  gap: 4px;
+}
+
+.reportsPage .summaryBox {
+  padding: 0;
+}
+
+.reportsPage .summaryRow {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.reportsPage .noteLine {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.reportsPage .summaryRow span,
+.reportsPage .noteLine span {
   display: flex;
   align-items: center;
-  padding: 3px 7px;
+  min-height: 26px;
+  padding: 4px 6px;
 }
 
-.reportsPage .summaryGrid span:last-child,
-.reportsPage .partsBox span:last-child {
+.reportsPage .noteLine span:last-child {
+  border-bottom: 1px solid #334155;
+}
+
+.reportsPage .noteLine span:first-child {
+  font-weight: 700;
+}
+
+.reportsPage .noteLine span:last-child {
   border-right: 0;
 }
 
-.reportsPage .noteBox {
-  min-height: 34px;
+.reportsPage .noteLine span:first-child {
+  font-weight: 700;
+}
+
+.reportsPage .summaryRow span:nth-child(2),
+.reportsPage .summaryRow span:nth-child(3) {
+  justify-content: center;
+}
+
+.reportsPage .summaryBox .noteLine {
+  grid-template-columns: 1.4fr 1fr;
+}
+
+.reportsPage .noteLine span:last-child {
+  border-right: 0;
 }
 
 .reportsPage .partsBox {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1.7fr 0.9fr 0.9fr;
+}
+
+.reportsPage .partsBox span {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+}
+
+.reportsPage .partsBox span:first-child {
+  font-weight: 700;
 }
 
 .reportsPage .workTimeGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  width: 48%;
+  width: 52%;
   margin-left: auto;
 }
 
@@ -2208,6 +2381,15 @@
 .reportsPage .workTimeGrid strong {
   background: #eaf2fb;
   font-weight: 800;
+  display: block;
+  padding: 4px 6px;
+}
+
+.reportsPage .workTimeGrid span {
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
 }
 
 .reportsPage .coverSheet {
@@ -2565,6 +2747,18 @@
   border: 0;
   display: block;
 }
+
+/* required star handling: wrap trailing '*' in labels and hide when filled */
+.label .required-star {
+  color: #ef4444;
+  margin-left: 6px;
+  font-weight: 900;
+}
+
+.label.has-value .required-star {
+  display: none;
+}
+
 
 .reportsPage .summaryReportPanel {
   overflow: hidden;

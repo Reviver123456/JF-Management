@@ -132,42 +132,44 @@ function ChecklistReportPanel({
 
   return (
     <section className="reportListPanel reportListOnly">
-        <div className="panelTitleRow">
-          <h2>{t("reports.reportList")}</h2>
-          <span>{filteredReports.length}</span>
-        </div>
-        <div className="rows reportRows">
-          {filteredReports.length > 0 ? filteredReports.map((row) => (
-            <button
-              aria-label={`${t("reports.preview")} ${row.site}`}
-              className="row reportListRow"
-              key={row.id}
-              type="button"
-              onClick={() => onPreviewReport(row)}
-            >
-              <div>
-                <strong>{row.site}</strong>
-                <span className={row.result === "ผิดปกติ" ? "statusPill danger" : "statusPill success"}>{localizeLabel(row.result, lang)}</span>
-              </div>
-              <small>
-                <UserRound size={13} /> {row.customer}
-                <CalendarDays size={13} /> {row.date}
-                <span>{t("common.inspectorPrefix")}: {row.inspector}</span>
-                <MapPin size={13} /> {row.province}
-              </small>
-              <span className="reportPreviewCue">
-                <Eye size={14} />
-                {t("reports.preview")}
-              </span>
-            </button>
-          )) : <EmptyState message={t("reports.empty")} />}
-        </div>
+      <div className="panelTitleRow">
+        <h2>{t("reports.reportList")}</h2>
+        <span>{filteredReports.length}</span>
+      </div>
+      <div className="rows reportRows">
+        {filteredReports.length > 0 ? filteredReports.map((row) => (
+          <button
+            aria-label={`${t("reports.preview")} ${row.site}`}
+            className="row reportListRow"
+            key={row.id}
+            type="button"
+            onClick={() => onPreviewReport(row)}
+          >
+            <div>
+              <strong>{row.site}</strong>
+              <span className={row.result === "ผิดปกติ" ? "statusPill danger" : "statusPill success"}>{localizeLabel(row.result, lang)}</span>
+            </div>
+            <small>
+              <UserRound size={13} /> {row.customer}
+              <CalendarDays size={13} /> {row.date}
+              <span>{t("common.inspectorPrefix")}: {row.inspector}</span>
+              <MapPin size={13} /> {row.province}
+            </small>
+            <span className="reportPreviewCue">
+              <Eye size={14} />
+              {t("reports.preview")}
+            </span>
+          </button>
+        )) : <EmptyState message={t("reports.empty")} />}
+      </div>
     </section>
   );
 }
 
+type FieldRow = string[];
+
 type StandardTemplatePage = ChecklistTemplate & {
-  fields: string[];
+  fields: FieldRow[];
   sections: { items: string[]; title: string }[];
   variant?: "synapse" | "environment" | "equipment";
 };
@@ -175,7 +177,11 @@ type StandardTemplatePage = ChecklistTemplate & {
 const standardTemplatePages: StandardTemplatePage[] = [
   {
     ...checklistTemplates[0],
-    fields: ["Customer Name :", "Synapse Version :", "Host Name :", "License Studies :", "Current studies Per year :"],
+    fields: [
+      ["Customer Name :"],
+      ["Synapse Version :", "Host Name :"],
+      ["License Studies :", "Current studies Per year :"]
+    ],
     sections: [
       { title: "SYNAPSE SYSTEM CHECKLIST", items: synapseSystem },
       { title: "CONFIGURATION BACKUP CHECKLIST", items: configurationBackup }
@@ -184,25 +190,44 @@ const standardTemplatePages: StandardTemplatePage[] = [
   },
   {
     ...checklistTemplates[1],
-    fields: ["Customer Name :", "Location :", "Manufacturer :", "Host Name :", "S/N or S/T :", "Model :", "IP Address :", "MT :", "ESX Version :"],
+    fields: [
+      ["Customer Name :"],
+      ["Location :", "Manufacturer :"],
+      ["Host Name :", "S/N or S/T :"],
+      ["Model :", "IP Address :"],
+      ["MT :", "ESX Version :"]
+    ],
     sections: [{ title: "SERVER CHECKLIST", items: serverChecklist }],
     variant: "equipment"
   },
   {
     ...checklistTemplates[2],
-    fields: ["Customer Name :", "Location :", "Brand :", "Model :", "S/N :", "Host Name :", "IP Address :"],
+    fields: [
+      ["Customer Name :"],
+      ["Location :", "Brand :"],
+      ["Model :", "S/N :"],
+      ["Host Name :", "IP Address :"]
+    ],
     sections: [{ title: "SWITCH CHECKLIST", items: switchChecklist }],
     variant: "equipment"
   },
   {
     ...checklistTemplates[3],
-    fields: ["Customer Name :", "Location :", "Manufacturer :", "Model :", "S/N or S/T :", "MT :"],
+    fields: [
+      ["Customer Name :"],
+      ["Location :", "Manufacturer :"],
+      ["Model :", "S/N or S/T :"],
+      ["MT :"]
+    ],
     sections: [{ title: "STORAGE CHECKLIST", items: storageChecklist }],
     variant: "equipment"
   },
   {
     ...checklistTemplates[4],
-    fields: ["Customer Name :", "Location :"],
+    fields: [
+      ["Customer Name :"],
+      ["Location :"]
+    ],
     sections: [
       { title: "ENVIRONMENT CHECKLIST", items: environmentMain },
       { title: "ENVIRONMENT CHECKLIST", items: environmentPower },
@@ -325,16 +350,18 @@ function TemplateHeader({ heading }: { heading: string }) {
   );
 }
 
-function TemplateInfoGrid({ fields }: { fields: string[] }) {
+function TemplateInfoGrid({ fields }: { fields: FieldRow[] }) {
   return (
     <table className="templateTable infoTemplateTable">
       <tbody>
-        {chunkFields(fields, 2).map((row, index) => (
+        {fields.map((row, index) => (
           <tr key={`${row.join("-")}-${index}`}>
             {row.map((field) => (
               <td className="fieldCell" key={field}>
-                <span>{field}</span>
-                <i />
+                <div className="fieldLabel">
+                  <span>{field}</span>
+                  <i />
+                </div>
               </td>
             ))}
             {row.length === 1 ? <td className="fieldCell" /> : null}
@@ -391,9 +418,9 @@ function SynapseBackupBlock() {
       <strong>BACKUP DEVICE / DATA BACKUP CHECKING</strong>
       <div className="backupChoiceRow">
         <span>Backup Type :</span>
-        <b>DR Site</b>
-        <b>NAS</b>
-        <b>Other</b>
+        <label className="choiceItem"><span className="checkbox" />DR Site</label>
+        <label className="choiceItem"><span className="checkbox" />NAS</label>
+        <label className="choiceItem"><span className="checkbox" />Other</label>
       </div>
       {["Location :", "Hardware Status :", "Backup Status :", "Runing Date :"].map((label) => (
         <div className="lineRow" key={label}>
@@ -408,16 +435,26 @@ function SynapseBackupBlock() {
 function TemplateFooter({ compact = false }: { compact?: boolean }) {
   return (
     <footer className={compact ? "templateFooter compactFooter" : "templateFooter"}>
-      <div className="suggestionBox">
-        <strong>ข้อเสนอแนะ :</strong>
+      <div className="footerTopGrid">
+        <div className="suggestionBox">
+          <strong>ข้อเสนอแนะ :</strong>
+        </div>
+        <div className="checkedByBox">
+          <div className="checkedByTitle">Checked By :</div>
+          <div className="checkedByValue" />
+        </div>
       </div>
-      <div className="summaryGrid">
-        <span>สรุปผลการดำเนินงาน :</span>
-        <span>สภาพปกติ&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ผิดปกติ</span>
-        <span>Checked By :</span>
-        <span />
+      <div className="statusBlock">
+        <div className="statusRow">
+          <span>สรุปผลการดำเนินงาน :</span>
+          <label className="statusOption"><span className="checkbox" />สภาพปกติ</label>
+          <label className="statusOption"><span className="checkbox" />ผิดปกติ</label>
+        </div>
+        <div className="noteLine">
+          <span>หมายเหตุ :</span>
+          <span />
+        </div>
       </div>
-      <div className="noteBox">หมายเหตุ :</div>
       <div className="partsBox">
         <span>อะไหล่ที่เปลี่ยน :</span>
         <span>1.</span>
@@ -443,7 +480,13 @@ function DiagTemplatePage() {
   return (
     <section className="templateSheet diagSheet">
       <TemplateHeader heading="DIAG Preventive Maintenance Checklist" />
-      <TemplateInfoGrid fields={["Customer Name :", "Location :", "Brand :", "Model :", "S/N :", "IP Address :", "OS :", "Antivirus :", "Definition Date :"]} />
+      <TemplateInfoGrid fields={[
+        ["Customer Name :", "Location :"],
+        ["Brand :", "Model :"],
+        ["S/N :", "IP Address :"],
+        ["OS :", "Antivirus :"],
+        ["Definition Date :"]
+      ]} />
       <ReferenceRows />
 
       <table className="templateTable diagCalibrateTable">
@@ -528,13 +571,7 @@ function DiagTemplatePage() {
   );
 }
 
-function chunkFields(fields: string[], size: number) {
-  const rows: string[][] = [];
-  for (let index = 0; index < fields.length; index += size) {
-    rows.push(fields.slice(index, index + size));
-  }
-  return rows;
-}
+// `chunkFields` removed — templates now provide explicit row definitions (FieldRow[])
 
 function PreviewModal({ preview, onClose }: { preview: PreviewState; onClose: () => void }) {
   const { t } = useUi();
