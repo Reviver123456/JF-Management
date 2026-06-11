@@ -33,7 +33,7 @@ export function LoadingPopup({
   }
 
   return (
-    <div className="appPopupOverlay loadingPopupOverlay" role="status" aria-live="polite" aria-label={message}>
+    <div className="appPopupOverlay loadingPopupOverlay" role="status" aria-live="polite" aria-label={message ?? "Loading"}>
       <div className="loadingPopupCard">
         <div className="loadingPopupRing" aria-hidden="true">
           {dots.map((dot) => (
@@ -41,7 +41,6 @@ export function LoadingPopup({
           ))}
           <strong>{progress}%</strong>
         </div>
-        {message ? <p>{message}</p> : null}
       </div>
     </div>
   );

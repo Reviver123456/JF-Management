@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import Link from "next/link";
+import { useMemo, useState } from "react";
 import {
   ArrowLeft,
   CalendarDays,
@@ -8,29 +9,59 @@ import {
   Clock3,
   ClipboardCheck,
   MapPin,
-  Navigation,
-  Save,
+  Pencil,
   UserRound,
   Wrench
 } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
 import { FeedbackPopups } from "@/components/AppPopup";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { useUi } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
-import { getWorkSiteByJobId, type ReportRow, type SavedChecklistGroup, type SiteRecord } from "@/lib/pm-data";
+import {
+  getContractVisitTotal,
+  getUniquePmJobs,
+  getWorkSiteByJobId,
+  normalizeOwnerName,
+  type PmJobRecord,
+  type ReportRow,
+  type SavedChecklistGroup,
+  type SiteRecord
+} from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
 
 const checklistTabs = ["SYNAPSE", "Server", "Switch", "Storage", "Environment", "DIAG"] as const;
+const allOwnersValue = "__all";
 
 export default function HistoryPage() {
   const { lang, t } = useUi();
   const { data, error, isLoading } = usePmData();
+  const { error: userError, isLoading: isUserLoading, userName } = useCurrentUser();
   const reportRows = data.reportRows;
   const [query, setQuery] = useState("");
   const [resultFilter, setResultFilter] = useState("");
+  const [ownerFilter, setOwnerFilter] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [activeReport, setActiveReport] = useState<ReportRow | null>(null);
+  const activeOwnerFilter = ownerFilter || userName || allOwnersValue;
+  const ownerOptions = useMemo(() => {
+    const owners = [userName, ...data.owners, ...reportRows.flatMap((row) => row.inspector.split(", "))];
+    const seenOwners = new Set<string>();
+
+    return owners
+      .map((owner) => owner.trim())
+      .filter((owner) => {
+        const normalizedOwner = normalizeOwnerName(owner);
+
+        if (!normalizedOwner || seenOwners.has(normalizedOwner)) {
+          return false;
+        }
+
+        seenOwners.add(normalizedOwner);
+        return true;
+      });
+  }, [data.owners, reportRows, userName]);
   const activeSite = activeReport
     ? data.sites.find((site) => site.id === activeReport.siteId && site.visitDate === toInputDate(activeReport.date))
       ?? getWorkSiteByJobId(data.sites, activeReport.jobId)
@@ -41,10 +72,13 @@ export default function HistoryPage() {
     const rowDate = toInputDate(row.date);
     const matchesQuery = query.trim() ? searchableText.includes(query.trim().toLowerCase()) : true;
     const matchesResult = resultFilter ? row.result === resultFilter : true;
+    const matchesOwner = activeOwnerFilter === allOwnersValue
+      ? true
+      : row.inspector.split(", ").some((owner) => normalizeOwnerName(owner) === normalizeOwnerName(activeOwnerFilter));
     const matchesStart = startDate ? rowDate >= startDate : true;
     const matchesEnd = endDate ? rowDate <= endDate : true;
 
-    return matchesQuery && matchesResult && matchesStart && matchesEnd;
+    return matchesQuery && matchesResult && matchesOwner && matchesStart && matchesEnd;
   });
 
   return (
@@ -52,6 +86,7 @@ export default function HistoryPage() {
       {activeReport && activeSite ? (
         <div className="pmWorkPage">
           <HistoryDetailView
+            pmJobs={data.pmJobs}
             report={activeReport}
             site={activeSite}
             onBack={() => setActiveReport(null)}
@@ -59,7 +94,7 @@ export default function HistoryPage() {
         </div>
       ) : (
         <div className="historyPage">
-          <FeedbackPopups loading={isLoading} loadingMessage={t("pm.loadingSubtitle")} alertMessage={error} />
+          <FeedbackPopups loading={isLoading || isUserLoading} loadingMessage={t("pm.loadingSubtitle")} alertMessage={error ?? userError} />
           <PageTitle title={t("history.title")} subtitle={t("history.subtitle")} />
           <section className="toolbar">
             <SearchControl placeholder={`${t("common.search")}...`} value={query} onChange={setQuery} />
@@ -67,6 +102,12 @@ export default function HistoryPage() {
               <option value="">{t("common.all")}</option>
               <option value="ปกติ">{t("common.normal")}</option>
               <option value="ผิดปกติ">{t("common.abnormal")}</option>
+            </select>
+            <select className="select" value={activeOwnerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
+              <option value={allOwnersValue}>{t("common.all")}</option>
+              {ownerOptions.map((owner) => (
+                <option key={owner} value={owner}>{owner}</option>
+              ))}
             </select>
             <label className="dateField">
               {t("common.datePlaceholder")}
@@ -107,10 +148,12 @@ export default function HistoryPage() {
 }
 
 function HistoryDetailView({
+  pmJobs,
   report,
   site,
   onBack
 }: {
+  pmJobs: PmJobRecord[];
   report: ReportRow;
   site: SiteRecord;
   onBack: () => void;
@@ -118,6 +161,11 @@ function HistoryDetailView({
   const { lang, t } = useUi();
   const [activeTab, setActiveTab] = useState<(typeof checklistTabs)[number]>("SYNAPSE");
   const statusClass = report.result === "ผิดปกติ" ? "danger" : "success";
+  const visitTotal = getContractVisitTotal(site.contractDetails, site.pmCycle);
+  const visitRound = getVisitRound(pmJobs, site, report.jobId);
+  const contractStartDate = site.contractDetails?.contractStartDate ?? (site.contractDetails?.contractStartMonth ? `${site.contractDetails.contractStartMonth}-01` : "");
+  const contractEndDate = site.contractDetails?.contractEndDate ?? (site.contractDetails?.contractEndMonth ? `${site.contractDetails.contractEndMonth}-01` : "");
+  const finishDate = report.workDetails?.savedAt ? report.workDetails.savedAt.slice(0, 10) : toInputDate(report.date);
 
   return (
     <div className="detailPage">
@@ -141,33 +189,34 @@ function HistoryDetailView({
           <Info label={t("pm.region")} value={site.region} />
           <Info label={t("common.owner")} value={report.inspector} />
           <Info label={t("pm.pmCycle")} value={localizeLabel(site.pmCycle, lang)} />
+          <Info label={t("history.visitRound")} value={`${visitRound}/${visitTotal || "-"}`} />
+          <Info label={t("fields.contractStartDate")} value={formatInputDate(contractStartDate)} />
+          <Info label={t("fields.contractEndDate")} value={formatInputDate(contractEndDate)} />
         </div>
-        <button
-          className="button subtle"
-          type="button"
-          onClick={() => {
-            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(site.address)}`, "_blank", "noopener,noreferrer");
-          }}
-        >
-          <Navigation size={16} />
-          {t("pm.navigateGoogleMaps")}
-        </button>
       </section>
 
       <section className="card">
         <h2><Clock3 size={17} /> {t("pm.workTime")}</h2>
         <div className="formGrid">
           <label className="label">
+            {t("history.startDate")}
+            <input className="field" type="date" readOnly defaultValue={site.visitDate} />
+          </label>
+          <label className="label">
+            {t("history.finishDate")}
+            <input className="field" type="date" readOnly defaultValue={finishDate} />
+          </label>
+          <label className="label">
             {t("fields.startTime")}
-            <input className="field" type="time" defaultValue={site.startTime ?? site.visitTime} />
+            <input className="field" type="time" readOnly defaultValue={site.startTime ?? site.visitTime} />
           </label>
           <label className="label">
             {t("fields.endTime")}
-            <input className="field" type="time" defaultValue={site.endTime ?? ""} />
+            <input className="field" type="time" readOnly defaultValue={site.endTime ?? ""} />
           </label>
           <label className="label">
             {t("common.inspector")}
-            <input className="field" defaultValue={report.inspector} />
+            <input className="field" readOnly defaultValue={report.inspector} />
           </label>
         </div>
       </section>
@@ -196,11 +245,10 @@ function HistoryDetailView({
 
       <div className="stickyActions">
         <button className="button ghost" type="button" onClick={onBack}>{t("common.back")}</button>
-        <button className="button subtle" type="button" onClick={onBack}>{t("common.saveDraft")}</button>
-        <button className="button primary" type="button" onClick={onBack}>
-          <Save size={16} />
-          {t("common.save")}
-        </button>
+        <Link className="button primary" href={`/pm-work?jobId=${encodeURIComponent(report.jobId)}`}>
+          <Pencil size={16} />
+          {t("history.editData")}
+        </Link>
       </div>
     </div>
   );
@@ -264,7 +312,7 @@ function HistoryChecklistBlock({
   report: ReportRow;
   setTitle: string;
 }) {
-  const { lang, t } = useUi();
+  const { lang } = useUi();
   const details = report.workDetails;
   const resultPrefix = `${group.key}:${setTitle}:${blockIndex}`;
 
@@ -380,6 +428,30 @@ function historyFieldKey(groupKey: string, setTitle: string, blockIndex: number,
 
 function historyRadioKey(groupKey: string, setTitle: string, blockIndex: number, label: string) {
   return `${groupKey}:radio:${setTitle}:${blockIndex}:${label}`;
+}
+
+function getVisitRound(pmJobs: PmJobRecord[], site: SiteRecord, jobId: string) {
+  const uniqueJobs = getUniquePmJobs(pmJobs.filter((job) => job.siteId === site.id))
+    .sort((first, second) => (
+      first.visitDate.localeCompare(second.visitDate) ||
+      first.visitTime.localeCompare(second.visitTime)
+    ));
+  const jobIndex = uniqueJobs.findIndex((job) => job.id === jobId);
+
+  if (jobIndex >= 0) {
+    return jobIndex + 1;
+  }
+
+  return uniqueJobs.findIndex((job) => job.visitDate === site.visitDate && job.visitTime === site.visitTime) + 1 || 1;
+}
+
+function formatInputDate(date: string) {
+  if (!date) {
+    return "-";
+  }
+
+  const [year, month, day] = date.split("-");
+  return day && month && year ? `${day}/${month}/${year}` : date;
 }
 
 function toInputDate(date: string) {

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo, useState } from "react";
 import { Building2, CalendarCheck2, CheckCircle2, Clock3, ClipboardCheck, MapPin, Timer } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { FeedbackPopups } from "@/components/AppPopup";
@@ -13,10 +14,13 @@ import {
   getSiteRecordJobKey,
   getUniquePmJobs,
   getWorkSitesByDate,
+  normalizeOwnerName,
   statusMeta,
   type Metric
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
+
+const allOwnersValue = "__all";
 
 const metricIcons = {
   sites: Building2,
@@ -41,11 +45,34 @@ export default function DashboardPage() {
   const { t } = useUi();
   const { data, error, isLoading } = usePmData();
   const { error: userError, isLoading: isUserLoading, userName } = useCurrentUser();
+  const [selectedOwner, setSelectedOwner] = useState("");
+  const activeOwner = selectedOwner || userName || allOwnersValue;
+  const showAllOwners = activeOwner === allOwnersValue;
+  const ownerOptions = useMemo(() => {
+    const owners = [userName, ...data.siteCatalog.map((site) => site.owner), ...data.pmJobs.map((job) => job.owner)];
+    const seenOwners = new Set<string>();
+
+    return owners
+      .map((owner) => owner.trim())
+      .filter((owner) => {
+        const normalizedOwner = normalizeOwnerName(owner);
+
+        if (!normalizedOwner || seenOwners.has(normalizedOwner)) {
+          return false;
+        }
+
+        seenOwners.add(normalizedOwner);
+        return true;
+      });
+  }, [data.pmJobs, data.siteCatalog, userName]);
   const todayDate = getDateString();
-  const assignedSites = filterSitesByOwner(data.siteCatalog, userName);
-  const visiblePmJobs = getUniquePmJobs(filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, userName));
+  const assignedSites = showAllOwners ? data.siteCatalog : filterSitesByOwner(data.siteCatalog, activeOwner);
+  const visiblePmJobs = getUniquePmJobs(showAllOwners ? data.pmJobs : filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, activeOwner));
   const visiblePmJobKeys = new Set(visiblePmJobs.map((job) => `${job.siteId}:${job.visitDate}:${job.visitTime}`));
   const sites = data.sites.filter((site) => visiblePmJobKeys.has(getSiteRecordJobKey(site)));
+  const ownerWorkloadJobs = getUniquePmJobs(filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, userName));
+  const ownerWorkloadKeys = new Set(ownerWorkloadJobs.map((job) => `${job.siteId}:${job.visitDate}:${job.visitTime}`));
+  const workloadSites = data.sites.filter((site) => ownerWorkloadKeys.has(getSiteRecordJobKey(site)));
   const metrics: Metric[] = [
     { id: "sites", value: String(assignedSites.length), trend: "+0", color: "blue" },
     { id: "monthly", value: String(visiblePmJobs.filter((job) => job.visitDate.startsWith("2026-06")).length), trend: "+0", color: "purple" },
@@ -53,17 +80,33 @@ export default function DashboardPage() {
     { id: "backlog", value: String(visiblePmJobs.filter((job) => job.status === "pending" || job.status === "inProgress").length), trend: "", color: "orange" }
   ];
   const today = getWorkSitesByDate(sites, todayDate);
-  const completedCount = sites.filter((site) => site.status === "completed").length;
-  const inProgressCount = sites.filter((site) => site.status === "inProgress").length;
-  const backlogCount = sites.filter((site) => site.status === "pending").length;
-  const abnormalCount = sites.filter((site) => site.status === "abnormal").length;
+  const completedCount = workloadSites.filter((site) => site.status === "completed").length;
+  const inProgressCount = workloadSites.filter((site) => site.status === "inProgress").length;
+  const backlogCount = workloadSites.filter((site) => site.status === "pending").length;
+  const abnormalCount = workloadSites.filter((site) => site.status === "abnormal").length;
   const nextSite = sites.find((site) => site.visitDate >= todayDate);
 
   return (
     <AppShell>
       <div className="dashboardPage">
         <FeedbackPopups loading={isLoading || isUserLoading} loadingMessage={t("pm.loadingSubtitle")} alertMessage={error ?? userError} />
-        <PageTitle title={t("dashboard.title")} subtitle={t("dashboard.subtitle")} />
+        <PageTitle
+          title={t("dashboard.title")}
+          subtitle={t("dashboard.subtitle")}
+          actions={
+            <div className="dashboardActions">
+              <label className="ownerFilter">
+                <span>{t("fields.siteOwner")}</span>
+                <select className="select" value={activeOwner} onChange={(event) => setSelectedOwner(event.target.value)}>
+                  <option value={allOwnersValue}>{t("common.all")}</option>
+                  {ownerOptions.map((owner) => (
+                    <option key={owner} value={owner}>{owner}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          }
+        />
 
         <section className="metrics">
           {metrics.map((metric) => {
@@ -73,7 +116,6 @@ export default function DashboardPage() {
                 <div>
                   <span>{t(metricLabelKeys[metric.id])}</span>
                   <strong>{metric.value}</strong>
-                  {metric.trend ? <small>{metric.trend}</small> : <small>&nbsp;</small>}
                 </div>
                 <i>
                   <Icon size={18} />

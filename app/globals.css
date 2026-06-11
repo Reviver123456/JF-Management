@@ -133,6 +133,17 @@ a {
   background: transparent;
 }
 
+.button.danger {
+  border-color: rgba(239, 68, 68, 0.5);
+  background: var(--danger-soft);
+  color: #fb7185;
+}
+
+.button.danger:hover {
+  border-color: var(--danger);
+  background: rgba(239, 68, 68, 0.24);
+}
+
 .iconButton {
   width: 34px;
   height: 34px;
@@ -186,6 +197,25 @@ a {
   color: var(--text);
   font-size: 12px;
   font-weight: 800;
+}
+
+.requiredLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.requiredLabel b {
+  color: #fb7185;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.missingRequired .field,
+.missingRequired .select,
+.missingRequired .textarea {
+  border-color: rgba(239, 68, 68, 0.78);
+  box-shadow: 0 0 0 3px var(--danger-soft);
 }
 
 .statusPill {
@@ -257,38 +287,34 @@ a {
 }
 
 .loadingPopupOverlay {
-  background: rgba(0, 0, 0, 0.84);
+  background: rgba(0, 0, 0, 0.68);
 }
 
 .loadingPopupCard {
-  width: min(92vw, 342px);
-  min-height: 342px;
+  width: 136px;
+  min-height: 136px;
   display: grid;
   place-items: center;
   align-content: center;
-  gap: 14px;
-  border: 1px solid rgba(20, 184, 166, 0.38);
-  border-radius: 18px;
-  background: #020403;
-  box-shadow:
-    0 0 42px rgba(13, 234, 213, 0.16),
-    0 28px 80px rgba(0, 0, 0, 0.72);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .loadingPopupRing {
   --loader-accent: #14f4dc;
   position: relative;
-  width: 264px;
-  height: 264px;
+  width: 118px;
+  height: 118px;
   display: grid;
   place-items: center;
 }
 
 .loadingPopupRing strong {
   color: var(--loader-accent);
-  font-size: 66px;
+  font-size: 29px;
   line-height: 1;
-  font-weight: 300;
+  font-weight: 700;
   letter-spacing: 0;
   text-shadow: 0 0 22px rgba(20, 244, 220, 0.3);
 }
@@ -298,25 +324,16 @@ a {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 29px;
-  height: 29px;
-  margin: -14.5px;
+  width: 12px;
+  height: 12px;
+  margin: -6px;
   border-radius: 999px;
   background: var(--loader-accent);
   box-shadow: 0 0 16px rgba(20, 244, 220, 0.34);
-  transform: rotate(var(--angle)) translateY(-110px);
+  transform: rotate(var(--angle)) translateY(-51px);
   transform-origin: center;
   animation: loadingPopupPulse 1.15s linear infinite;
   animation-delay: calc(var(--dot-index) * -72ms);
-}
-
-.loadingPopupCard p {
-  max-width: 260px;
-  margin: 0;
-  color: rgba(20, 244, 220, 0.86);
-  font-size: 13px;
-  font-weight: 900;
-  text-align: center;
 }
 
 .alertPopupCard {
@@ -406,22 +423,23 @@ a {
   }
 
   .loadingPopupCard {
-    min-height: 302px;
+    width: 116px;
+    min-height: 116px;
   }
 
   .loadingPopupRing {
-    width: 226px;
-    height: 226px;
+    width: 102px;
+    height: 102px;
   }
 
   .loadingPopupRing strong {
-    font-size: 54px;
+    font-size: 25px;
   }
 
   .loadingPopupDot {
-    width: 24px;
-    height: 24px;
-    margin: -12px;
-    transform: rotate(var(--angle)) translateY(-94px);
+    width: 10px;
+    height: 10px;
+    margin: -5px;
+    transform: rotate(var(--angle)) translateY(-44px);
   }
 }

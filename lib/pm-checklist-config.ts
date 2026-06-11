@@ -4,6 +4,9 @@ export type PmChecklistKey = (typeof pmChecklistKeys)[number];
 
 export type PmChecklistConfig = {
   customItems: Partial<Record<PmChecklistKey, string[]>>;
+  customItemsBySection: Partial<Record<PmChecklistKey, Record<string, string[]>>>;
+  diagMonitorCounts: Record<number, 1 | 2>;
+  itemLabelsBySection: Partial<Record<PmChecklistKey, Record<string, Record<string, string>>>>;
   selectedTabs: PmChecklistKey[];
   setCounts: Record<PmChecklistKey, number>;
   selectedItems: Partial<Record<PmChecklistKey, string[]>>;
@@ -13,6 +16,9 @@ const storageKey = "pm-site-checklist-configs";
 
 export const defaultPmChecklistConfig: PmChecklistConfig = {
   customItems: {},
+  customItemsBySection: {},
+  diagMonitorCounts: {},
+  itemLabelsBySection: {},
   selectedTabs: [...pmChecklistKeys],
   setCounts: {
     synapse: 1,
@@ -45,9 +51,69 @@ function normalizeConfig(value: Partial<PmChecklistConfig> | undefined): PmCheck
 
     return items;
   }, {} as Partial<Record<PmChecklistKey, string[]>>);
+  const customItemsBySection = pmChecklistKeys.reduce((items, key) => {
+    const sections = value?.customItemsBySection?.[key];
+
+    if (sections && typeof sections === "object" && !Array.isArray(sections)) {
+      const normalizedSections = Object.entries(sections).reduce((sectionItems, [sectionId, currentItems]) => {
+        if (Array.isArray(currentItems)) {
+          sectionItems[sectionId] = [...new Set(currentItems.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim()))];
+        }
+
+        return sectionItems;
+      }, {} as Record<string, string[]>);
+
+      if (Object.keys(normalizedSections).length > 0) {
+        items[key] = normalizedSections;
+      }
+    }
+
+    return items;
+  }, {} as Partial<Record<PmChecklistKey, Record<string, string[]>>>);
+  const itemLabelsBySection = pmChecklistKeys.reduce((items, key) => {
+    const sections = value?.itemLabelsBySection?.[key];
+
+    if (sections && typeof sections === "object" && !Array.isArray(sections)) {
+      const normalizedSections = Object.entries(sections).reduce((sectionItems, [sectionId, currentItems]) => {
+        if (currentItems && typeof currentItems === "object" && !Array.isArray(currentItems)) {
+          const labels = Object.entries(currentItems).reduce((labelItems, [item, label]) => {
+            if (typeof label === "string" && item.trim() && label.trim()) {
+              labelItems[item] = label.trim();
+            }
+
+            return labelItems;
+          }, {} as Record<string, string>);
+
+          if (Object.keys(labels).length > 0) {
+            sectionItems[sectionId] = labels;
+          }
+        }
+
+        return sectionItems;
+      }, {} as Record<string, Record<string, string>>);
+
+      if (Object.keys(normalizedSections).length > 0) {
+        items[key] = normalizedSections;
+      }
+    }
+
+    return items;
+  }, {} as Partial<Record<PmChecklistKey, Record<string, Record<string, string>>>>);
+  const diagMonitorCounts = Object.entries(value?.diagMonitorCounts ?? {}).reduce<Record<number, 1 | 2>>((counts, [setId, count]) => {
+    const numericSetId = Number(setId);
+
+    if (Number.isInteger(numericSetId) && numericSetId > 0 && (count === 1 || count === 2)) {
+      counts[numericSetId] = count;
+    }
+
+    return counts;
+  }, {});
 
   return {
     customItems,
+    customItemsBySection,
+    diagMonitorCounts,
+    itemLabelsBySection,
     selectedTabs,
     setCounts: pmChecklistKeys.reduce((counts, key) => {
       const count = value?.setCounts?.[key];

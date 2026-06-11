@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Languages, LockKeyhole, Moon, Save, Sun, UserRound } from "lucide-react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { Eye, EyeOff, Languages, LockKeyhole, Moon, PenLine, RotateCcw, Save, Sun, UserRound } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { defaultLoginUser } from "@/lib/auth/default-user";
@@ -127,14 +127,19 @@ export default function SettingsPage() {
         <article className="card">
           <h2><LockKeyhole size={17} /> {t("settings.password")}</h2>
           <div className="formGridSingle">
-            <label className="label">{t("settings.oldPassword")}<input className="field" type="password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label>
-            <label className="label">{t("settings.newPassword")}<input className="field" type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /></label>
-            <label className="label">{t("settings.confirmPassword")}<input className="field" type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>
+            <PasswordField label={t("settings.oldPassword")} value={currentPassword} onChange={setCurrentPassword} />
+            <PasswordField label={t("settings.newPassword")} value={newPassword} onChange={setNewPassword} />
+            <PasswordField label={t("settings.confirmPassword")} value={confirmPassword} onChange={setConfirmPassword} />
             <button className="button subtle" type="button" onClick={changePassword}>
               <LockKeyhole size={16} />
               {t("settings.password")}
             </button>
           </div>
+        </article>
+
+        <article className="card">
+          <h2><PenLine size={17} /> {t("settings.mySignature")}</h2>
+          <SettingsSignaturePad />
         </article>
 
         <article className="card">
@@ -155,5 +160,135 @@ export default function SettingsPage() {
       </section>
       </div>
     </AppShell>
+  );
+}
+
+function PasswordField({
+  label,
+  value,
+  onChange
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const { t } = useUi();
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <label className="label">
+      {label}
+      <span className="passwordField">
+        <input className="field" type={visible ? "text" : "password"} value={value} onChange={(event) => onChange(event.target.value)} />
+        <button className="iconButton" type="button" onClick={() => setVisible((current) => !current)} aria-label={visible ? t("settings.hidePassword") : t("settings.showPassword")}>
+          {visible ? <EyeOff size={15} /> : <Eye size={15} />}
+        </button>
+      </span>
+    </label>
+  );
+}
+
+function SettingsSignaturePad() {
+  const { t } = useUi();
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    const setupCanvas = () => {
+      const width = canvas.clientWidth;
+      const height = canvas.clientHeight;
+      const ratio = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(width * ratio);
+      canvas.height = Math.floor(height * ratio);
+      const context = canvas.getContext("2d");
+      if (!context) {
+        return;
+      }
+
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, width, height);
+      context.strokeStyle = "#0f172a";
+      context.lineWidth = 2.4;
+      context.lineCap = "round";
+      context.lineJoin = "round";
+    };
+
+    setupCanvas();
+    window.addEventListener("resize", setupCanvas);
+    return () => window.removeEventListener("resize", setupCanvas);
+  }, []);
+
+  const getPoint = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return {
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top
+    };
+  };
+  const startDrawing = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    const context = event.currentTarget.getContext("2d");
+    if (!context) {
+      return;
+    }
+
+    const point = getPoint(event);
+    event.currentTarget.setPointerCapture(event.pointerId);
+    context.beginPath();
+    context.moveTo(point.x, point.y);
+    setIsDrawing(true);
+  };
+  const draw = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) {
+      return;
+    }
+
+    const context = event.currentTarget.getContext("2d");
+    if (!context) {
+      return;
+    }
+
+    const point = getPoint(event);
+    context.lineTo(point.x, point.y);
+    context.stroke();
+  };
+  const stopDrawing = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) {
+      return;
+    }
+
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    setIsDrawing(false);
+  };
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) {
+      return;
+    }
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+  };
+
+  return (
+    <div className="settingsSignaturePad">
+      <canvas
+        ref={canvasRef}
+        onPointerDown={startDrawing}
+        onPointerMove={draw}
+        onPointerUp={stopDrawing}
+        onPointerLeave={stopDrawing}
+      />
+      <button className="button ghost" type="button" onClick={clearSignature}>
+        <RotateCcw size={15} />
+        {t("pm.clearSignature")}
+      </button>
+    </div>
   );
 }

@@ -63,3 +63,35 @@ export async function PATCH(
     );
   }
 }
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ siteId: string }> }
+) {
+  const { siteId } = await params;
+
+  try {
+    const supabase = createAdminClient();
+    const { count, error } = await supabase
+      .from("sites")
+      .delete({ count: "exact" })
+      .eq("id", siteId);
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (count === 0) {
+      return NextResponse.json({ message: "Site not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        message: error instanceof Error ? error.message : "Cannot delete site."
+      },
+      { status: 500 }
+    );
+  }
+}

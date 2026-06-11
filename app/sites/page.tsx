@@ -5,6 +5,7 @@ import {
   Building2,
   Check,
   ChevronRight,
+  Pencil,
   Plus,
   Save,
   Trash2,
@@ -37,7 +38,7 @@ import {
   synapseSystem,
   type DiagCheck
 } from "@/lib/pm-checklist-data";
-import type { SiteCatalogRecord, SiteContractDetails } from "@/lib/pm-data";
+import { getVisitCountForPmCycle, type SiteCatalogRecord, type SiteContractDetails } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
 
 type SiteTab = "customer" | "contract" | "synapse" | "server" | "switch" | "storage" | "environment" | "diag";
@@ -86,6 +87,29 @@ const checklistItemsByInspectionTab: Record<InspectionTab, string[]> = {
   diag: []
 };
 
+const primaryChecklistSectionByTab: Partial<Record<InspectionTab, string>> = {
+  synapse: "synapseSystem",
+  server: "serverChecklist",
+  switch: "switchChecklist",
+  storage: "storageChecklist",
+  environment: "environmentMain"
+};
+
+const monthOptions = [
+  { value: "01", th: "มกราคม", en: "January" },
+  { value: "02", th: "กุมภาพันธ์", en: "February" },
+  { value: "03", th: "มีนาคม", en: "March" },
+  { value: "04", th: "เมษายน", en: "April" },
+  { value: "05", th: "พฤษภาคม", en: "May" },
+  { value: "06", th: "มิถุนายน", en: "June" },
+  { value: "07", th: "กรกฎาคม", en: "July" },
+  { value: "08", th: "สิงหาคม", en: "August" },
+  { value: "09", th: "กันยายน", en: "September" },
+  { value: "10", th: "ตุลาคม", en: "October" },
+  { value: "11", th: "พฤศจิกายน", en: "November" },
+  { value: "12", th: "ธันวาคม", en: "December" }
+];
+
 const emptySite: SiteCatalogRecord = {
   id: "",
   site: "",
@@ -105,10 +129,34 @@ const emptySite: SiteCatalogRecord = {
 function resolveSelectedChecklistItems(config: PmChecklistConfig): Record<InspectionTab, string[]> {
   return inspectionTabs.reduce((items, tab) => {
     const defaultItems = checklistItemsByInspectionTab[tab.id];
+    const sectionItems = Object.values(config.customItemsBySection[tab.id] ?? {}).flat();
+    const legacyItems = config.customItems[tab.id] ?? [];
+    const allItems = [...defaultItems, ...sectionItems, ...legacyItems];
     const savedItems = config.selectedItems[tab.id];
-    items[tab.id] = savedItems ? defaultItems.filter((item) => savedItems.includes(item)) : defaultItems;
+    items[tab.id] = savedItems ? allItems.filter((item) => savedItems.includes(item)) : allItems;
     return items;
   }, {} as Record<InspectionTab, string[]>);
+}
+
+function readCustomItemsBySection(config: PmChecklistConfig) {
+  const customItemsBySection = { ...config.customItemsBySection };
+
+  inspectionTabs.forEach((tab) => {
+    const legacyItems = config.customItems[tab.id] ?? [];
+    const primarySection = primaryChecklistSectionByTab[tab.id];
+
+    if (legacyItems.length > 0 && primarySection) {
+      customItemsBySection[tab.id] = {
+        ...(customItemsBySection[tab.id] ?? {}),
+        [primarySection]: [...new Set([
+          ...(customItemsBySection[tab.id]?.[primarySection] ?? []),
+          ...legacyItems
+        ])]
+      };
+    }
+  });
+
+  return customItemsBySection;
 }
 
 export default function SitesPage() {
@@ -275,7 +323,9 @@ function SiteModal({
   const [selectedInspectionTabs, setSelectedInspectionTabs] = useState<InspectionTab[]>(() => readSitePmChecklistConfig(site.id).selectedTabs);
   const [inspectionSetCounts, setInspectionSetCounts] = useState(() => readSitePmChecklistConfig(site.id).setCounts);
   const [selectedChecklistItems, setSelectedChecklistItems] = useState(() => resolveSelectedChecklistItems(readSitePmChecklistConfig(site.id)));
-  const [customChecklistItems, setCustomChecklistItems] = useState(() => readSitePmChecklistConfig(site.id).customItems);
+  const [customChecklistItemsBySection, setCustomChecklistItemsBySection] = useState(() => readCustomItemsBySection(readSitePmChecklistConfig(site.id)));
+  const [diagMonitorCounts, setDiagMonitorCounts] = useState(() => readSitePmChecklistConfig(site.id).diagMonitorCounts);
+  const [itemLabelsBySection, setItemLabelsBySection] = useState(() => readSitePmChecklistConfig(site.id).itemLabelsBySection);
   const title = mode === "add" ? t("sites.addModalTitle") : t("sites.editModalTitle");
   const visibleTabs = useMemo(() => (
     tabs.filter((tab) => tab.id === "customer" || tab.id === "contract" || selectedInspectionTabs.includes(tab.id as InspectionTab))
@@ -312,14 +362,26 @@ function SiteModal({
     });
   }, []);
 
-  const addCustomChecklistItem = useCallback((tabId: InspectionTab, item: string) => {
+  const addCustomChecklistItem = useCallback((tabId: InspectionTab, sectionId: string, item: string) => {
     const trimmedItem = item.trim();
 
     if (!trimmedItem) {
       return;
     }
 
-    setCustomChecklistItems((current) => {
+    setCustomChecklistItemsBySection((current) => {
+      const currentSections = current[tabId] ?? {};
+      const currentItems = currentSections[sectionId] ?? [];
+      return {
+        ...current,
+        [tabId]: {
+          ...currentSections,
+          [sectionId]: currentItems.includes(trimmedItem) ? currentItems : [...currentItems, trimmedItem]
+        }
+      };
+    });
+
+    setSelectedChecklistItems((current) => {
       const currentItems = current[tabId] ?? [];
       return {
         ...current,
@@ -328,16 +390,104 @@ function SiteModal({
     });
   }, []);
 
-  const removeCustomChecklistItem = useCallback((tabId: InspectionTab, item: string) => {
-    setCustomChecklistItems((current) => ({
+  const removeCustomChecklistItem = useCallback((tabId: InspectionTab, sectionId: string, item: string) => {
+    setCustomChecklistItemsBySection((current) => {
+      const currentSections = current[tabId] ?? {};
+
+      return {
+        ...current,
+        [tabId]: {
+          ...currentSections,
+          [sectionId]: (currentSections[sectionId] ?? []).filter((currentItem) => currentItem !== item)
+        }
+      };
+    });
+
+    setSelectedChecklistItems((current) => ({
       ...current,
       [tabId]: (current[tabId] ?? []).filter((currentItem) => currentItem !== item)
     }));
   }, []);
 
+  const updateCustomChecklistItem = useCallback((tabId: InspectionTab, sectionId: string, item: string, nextItem: string) => {
+    const trimmedItem = nextItem.trim();
+
+    if (!trimmedItem || trimmedItem === item) {
+      return;
+    }
+
+    setCustomChecklistItemsBySection((current) => {
+      const currentSections = current[tabId] ?? {};
+      const currentItems = currentSections[sectionId] ?? [];
+
+      if (currentItems.some((currentItem) => currentItem !== item && currentItem === trimmedItem)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [tabId]: {
+          ...currentSections,
+          [sectionId]: currentItems.map((currentItem) => (currentItem === item ? trimmedItem : currentItem))
+        }
+      };
+    });
+
+    setSelectedChecklistItems((current) => {
+      const nextItems = (current[tabId] ?? []).map((currentItem) => (currentItem === item ? trimmedItem : currentItem));
+      return {
+        ...current,
+        [tabId]: Array.from(new Set(nextItems))
+      };
+    });
+  }, []);
+
+  const updateDefaultChecklistItem = useCallback((tabId: InspectionTab, sectionId: string, item: string, nextItem: string) => {
+    const trimmedItem = nextItem.trim();
+
+    if (!trimmedItem || trimmedItem === item) {
+      return;
+    }
+
+    setItemLabelsBySection((current) => {
+      const currentSections = current[tabId] ?? {};
+      const currentItems = currentSections[sectionId] ?? {};
+
+      return {
+        ...current,
+        [tabId]: {
+          ...currentSections,
+          [sectionId]: {
+            ...currentItems,
+            [item]: trimmedItem
+          }
+        }
+      };
+    });
+  }, []);
+
+  const updateDiagMonitorCount = useCallback((setId: number, count: 1 | 2) => {
+    setDiagMonitorCounts((current) => ({
+      ...current,
+      [setId]: count
+    }));
+  }, []);
+
   const saveChecklistConfig = async () => {
+    const pmCycle = contractDetails.pmCycle ?? "ครึ่งปี";
+    const visitCount = getVisitCountForPmCycle(pmCycle);
+    const normalizedContractDetails: SiteContractDetails = {
+      ...contractDetails,
+      pmCycle,
+      visitCount: visitCount ? String(visitCount) : contractDetails.visitCount,
+      visitMonths: (contractDetails.visitMonths ?? []).slice(0, visitCount || undefined)
+    };
+
     writeSitePmChecklistConfig(site.id, {
-      customItems: customChecklistItems,
+      customItems: {},
+      customItemsBySection: customChecklistItemsBySection,
+      diagMonitorCounts,
+      itemLabelsBySection,
       selectedTabs: selectedInspectionTabs,
       setCounts: inspectionSetCounts,
       selectedItems: selectedChecklistItems
@@ -351,7 +501,7 @@ function SiteModal({
         },
         body: JSON.stringify({
           contract: contractNumber,
-          contractDetails,
+          contractDetails: normalizedContractDetails,
           owner: selectedOwner
         })
       });
@@ -415,21 +565,21 @@ function SiteModal({
           />
         );
       case "synapse":
-        return <SynapseTab customItems={customChecklistItems.synapse ?? []} setCount={inspectionSetCounts.synapse} selectedItems={selectedChecklistItems.synapse} onToggleItem={(item, checked) => toggleChecklistItem("synapse", item, checked)} onAddCustomItem={(item) => addCustomChecklistItem("synapse", item)} onRemoveCustomItem={(item) => removeCustomChecklistItem("synapse", item)} onAddSet={() => addInspectionSet("synapse")} />;
+        return <SynapseTab customItemsBySection={customChecklistItemsBySection.synapse ?? {}} itemLabelsBySection={itemLabelsBySection.synapse ?? {}} setCount={inspectionSetCounts.synapse} selectedItems={selectedChecklistItems.synapse} onToggleItem={(item, checked) => toggleChecklistItem("synapse", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("synapse", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("synapse", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("synapse", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("synapse", sectionId, item, nextItem)} onAddSet={() => addInspectionSet("synapse")} />;
       case "server":
-        return <DeviceTab title="SERVER" fields={["Location", "Manufacturer", "Host Name", "Model", "S/N or S/T", "IP Address", "ESX Version", "MT"]} checklistTitle="SERVER CHECKLIST" checklist={serverChecklist} addLabel={t("sites.addDeviceSet").replace("{device}", "Server")} customItems={customChecklistItems.server ?? []} setCount={inspectionSetCounts.server} selectedItems={selectedChecklistItems.server} onToggleItem={(item, checked) => toggleChecklistItem("server", item, checked)} onAddCustomItem={(item) => addCustomChecklistItem("server", item)} onRemoveCustomItem={(item) => removeCustomChecklistItem("server", item)} onAddSet={() => addInspectionSet("server")} />;
+        return <DeviceTab title="SERVER" sectionId="serverChecklist" fields={["Location", "Manufacturer", "Host Name", "Model", "S/N or S/T", "IP Address", "ESX Version", "MT"]} checklistTitle="SERVER CHECKLIST" checklist={serverChecklist} addLabel={t("sites.addDeviceSet").replace("{device}", "Server")} customItemsBySection={customChecklistItemsBySection.server ?? {}} itemLabelsBySection={itemLabelsBySection.server ?? {}} setCount={inspectionSetCounts.server} selectedItems={selectedChecklistItems.server} onToggleItem={(item, checked) => toggleChecklistItem("server", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("server", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("server", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("server", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("server", sectionId, item, nextItem)} onAddSet={() => addInspectionSet("server")} />;
       case "switch":
-        return <DeviceTab title="SWITCH" fields={["Customer Name", "Location", "Brand", "Model", "S/N", "Host Name", "IP Address"]} checklistTitle="SWITCH CHECKLIST" checklist={switchChecklist} addLabel={t("sites.addDeviceSet").replace("{device}", "Switch")} customItems={customChecklistItems.switch ?? []} setCount={inspectionSetCounts.switch} selectedItems={selectedChecklistItems.switch} onToggleItem={(item, checked) => toggleChecklistItem("switch", item, checked)} onAddCustomItem={(item) => addCustomChecklistItem("switch", item)} onRemoveCustomItem={(item) => removeCustomChecklistItem("switch", item)} onAddSet={() => addInspectionSet("switch")} />;
+        return <DeviceTab title="SWITCH" sectionId="switchChecklist" fields={["Customer Name", "Location", "Brand", "Model", "S/N", "Host Name", "IP Address"]} checklistTitle="SWITCH CHECKLIST" checklist={switchChecklist} addLabel={t("sites.addDeviceSet").replace("{device}", "Switch")} customItemsBySection={customChecklistItemsBySection.switch ?? {}} itemLabelsBySection={itemLabelsBySection.switch ?? {}} setCount={inspectionSetCounts.switch} selectedItems={selectedChecklistItems.switch} onToggleItem={(item, checked) => toggleChecklistItem("switch", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("switch", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("switch", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("switch", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("switch", sectionId, item, nextItem)} onAddSet={() => addInspectionSet("switch")} />;
       case "storage":
-        return <DeviceTab title="STORAGE" fields={["Customer Name", "Location", "Model", "Manufacturer", "S/N or S/T", "MT"]} checklistTitle="STORAGE CHECKLIST" checklist={storageChecklist} addLabel={t("sites.addDeviceSet").replace("{device}", "Storage")} customItems={customChecklistItems.storage ?? []} setCount={inspectionSetCounts.storage} selectedItems={selectedChecklistItems.storage} onToggleItem={(item, checked) => toggleChecklistItem("storage", item, checked)} onAddCustomItem={(item) => addCustomChecklistItem("storage", item)} onRemoveCustomItem={(item) => removeCustomChecklistItem("storage", item)} onAddSet={() => addInspectionSet("storage")} />;
+        return <DeviceTab title="STORAGE" sectionId="storageChecklist" fields={["Customer Name", "Location", "Model", "Manufacturer", "S/N or S/T", "MT"]} checklistTitle="STORAGE CHECKLIST" checklist={storageChecklist} addLabel={t("sites.addDeviceSet").replace("{device}", "Storage")} customItemsBySection={customChecklistItemsBySection.storage ?? {}} itemLabelsBySection={itemLabelsBySection.storage ?? {}} setCount={inspectionSetCounts.storage} selectedItems={selectedChecklistItems.storage} onToggleItem={(item, checked) => toggleChecklistItem("storage", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("storage", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("storage", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("storage", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("storage", sectionId, item, nextItem)} onAddSet={() => addInspectionSet("storage")} />;
       case "environment":
-        return <EnvironmentTab customItems={customChecklistItems.environment ?? []} setCount={inspectionSetCounts.environment} selectedItems={selectedChecklistItems.environment} onToggleItem={(item, checked) => toggleChecklistItem("environment", item, checked)} onAddCustomItem={(item) => addCustomChecklistItem("environment", item)} onRemoveCustomItem={(item) => removeCustomChecklistItem("environment", item)} onAddSet={() => addInspectionSet("environment")} />;
+        return <EnvironmentTab customItemsBySection={customChecklistItemsBySection.environment ?? {}} itemLabelsBySection={itemLabelsBySection.environment ?? {}} setCount={inspectionSetCounts.environment} selectedItems={selectedChecklistItems.environment} onToggleItem={(item, checked) => toggleChecklistItem("environment", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("environment", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("environment", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("environment", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("environment", sectionId, item, nextItem)} onAddSet={() => addInspectionSet("environment")} />;
       case "diag":
-        return <DiagTab setCount={inspectionSetCounts.diag} onAddSet={() => addInspectionSet("diag")} />;
+        return <DiagTab monitorCounts={diagMonitorCounts} setCount={inspectionSetCounts.diag} onAddSet={() => addInspectionSet("diag")} onMonitorCountChange={updateDiagMonitorCount} />;
       default:
         return null;
     }
-  }, [activeTab, addCustomChecklistItem, addInspectionSet, contractDetails, contractNumber, customChecklistItems, inspectionSetCounts, regions, removeCustomChecklistItem, selectedChecklistItems, selectedInspectionTabs, selectedOwner, site, systemUsers, t, toggleChecklistItem, toggleInspectionTab]);
+  }, [activeTab, addCustomChecklistItem, addInspectionSet, contractDetails, contractNumber, customChecklistItemsBySection, diagMonitorCounts, inspectionSetCounts, itemLabelsBySection, regions, removeCustomChecklistItem, selectedChecklistItems, selectedInspectionTabs, selectedOwner, site, systemUsers, t, toggleChecklistItem, toggleInspectionTab, updateCustomChecklistItem, updateDefaultChecklistItem, updateDiagMonitorCount]);
 
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label={title}>
@@ -459,10 +609,9 @@ function SiteModal({
 
         <div className="modalBody">{content}</div>
         <AlertPopup open={Boolean(saveError)} tone="error" message={saveError} onClose={() => setSaveError("")} />
-        <AlertPopup open={showDeleteConfirm} tone="error" title={t("sites.deleteModalTitle") ?? "Delete Site"} message={t("sites.deleteConfirmMessage") ?? `Are you sure you want to delete "${site.site}"?`} onClose={() => setShowDeleteConfirm(false)} />
 
         <footer className="modalFooter">
-          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          <div className="modalFooterActions">
             <button className="button ghost" type="button" onClick={onClose}>{t("common.cancel")}</button>
             {mode === "edit" && (
               <button
@@ -472,7 +621,7 @@ function SiteModal({
                 disabled={isDeleting}
               >
                 <Trash2 size={16} />
-                {t("delete") ?? "Delete"}
+                {t("sites.deleteSite")}
               </button>
             )}
           </div>
@@ -483,44 +632,19 @@ function SiteModal({
         </footer>
 
         {showDeleteConfirm && (
-          <div style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 10000
-          }}>
-            <div style={{
-              backgroundColor: "rgba(0,0,0,0.5)",
-              position: "absolute",
-              inset: 0,
-              zIndex: -1
-            }} onClick={() => setShowDeleteConfirm(false)} />
-            <div style={{
-              backgroundColor: "var(--bg-secondary)",
-              borderRadius: "8px",
-              padding: "24px",
-              minWidth: "300px",
-              border: "1px solid var(--border-color)"
-            }}>
-              <h3 style={{ marginBottom: "16px" }}>
-                {t("sites.deleteModalTitle") ?? "Delete Site"}
-              </h3>
-              <p style={{ marginBottom: "24px", color: "var(--text-secondary)" }}>
-                {t("sites.deleteConfirmMessage") ?? `Are you sure you want to delete "${site.site}"? This action cannot be undone.`}
-              </p>
-              <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+          <div className="confirmOverlay" role="alertdialog" aria-modal="true" aria-label={t("sites.deleteModalTitle")}>
+            <button className="confirmBackdrop" type="button" aria-label={t("common.cancel")} onClick={() => setShowDeleteConfirm(false)} />
+            <article className="confirmDialog">
+              <h3>{t("sites.deleteModalTitle")}</h3>
+              <p>{t("sites.deleteConfirmMessage").replace("{site}", site.site)}</p>
+              <div className="confirmActions">
                 <button
                   className="button ghost"
                   type="button"
                   onClick={() => setShowDeleteConfirm(false)}
                   disabled={isDeleting}
                 >
-                  {t("cancel")}
+                  {t("common.cancel")}
                 </button>
                 <button
                   className="button danger"
@@ -528,10 +652,10 @@ function SiteModal({
                   onClick={deleteSite}
                   disabled={isDeleting}
                 >
-                  {isDeleting ? t("pm.loadingSubtitle") : t("delete") ?? "Delete"}
+                  {isDeleting ? t("sites.deletingSite") : t("sites.deleteSite")}
                 </button>
               </div>
-            </div>
+            </article>
           </div>
         )}
       </article>
@@ -612,12 +736,41 @@ function ContractTab({
   onToggleInspectionTab: (tabId: InspectionTab, checked: boolean) => void;
 }) {
   const { lang, t } = useUi();
-  const updateContractDetails = (field: keyof SiteContractDetails, value: string) => {
+  const selectedVisitMonths = Array.isArray(contractDetails.visitMonths) ? contractDetails.visitMonths : [];
+  const selectedPmCycle = contractDetails.pmCycle ?? "ครึ่งปี";
+  const visitLimit = getVisitCountForPmCycle(selectedPmCycle);
+  const visitLimitLabel = lang === "th" ? `เลือกได้ ${selectedVisitMonths.length}/${visitLimit} เดือน` : `${selectedVisitMonths.length}/${visitLimit} months selected`;
+  const availableVisitMonths = monthOptions.filter((month) => !selectedVisitMonths.includes(month.value));
+  const orderedSelectedVisitMonths = monthOptions.filter((month) => selectedVisitMonths.includes(month.value));
+  const canAddVisitMonth = visitLimit > selectedVisitMonths.length && availableVisitMonths.length > 0;
+  const updateContractDetails = <K extends keyof SiteContractDetails>(field: K, value: SiteContractDetails[K]) => {
     onContractDetailsChange({
       ...contractDetails,
       [field]: value
     });
   };
+  const updatePmCycle = (value: string) => {
+    const nextVisitCount = getVisitCountForPmCycle(value);
+
+    onContractDetailsChange({
+      ...contractDetails,
+      pmCycle: value,
+      visitCount: nextVisitCount ? String(nextVisitCount) : "",
+      visitMonths: selectedVisitMonths.slice(0, nextVisitCount || undefined)
+    });
+  };
+  const addVisitMonth = (month: string) => {
+    if (!month || selectedVisitMonths.includes(month) || selectedVisitMonths.length >= visitLimit) {
+      return;
+    }
+
+    updateContractDetails("visitMonths", [...selectedVisitMonths, month]);
+  };
+  const removeVisitMonth = (month: string) => {
+    updateContractDetails("visitMonths", selectedVisitMonths.filter((item) => item !== month));
+  };
+  const contractStartDate = contractDetails.contractStartDate ?? (contractDetails.contractStartMonth ? `${contractDetails.contractStartMonth}-01` : "");
+  const contractEndDate = contractDetails.contractEndDate ?? (contractDetails.contractEndMonth ? `${contractDetails.contractEndMonth}-01` : "");
 
   return (
     <div className="tabPane">
@@ -626,8 +779,8 @@ function ContractTab({
           {t("fields.pmCycle")}
           <select
             className="select"
-            value={contractDetails.pmCycle ?? "ครึ่งปี"}
-            onChange={(event) => updateContractDetails("pmCycle", event.target.value)}
+            value={selectedPmCycle}
+            onChange={(event) => updatePmCycle(event.target.value)}
           >
             {["รายเดือน", "ราย3เดือน", "ราย4เดือน", "ครึ่งปี", "รายปี"].map((cycle) => (
               <option key={cycle} value={cycle}>{localizeLabel(cycle, lang)}</option>
@@ -639,14 +792,43 @@ function ContractTab({
           <input className="field" value={contractNumber} placeholder={t("fields.contractNumber")} onChange={(event) => onContractNumberChange(event.target.value)} />
         </label>
         <label className="label">
-          {lang === "th" ? "เดือน/ปี ที่เริ่มสัญญา" : "Contract start month/year"}
-          <input className="field" type="month" value={contractDetails.contractStartMonth ?? ""} onChange={(event) => updateContractDetails("contractStartMonth", event.target.value)} />
+          {t("fields.visitCount")}
+          <input className="field" min={0} max={12} readOnly type="number" value={visitLimit || ""} placeholder={t("fields.visitCount")} />
         </label>
         <label className="label">
-          {lang === "th" ? "เดือน/ปี ที่หมดสัญญา" : "Contract end month/year"}
-          <input className="field" type="month" value={contractDetails.contractEndMonth ?? ""} onChange={(event) => updateContractDetails("contractEndMonth", event.target.value)} />
+          {t("fields.contractStartDate")}
+          <input className="field" type="date" value={contractStartDate} onChange={(event) => updateContractDetails("contractStartDate", event.target.value)} />
+        </label>
+        <label className="label">
+          {t("fields.contractEndDate")}
+          <input className="field" type="date" value={contractEndDate} onChange={(event) => updateContractDetails("contractEndDate", event.target.value)} />
         </label>
       </div>
+
+      <section className="sectionCard">
+        <div className="sectionTitleRow">
+          <h3>{t("sites.visitMonths")}</h3>
+          <span>{visitLimitLabel}</span>
+        </div>
+        <select className="select" value="" disabled={!canAddVisitMonth} onChange={(event) => addVisitMonth(event.target.value)}>
+          <option value="">{t("sites.selectVisitMonth")}</option>
+          {availableVisitMonths.map((month) => (
+            <option key={month.value} value={month.value}>{lang === "th" ? month.th : month.en}</option>
+          ))}
+        </select>
+        {orderedSelectedVisitMonths.length > 0 ? (
+          <div className="visitMonthChips">
+            {orderedSelectedVisitMonths.map((month) => (
+              <span key={month.value}>
+                {lang === "th" ? month.th : month.en}
+                <button type="button" aria-label={`${t("sites.removeVisitMonth")} ${lang === "th" ? month.th : month.en}`} onClick={() => removeVisitMonth(month.value)}>
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </section>
 
       <label className="uploadBox">
         <span>{t("sites.attachContract")}</span>
@@ -680,20 +862,26 @@ function ContractTab({
 }
 
 function SynapseTab({
-  customItems,
+  customItemsBySection,
+  itemLabelsBySection,
   setCount,
   selectedItems,
   onToggleItem,
   onAddCustomItem,
   onRemoveCustomItem,
+  onUpdateCustomItem,
+  onUpdateDefaultItem,
   onAddSet
 }: {
-  customItems: string[];
+  customItemsBySection: Record<string, string[]>;
+  itemLabelsBySection: Record<string, Record<string, string>>;
   setCount: number;
   selectedItems: string[];
   onToggleItem: (item: string, checked: boolean) => void;
-  onAddCustomItem: (item: string) => void;
-  onRemoveCustomItem: (item: string) => void;
+  onAddCustomItem: (sectionId: string, item: string) => void;
+  onRemoveCustomItem: (sectionId: string, item: string) => void;
+  onUpdateCustomItem: (sectionId: string, item: string, nextItem: string) => void;
+  onUpdateDefaultItem: (sectionId: string, item: string, nextItem: string) => void;
   onAddSet: () => void;
 }) {
   const { t } = useUi();
@@ -701,9 +889,8 @@ function SynapseTab({
   return (
     <div className="tabPane">
       {Array.from({ length: setCount }, (_, index) => index + 1).map((setId) => (
-        <SynapseSetPanel key={setId} setId={setId} selectedItems={selectedItems} onToggleItem={onToggleItem} />
+        <SynapseSetPanel key={setId} customItemsBySection={customItemsBySection} itemLabelsBySection={itemLabelsBySection} setId={setId} selectedItems={selectedItems} onAddCustomItem={onAddCustomItem} onRemoveCustomItem={onRemoveCustomItem} onUpdateCustomItem={onUpdateCustomItem} onUpdateDefaultItem={onUpdateDefaultItem} onToggleItem={onToggleItem} />
       ))}
-      <CustomChecklistEditor items={customItems} onAddItem={onAddCustomItem} onRemoveItem={onRemoveCustomItem} />
       <button className="addLineButton" type="button" onClick={onAddSet}>
         <Plus size={15} />
         {t("sites.addSynapseSet")}
@@ -713,12 +900,24 @@ function SynapseTab({
 }
 
 function SynapseSetPanel({
+  customItemsBySection,
+  itemLabelsBySection,
   setId,
   selectedItems,
+  onAddCustomItem,
+  onRemoveCustomItem,
+  onUpdateCustomItem,
+  onUpdateDefaultItem,
   onToggleItem
 }: {
+  customItemsBySection: Record<string, string[]>;
+  itemLabelsBySection: Record<string, Record<string, string>>;
   setId: number;
   selectedItems: string[];
+  onAddCustomItem: (sectionId: string, item: string) => void;
+  onRemoveCustomItem: (sectionId: string, item: string) => void;
+  onUpdateCustomItem: (sectionId: string, item: string, nextItem: string) => void;
+  onUpdateDefaultItem: (sectionId: string, item: string, nextItem: string) => void;
   onToggleItem: (item: string, checked: boolean) => void;
 }) {
   return (
@@ -744,13 +943,13 @@ function SynapseSetPanel({
         </div>
       </section>
 
-      <ChecklistSection title={`SYNAPSE SYSTEM CHECKLIST #${setId}`} items={synapseSystem} selectedItems={selectedItems} onToggleItem={onToggleItem} />
-      <ChecklistSection title={`CONFIGURATION BACKUP CHECKLIST #${setId}`} items={configurationBackup} selectedItems={selectedItems} onToggleItem={onToggleItem} />
+      <ChecklistSection customItems={customItemsBySection.synapseSystem ?? []} itemLabels={itemLabelsBySection.synapseSystem ?? {}} title={`SYNAPSE SYSTEM CHECKLIST #${setId}`} items={synapseSystem} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("synapseSystem", item)} onRemoveItem={(item) => onRemoveCustomItem("synapseSystem", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("synapseSystem", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("synapseSystem", item, nextItem)} onToggleItem={onToggleItem} />
+      <ChecklistSection customItems={customItemsBySection.configurationBackup ?? []} itemLabels={itemLabelsBySection.configurationBackup ?? {}} title={`CONFIGURATION BACKUP CHECKLIST #${setId}`} items={configurationBackup} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("configurationBackup", item)} onRemoveItem={(item) => onRemoveCustomItem("configurationBackup", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("configurationBackup", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("configurationBackup", item, nextItem)} onToggleItem={onToggleItem} />
       <Field label="Configuration Backup Path" placeholder="Configuration Backup Path" />
 
       <section className="sectionCard">
         <h3>BACKUP DEVICE / DATA BACKUP CHECKING #{setId}</h3>
-        <RadioGroup label={`Backup Type ${setId}`} items={["DR Site", "S", "Other"]} />
+        <RadioGroup label={`Backup Type ${setId}`} items={["DR Site", "NAS", "Other"]} />
         <Field label="Location" placeholder="Location" />
         <RadioGroup label={`Hardware Status ${setId}`} items={["ปกติ", "ผิดปกติ"]} />
         <RadioGroup label={`Backup Status ${setId}`} items={["ปกติ", "ผิดปกติ"]} />
@@ -762,29 +961,37 @@ function SynapseSetPanel({
 
 function DeviceTab({
   title,
+  sectionId,
   fields,
   checklistTitle,
   checklist,
   addLabel,
-  customItems,
+  customItemsBySection,
+  itemLabelsBySection,
   setCount,
   selectedItems,
   onToggleItem,
   onAddCustomItem,
   onRemoveCustomItem,
+  onUpdateCustomItem,
+  onUpdateDefaultItem,
   onAddSet
 }: {
   title: string;
+  sectionId: string;
   fields: string[];
   checklistTitle: string;
   checklist: string[];
   addLabel: string;
-  customItems: string[];
+  customItemsBySection: Record<string, string[]>;
+  itemLabelsBySection: Record<string, Record<string, string>>;
   setCount: number;
   selectedItems: string[];
   onToggleItem: (item: string, checked: boolean) => void;
-  onAddCustomItem: (item: string) => void;
-  onRemoveCustomItem: (item: string) => void;
+  onAddCustomItem: (sectionId: string, item: string) => void;
+  onRemoveCustomItem: (sectionId: string, item: string) => void;
+  onUpdateCustomItem: (sectionId: string, item: string, nextItem: string) => void;
+  onUpdateDefaultItem: (sectionId: string, item: string, nextItem: string) => void;
   onAddSet: () => void;
 }) {
   return (
@@ -797,10 +1004,9 @@ function DeviceTab({
               <Field key={field} label={field} placeholder={field} />
             ))}
           </div>
-          <ChecklistSection title={`${checklistTitle} #${setId}`} items={checklist} selectedItems={selectedItems} onToggleItem={onToggleItem} />
+          <ChecklistSection customItems={customItemsBySection[sectionId] ?? []} itemLabels={itemLabelsBySection[sectionId] ?? {}} title={`${checklistTitle} #${setId}`} items={checklist} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem(sectionId, item)} onRemoveItem={(item) => onRemoveCustomItem(sectionId, item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem(sectionId, item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem(sectionId, item, nextItem)} onToggleItem={onToggleItem} />
         </section>
       ))}
-      <CustomChecklistEditor items={customItems} onAddItem={onAddCustomItem} onRemoveItem={onRemoveCustomItem} />
       <button className="addLineButton" type="button" onClick={onAddSet}>
         <Plus size={15} />
         {addLabel}
@@ -810,20 +1016,26 @@ function DeviceTab({
 }
 
 function EnvironmentTab({
-  customItems,
+  customItemsBySection,
+  itemLabelsBySection,
   setCount,
   selectedItems,
   onToggleItem,
   onAddCustomItem,
   onRemoveCustomItem,
+  onUpdateCustomItem,
+  onUpdateDefaultItem,
   onAddSet
 }: {
-  customItems: string[];
+  customItemsBySection: Record<string, string[]>;
+  itemLabelsBySection: Record<string, Record<string, string>>;
   setCount: number;
   selectedItems: string[];
   onToggleItem: (item: string, checked: boolean) => void;
-  onAddCustomItem: (item: string) => void;
-  onRemoveCustomItem: (item: string) => void;
+  onAddCustomItem: (sectionId: string, item: string) => void;
+  onRemoveCustomItem: (sectionId: string, item: string) => void;
+  onUpdateCustomItem: (sectionId: string, item: string, nextItem: string) => void;
+  onUpdateDefaultItem: (sectionId: string, item: string, nextItem: string) => void;
   onAddSet: () => void;
 }) {
   const { t } = useUi();
@@ -831,9 +1043,8 @@ function EnvironmentTab({
   return (
     <div className="tabPane">
       {Array.from({ length: setCount }, (_, index) => index + 1).map((setId) => (
-        <EnvironmentSetPanel key={setId} setId={setId} selectedItems={selectedItems} onToggleItem={onToggleItem} />
+        <EnvironmentSetPanel key={setId} customItemsBySection={customItemsBySection} itemLabelsBySection={itemLabelsBySection} setId={setId} selectedItems={selectedItems} onAddCustomItem={onAddCustomItem} onRemoveCustomItem={onRemoveCustomItem} onUpdateCustomItem={onUpdateCustomItem} onUpdateDefaultItem={onUpdateDefaultItem} onToggleItem={onToggleItem} />
       ))}
-      <CustomChecklistEditor items={customItems} onAddItem={onAddCustomItem} onRemoveItem={onRemoveCustomItem} />
       <button className="addLineButton" type="button" onClick={onAddSet}>
         <Plus size={15} />
         {t("sites.addEnvironmentSet")}
@@ -843,12 +1054,24 @@ function EnvironmentTab({
 }
 
 function EnvironmentSetPanel({
+  customItemsBySection,
+  itemLabelsBySection,
   setId,
   selectedItems,
+  onAddCustomItem,
+  onRemoveCustomItem,
+  onUpdateCustomItem,
+  onUpdateDefaultItem,
   onToggleItem
 }: {
+  customItemsBySection: Record<string, string[]>;
+  itemLabelsBySection: Record<string, Record<string, string>>;
   setId: number;
   selectedItems: string[];
+  onAddCustomItem: (sectionId: string, item: string) => void;
+  onRemoveCustomItem: (sectionId: string, item: string) => void;
+  onUpdateCustomItem: (sectionId: string, item: string, nextItem: string) => void;
+  onUpdateDefaultItem: (sectionId: string, item: string, nextItem: string) => void;
   onToggleItem: (item: string, checked: boolean) => void;
 }) {
   const { t } = useUi();
@@ -862,14 +1085,24 @@ function EnvironmentSetPanel({
           <Field label="Location" placeholder="Location" />
         </div>
       </section>
-      <ChecklistSection title={`${t("sites.environmentChecklist")} #${setId}`} items={environmentMain} selectedItems={selectedItems} onToggleItem={onToggleItem} />
-      <ChecklistSection title={`${t("sites.cablingPowerChecklist")} #${setId}`} items={environmentPower} selectedItems={selectedItems} onToggleItem={onToggleItem} />
-      <ChecklistSection title={`SECURITY CHECKLIST #${setId}`} items={environmentSecurity} selectedItems={selectedItems} onToggleItem={onToggleItem} />
+      <ChecklistSection customItems={customItemsBySection.environmentMain ?? []} itemLabels={itemLabelsBySection.environmentMain ?? {}} title={`${t("sites.environmentChecklist")} #${setId}`} items={environmentMain} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("environmentMain", item)} onRemoveItem={(item) => onRemoveCustomItem("environmentMain", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("environmentMain", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("environmentMain", item, nextItem)} onToggleItem={onToggleItem} />
+      <ChecklistSection customItems={customItemsBySection.environmentPower ?? []} itemLabels={itemLabelsBySection.environmentPower ?? {}} title={`${t("sites.cablingPowerChecklist")} #${setId}`} items={environmentPower} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("environmentPower", item)} onRemoveItem={(item) => onRemoveCustomItem("environmentPower", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("environmentPower", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("environmentPower", item, nextItem)} onToggleItem={onToggleItem} />
+      <ChecklistSection customItems={customItemsBySection.environmentSecurity ?? []} itemLabels={itemLabelsBySection.environmentSecurity ?? {}} title={`SECURITY CHECKLIST #${setId}`} items={environmentSecurity} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("environmentSecurity", item)} onRemoveItem={(item) => onRemoveCustomItem("environmentSecurity", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("environmentSecurity", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("environmentSecurity", item, nextItem)} onToggleItem={onToggleItem} />
     </>
   );
 }
 
-function DiagTab({ setCount, onAddSet }: { setCount: number; onAddSet: () => void }) {
+function DiagTab({
+  monitorCounts,
+  setCount,
+  onAddSet,
+  onMonitorCountChange
+}: {
+  monitorCounts: Record<number, 1 | 2>;
+  setCount: number;
+  onAddSet: () => void;
+  onMonitorCountChange: (setId: number, count: 1 | 2) => void;
+}) {
   const { t } = useUi();
   const [diagRowsBySet, setDiagRowsBySet] = useState<Record<number, DiagSet["rows"]>>({});
   const diagSets = useMemo(() => (
@@ -906,7 +1139,9 @@ function DiagTab({ setCount, onAddSet }: { setCount: number; onAddSet: () => voi
         <DiagSetPanel
           key={diagSet.id}
           diagSet={diagSet}
+          monitorCount={monitorCounts[diagSet.id] ?? 2}
           onToggle={toggleDiagCheck}
+          onMonitorCountChange={onMonitorCountChange}
         />
       ))}
 
@@ -920,12 +1155,24 @@ function DiagTab({ setCount, onAddSet }: { setCount: number; onAddSet: () => voi
 
 function DiagSetPanel({
   diagSet,
+  monitorCount,
+  onMonitorCountChange,
   onToggle
 }: {
   diagSet: DiagSet;
+  monitorCount: 1 | 2;
+  onMonitorCountChange: (setId: number, count: 1 | 2) => void;
   onToggle: (setId: number, device: string, check: DiagCheck) => void;
 }) {
   const { t } = useUi();
+  const physicalStatusFields = [
+    "Act. Times Monitor 1",
+    ...(monitorCount === 2 ? ["Act. Times Monitor 2"] : []),
+    "Backlight Times Monitor 1",
+    ...(monitorCount === 2 ? ["Backlight Times Monitor 2"] : []),
+    "Mfg Date Monitor 1",
+    ...(monitorCount === 2 ? ["Mfg Date Monitor 2"] : [])
+  ];
 
   return (
     <>
@@ -935,19 +1182,26 @@ function DiagSetPanel({
           {["Customer Name", "Location", "Brand", "Model", "S/N", "IP Address", "OS"].map((field) => (
             <Field key={field} label={field} placeholder={field} />
           ))}
+          <label className="label">
+            {t("sites.monitorCount")}
+            <select className="select" value={monitorCount} onChange={(event) => onMonitorCountChange(diagSet.id, Number(event.target.value) === 1 ? 1 : 2)}>
+              <option value={1}>1 Monitor</option>
+              <option value={2}>2 Monitor</option>
+            </select>
+          </label>
         </div>
         <RadioGroup label={`Antivirus ${diagSet.id}`} items={["Installed", "No Installation"]} />
         <Field label="Definition Date" placeholder="DD/MM/YYYY" />
       </section>
 
       <Calibrate title={`Calibrate: Monitor 1 - DIAG #${diagSet.id}`} />
-      <Calibrate title={`Calibrate: Monitor 2 - DIAG #${diagSet.id}`} />
+      {monitorCount === 2 ? <Calibrate title={`Calibrate: Monitor 2 - DIAG #${diagSet.id}`} /> : null}
 
       <section className="sectionCard">
         <RadioGroup label={`Diagnostic Monitor / SMPTE Pattern ${diagSet.id}`} items={["ปกติ", "ผิดปกติ"]} />
-        <h3>Physical Status</h3>
+        <h3>{monitorCount === 1 ? "Physical Status 1" : "Physical Status"}</h3>
         <div className="formGrid">
-          {["Act. Times Monitor 1", "Act. Times Monitor 2", "Backlight Times Monitor 1", "Backlight Times Monitor 2", "Mfg Date Monitor 1", "Mfg Date Monitor 2"].map((field) => (
+          {physicalStatusFields.map((field) => (
             <Field key={field} label={field} placeholder={field.includes("Date") ? "DD/MM/YYYY" : field} />
           ))}
         </div>
@@ -1026,29 +1280,192 @@ function Field({ label, value, placeholder }: { label: string; value?: string; p
 }
 
 function ChecklistSection({
+  customItems = [],
+  itemLabels = {},
   title,
   items,
   selectedItems,
+  onAddItem,
+  onRemoveItem,
+  onUpdateItem,
+  onUpdateDefaultItem,
   onToggleItem
 }: {
+  customItems?: string[];
+  itemLabels?: Record<string, string>;
   title: string;
   items: string[];
   selectedItems?: string[];
+  onAddItem?: (item: string) => void;
+  onRemoveItem?: (item: string) => void;
+  onUpdateItem?: (item: string, nextItem: string) => void;
+  onUpdateDefaultItem?: (item: string, nextItem: string) => void;
   onToggleItem?: (item: string, checked: boolean) => void;
 }) {
-  const { lang } = useUi();
+  const { lang, t } = useUi();
+  const [isAdding, setIsAdding] = useState(false);
+  const [newItem, setNewItem] = useState("");
+  const [editingItem, setEditingItem] = useState("");
+  const [editingValue, setEditingValue] = useState("");
+  const allDisplayItems = [...items.map((item) => itemLabels[item] ?? item), ...customItems];
+  const isDefaultEditingItem = items.includes(editingItem);
+  const addItem = () => {
+    const trimmedItem = newItem.trim();
+
+    if (!trimmedItem) {
+      return;
+    }
+
+    if (allDisplayItems.includes(trimmedItem)) {
+      setNewItem("");
+      setIsAdding(false);
+      return;
+    }
+
+    onAddItem?.(trimmedItem);
+    setNewItem("");
+    setIsAdding(false);
+  };
+  const startEditing = (item: string) => {
+    setEditingItem(item);
+    setEditingValue(itemLabels[item] ?? item);
+    setIsAdding(false);
+  };
+  const confirmEdit = () => {
+    const trimmedItem = editingValue.trim();
+
+    if (!editingItem || !trimmedItem || (trimmedItem !== (itemLabels[editingItem] ?? editingItem) && allDisplayItems.includes(trimmedItem))) {
+      return;
+    }
+
+    if (isDefaultEditingItem) {
+      onUpdateDefaultItem?.(editingItem, trimmedItem);
+    } else {
+      onUpdateItem?.(editingItem, trimmedItem);
+    }
+
+    setEditingItem("");
+    setEditingValue("");
+  };
+  const deleteEditingItem = () => {
+    if (!editingItem) {
+      return;
+    }
+
+    if (isDefaultEditingItem) {
+      setEditingItem("");
+      setEditingValue("");
+      return;
+    }
+
+    onRemoveItem?.(editingItem);
+    setEditingItem("");
+    setEditingValue("");
+  };
 
   return (
     <section className="sectionCard">
-      <h3>{localizeLabel(title, lang)}</h3>
+      <div className="checklistHeader">
+        <h3>{localizeLabel(title, lang)}</h3>
+        {onAddItem ? (
+          <button className="checklistAddButton" type="button" onClick={() => setIsAdding((current) => !current)} aria-label={t("sites.addChecklistItem")}>
+            <Plus size={14} />
+          </button>
+        ) : null}
+      </div>
+      {isAdding ? (
+        <div className="inlineChecklistForm">
+          <input
+            className="field"
+            value={newItem}
+            placeholder={t("sites.addChecklistItem")}
+            onChange={(event) => setNewItem(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                addItem();
+              }
+            }}
+          />
+          <button className="button subtle" type="button" onClick={addItem}>{t("common.add")}</button>
+        </div>
+      ) : null}
       <div className="checkList">
         {items.map((item) => (
-          <CheckItem
-            key={item}
-            label={item}
-            checked={selectedItems?.includes(item)}
-            onChange={onToggleItem ? (checked) => onToggleItem(item, checked) : undefined}
-          />
+          <div className="checkItemWithAction" key={item}>
+            {editingItem === item ? (
+              <div className="checkItemEditRow">
+                <input
+                  className="field"
+                  value={editingValue}
+                  onChange={(event) => setEditingValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      confirmEdit();
+                    }
+                  }}
+                />
+                <button className="iconButton confirmChecklistButton" type="button" onClick={confirmEdit} aria-label={`${t("sites.confirmChecklistItem")} ${itemLabels[item] ?? item}`}>
+                  <Check size={14} />
+                </button>
+                <button className="iconButton deleteChecklistButton" type="button" onClick={deleteEditingItem} aria-label={`${t("common.cancel")} ${itemLabels[item] ?? item}`}>
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <CheckItem
+                  label={itemLabels[item] ?? item}
+                  checked={selectedItems?.includes(item)}
+                  onChange={onToggleItem ? (checked) => onToggleItem(item, checked) : undefined}
+                />
+                {onUpdateDefaultItem ? (
+                  <button className="iconButton" type="button" onClick={() => startEditing(item)} aria-label={`${t("sites.editChecklistItem")} ${itemLabels[item] ?? item}`}>
+                    <Pencil size={14} />
+                  </button>
+                ) : null}
+              </>
+            )}
+          </div>
+        ))}
+        {customItems.map((item) => (
+          <div className="checkItemWithAction" key={item}>
+            {editingItem === item ? (
+              <div className="checkItemEditRow">
+                <input
+                  className="field"
+                  value={editingValue}
+                  onChange={(event) => setEditingValue(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      confirmEdit();
+                    }
+                  }}
+                />
+                <button className="iconButton confirmChecklistButton" type="button" onClick={confirmEdit} aria-label={`${t("sites.confirmChecklistItem")} ${item}`}>
+                  <Check size={14} />
+                </button>
+                <button className="iconButton deleteChecklistButton" type="button" onClick={deleteEditingItem} aria-label={`${t("sites.deleteChecklistItem")} ${item}`}>
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <CheckItem
+                  label={item}
+                  checked={selectedItems?.includes(item)}
+                  onChange={onToggleItem ? (checked) => onToggleItem(item, checked) : undefined}
+                />
+                {onUpdateItem ? (
+                  <button className="iconButton" type="button" onClick={() => startEditing(item)} aria-label={`${t("sites.editChecklistItem")} ${item}`}>
+                    <Pencil size={14} />
+                  </button>
+                ) : null}
+              </>
+            )}
+          </div>
         ))}
       </div>
     </section>
@@ -1122,55 +1539,5 @@ function RadioGroup({ label, items }: { label: string; items: string[] }) {
         ))}
       </div>
     </div>
-  );
-}
-
-function CustomChecklistEditor({
-  items,
-  onAddItem,
-  onRemoveItem
-}: {
-  items: string[];
-  onAddItem: (item: string) => void;
-  onRemoveItem: (item: string) => void;
-}) {
-  const { lang, t } = useUi();
-  const [newItem, setNewItem] = useState("");
-
-  return (
-    <section className="sectionCard">
-      <h3>{lang === "th" ? "รายการเช็กลิสต์เพิ่มเติม" : "Custom checklist items"}</h3>
-      <div className="customChecklistForm">
-        <input
-          className="field"
-          value={newItem}
-          placeholder={lang === "th" ? "เพิ่มรายการเช็กลิสต์" : "Add checklist item"}
-          onChange={(event) => setNewItem(event.target.value)}
-        />
-        <button
-          className="button subtle"
-          type="button"
-          onClick={() => {
-            onAddItem(newItem);
-            setNewItem("");
-          }}
-        >
-          <Plus size={15} />
-          {t("common.add")}
-        </button>
-      </div>
-      {items.length > 0 ? (
-        <div className="customChecklistList">
-          {items.map((item) => (
-            <div className="customChecklistItem" key={item}>
-              <strong>{localizeLabel(item, lang)}</strong>
-              <button className="iconButton" type="button" onClick={() => onRemoveItem(item)} aria-label={`${t("common.close")} ${item}`}>
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </section>
   );
 }

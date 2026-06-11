@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, MapPin, Plus, UserRound, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ListFilter, MapPin, Plus, Trash2, UserRound, X } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { AlertPopup, FeedbackPopups } from "@/components/AppPopup";
 import type { SystemUser } from "@/lib/auth/system-users";
@@ -10,6 +10,7 @@ import { useUi, type Lang } from "@/lib/i18n";
 import {
   filterPmJobsByParticipant,
   filterSitesByOwner,
+  getDateString,
   getScheduleDaysForSites,
   normalizeOwnerName,
   type PmJobRecord,
@@ -33,15 +34,16 @@ type MonthPlan = {
 };
 
 type NewPlanJob = {
-  day: number;
+  endDate: string;
   followers: string[];
-  monthNumber: string;
   siteId: string;
+  startDate: string;
   time: string;
 };
 
 type DisplayPlanJob = {
   id: string;
+  groupKey: string;
   siteId: string;
   date: string;
   time: string;
@@ -74,18 +76,62 @@ export default function SchedulePage() {
   const [usersError, setUsersError] = useState("");
   const [monthIndex, setMonthIndex] = useState(1);
   const [selectedDay, setSelectedDay] = useState<number | null>(2);
-  const [addingDate, setAddingDate] = useState<{ monthIndex: number; day: number } | null>(null);
-  const sites = useMemo(() => filterSitesByOwner(data.siteCatalog, userName), [data.siteCatalog, userName]);
+  const [addingDate, setAddingDate] = useState<{ monthIndex: number; day: number; siteId?: string } | null>(null);
+  const [editingJob, setEditingJob] = useState<DisplayPlanJob | null>(null);
+  const [viewingJob, setViewingJob] = useState<DisplayPlanJob | null>(null);
+  const [selectedOwner, setSelectedOwner] = useState("");
+  const [deletingJobId, setDeletingJobId] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const [actionTone, setActionTone] = useState<"error" | "success">("success");
+  const activeOwner = selectedOwner || userName;
+  const todayDate = useMemo(() => getDateString(), []);
+  const sites = useMemo(() => filterSitesByOwner(data.siteCatalog, activeOwner), [activeOwner, data.siteCatalog]);
   const visiblePmJobs = useMemo(
-    () => filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, userName),
-    [data.pmJobs, data.siteCatalog, userName]
+    () => filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, activeOwner),
+    [activeOwner, data.pmJobs, data.siteCatalog]
   );
   const monthPlansByLang = useMemo(() => getMonthPlansByLang(visiblePmJobs, data.siteCatalog), [data.siteCatalog, visiblePmJobs]);
   const monthPlans = monthPlansByLang[lang];
   const weekDays = weekDaysByLang[lang];
   const month = monthPlans[monthIndex];
+  const plannedSiteIds = useMemo(() => new Set(
+    visiblePmJobs
+      .filter((job) => job.visitDate.startsWith(`2026-${month.monthNumber}`))
+      .map((job) => job.siteId)
+  ), [month.monthNumber, visiblePmJobs]);
+  const allPlannedSiteIds = useMemo(() => new Set(
+    data.pmJobs
+      .filter((job) => job.visitDate.startsWith(`2026-${month.monthNumber}`))
+      .map((job) => job.siteId)
+  ), [data.pmJobs, month.monthNumber]);
+  const unplannedSites = useMemo(
+    () => sites.filter((site) => !allPlannedSiteIds.has(site.id)),
+    [allPlannedSiteIds, sites]
+  );
+  const allUnplannedSites = useMemo(
+    () => data.siteCatalog.filter((site) => !allPlannedSiteIds.has(site.id)),
+    [allPlannedSiteIds, data.siteCatalog]
+  );
+  const ownerOptions = useMemo(() => {
+    const owners = [userName, ...systemUsers.map((user) => user.name), ...data.siteCatalog.map((site) => site.owner)];
+    const seenOwners = new Set<string>();
+
+    return owners
+      .map((owner) => owner.trim())
+      .filter((owner) => {
+        const normalizedOwner = normalizeOwnerName(owner);
+
+        if (!normalizedOwner || seenOwners.has(normalizedOwner)) {
+          return false;
+        }
+
+        seenOwners.add(normalizedOwner);
+        return true;
+      });
+  }, [data.siteCatalog, systemUsers, userName]);
   const days = useMemo(() => Array.from({ length: month.dayCount }, (_, index) => index + 1), [month.dayCount]);
   const selectedDate = selectedDay ? `2026-${month.monthNumber}-${String(selectedDay).padStart(2, "0")}` : "";
+  const selectedDateIsPast = Boolean(selectedDate && selectedDate < todayDate);
   const selectedJobs = useMemo(
     () => getDisplayPlanJobs(visiblePmJobs, data.siteCatalog).filter((job) => job.date === selectedDate),
     [data.siteCatalog, selectedDate, visiblePmJobs]
@@ -129,6 +175,27 @@ export default function SchedulePage() {
     setMonthIndex((current) => (current + direction + monthPlans.length) % monthPlans.length);
   };
 
+  const openAddPlan = (siteId?: string) => {
+    if (!selectedDay || selectedDateIsPast) {
+      if (selectedDateIsPast) {
+        setActionTone("error");
+        setActionMessage(t("schedule.pastDateBlocked"));
+      }
+      return;
+    }
+
+    setAddingDate({ monthIndex, day: selectedDay, siteId });
+  };
+
+  const openEditPlan = (job: DisplayPlanJob) => {
+    if (job.date < todayDate) {
+      setViewingJob(job);
+      return;
+    }
+
+    setEditingJob(job);
+  };
+
   const addPlan = async (job: NewPlanJob) => {
     const response = await fetch("/api/pm-jobs", {
       method: "POST",
@@ -138,7 +205,8 @@ export default function SchedulePage() {
       body: JSON.stringify({
         followers: job.followers,
         siteId: job.siteId,
-        visitDate: `2026-${job.monthNumber}-${String(job.day).padStart(2, "0")}`,
+        visitDate: job.startDate,
+        visitEndDate: job.endDate,
         visitTime: job.time
       })
     });
@@ -149,6 +217,60 @@ export default function SchedulePage() {
     }
 
     await reload();
+    setActionTone("success");
+    setActionMessage(t("schedule.addSuccess"));
+  };
+
+  const updatePlan = async (jobId: string, job: NewPlanJob) => {
+    const response = await fetch(`/api/pm-jobs/${encodeURIComponent(jobId)}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        planUpdate: true,
+        followers: job.followers,
+        siteId: job.siteId,
+        visitDate: job.startDate,
+        visitEndDate: job.endDate,
+        visitTime: job.time
+      })
+    });
+    const payload = await response.json() as { message?: string };
+
+    if (!response.ok) {
+      throw new Error(payload.message ?? "Cannot update PM job.");
+    }
+
+    await reload();
+    setActionTone("success");
+    setActionMessage(t("schedule.updateSuccess"));
+  };
+
+  const deletePlan = async (jobId: string) => {
+    setDeletingJobId(jobId);
+    setActionMessage("");
+
+    try {
+      const response = await fetch(`/api/pm-jobs/${encodeURIComponent(jobId)}`, {
+        method: "DELETE"
+      });
+      const payload = await response.json() as { message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.message ?? "Cannot delete PM job.");
+      }
+
+      await reload();
+      setActionTone("success");
+      setActionMessage(t("schedule.deleteSuccess"));
+      setEditingJob(null);
+    } catch (error) {
+      setActionTone("error");
+      setActionMessage(error instanceof Error ? error.message : "Cannot delete PM job.");
+    } finally {
+      setDeletingJobId("");
+    }
   };
 
   return (
@@ -159,7 +281,27 @@ export default function SchedulePage() {
           loadingMessage={t("pm.loadingSubtitle")}
           alertMessage={error ?? userError ?? usersError}
         />
-        <PageTitle title={t("schedule.title")} subtitle={t("schedule.subtitle")} />
+        <AlertPopup open={Boolean(actionMessage)} tone={actionTone} message={actionMessage} onClose={() => setActionMessage("")} />
+        <PageTitle
+          title={t("schedule.title")}
+          subtitle={t("schedule.subtitle")}
+          actions={
+            <div className="scheduleActions">
+              <label className="ownerFilter">
+                <span>{t("fields.siteOwner")}</span>
+                <select
+                  className="select"
+                  value={activeOwner}
+                  onChange={(event) => setSelectedOwner(event.target.value)}
+                >
+                  {ownerOptions.map((owner) => (
+                    <option key={owner} value={owner}>{owner}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          }
+        />
         <section className="layout">
           <article className="calendarPanel">
             <div className="calendarHead">
@@ -170,6 +312,10 @@ export default function SchedulePage() {
               <button type="button" onClick={() => moveMonth(1)} aria-label={t("schedule.nextMonth")}>
                 <ChevronRight size={18} />
               </button>
+            </div>
+            <div className="calendarLegend" aria-label={t("schedule.calendarLegend")}>
+              <span><b className="todayLegend" />{t("common.today")}</span>
+              <span><b className="pastLegend" />{t("schedule.pastDate")}</span>
             </div>
 
             <div className="weekHeader">
@@ -184,10 +330,17 @@ export default function SchedulePage() {
               ))}
               {days.map((day) => {
                 const initialJobs = month.events.find((event) => event.day === day)?.jobs ?? [];
+                const dayDate = `2026-${month.monthNumber}-${String(day).padStart(2, "0")}`;
+                const dayClassName = [
+                  "dayCell",
+                  selectedDay === day ? "selectedDay" : "",
+                  dayDate === todayDate ? "todayDay" : "",
+                  dayDate < todayDate ? "pastDay" : ""
+                ].filter(Boolean).join(" ");
 
                 return (
                   <button
-                    className={selectedDay === day ? "dayCell selectedDay" : "dayCell"}
+                    className={dayClassName}
                     type="button"
                     key={day}
                     onClick={() => setSelectedDay(day)}
@@ -214,110 +367,238 @@ export default function SchedulePage() {
                 {selectedJobs.length > 0 ? (
                   <div className="plannedList">
                     {selectedJobs.map((job) => (
-                      <article className="plannedItem plannedItemReadOnly" key={job.id}>
+                      <button className={job.date < todayDate ? "plannedItem plannedItemButton plannedItemReadOnly" : "plannedItem plannedItemButton"} type="button" key={job.groupKey} onClick={() => openEditPlan(job)}>
                         <div>
                           <strong>{job.site}</strong>
                           <span>{job.time} · {job.customer}</span>
                           {job.followers.length > 0 ? <span>{followersLabel}: {job.followers.join(", ")}</span> : null}
                         </div>
-                      </article>
+                        <ChevronRight size={16} />
+                      </button>
                     ))}
                   </div>
                 ) : (
                   <p>{selectedDay ? t("schedule.noWorkToday") : t("schedule.chooseDateToAddJob")}</p>
                 )}
               </div>
-              <button
-                className="button primary addPlanButton"
-                type="button"
-                disabled={!selectedDay || sites.length === 0}
-                onClick={() => selectedDay ? setAddingDate({ monthIndex, day: selectedDay }) : null}
-              >
-                <Plus size={15} />
-                {t("schedule.addJob")}
-              </button>
+              {!selectedDateIsPast ? (
+                <button
+                  className="button primary addPlanButton"
+                  type="button"
+                  disabled={!selectedDay || unplannedSites.length === 0}
+                  onClick={() => openAddPlan()}
+                >
+                  <Plus size={15} />
+                  {t("schedule.addJob")}
+                </button>
+              ) : null}
             </section>
           </article>
 
           <aside className="sideCard">
             <h2>{t("schedule.unplanned")}</h2>
-            <p>{sites.length} {t("schedule.siteUnit")}</p>
+            <p>{unplannedSites.length} {t("schedule.siteUnit")}</p>
             <div className="unplannedList">
-              {sites.map((site) => (
-                <article className="unplannedItem" key={site.id}>
-                  <strong>{site.site}</strong>
-                  <span>
-                    <UserRound size={12} />
-                    {site.customer}
-                  </span>
-                  <span>
-                    <MapPin size={12} />
-                    {site.province}
-                  </span>
-                </article>
-              ))}
+              {unplannedSites.map((site) => {
+                const isPlanned = plannedSiteIds.has(site.id);
+
+                return (
+                  <button
+                    className={isPlanned ? "unplannedItem scheduledSiteItem" : "unplannedItem"}
+                    key={site.id}
+                    type="button"
+                    disabled={isPlanned || !selectedDay || selectedDateIsPast}
+                    onClick={() => openAddPlan(site.id)}
+                  >
+                    <strong>{site.site}</strong>
+                    <span>
+                      <UserRound size={12} />
+                      {site.customer}
+                    </span>
+                    <span>
+                      <MapPin size={12} />
+                      {site.province}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </aside>
         </section>
         {addingDate ? (
           <AddPlanModal
+            allSites={allUnplannedSites}
             day={addingDate.day}
+            initialSiteId={addingDate.siteId}
             monthNumber={monthPlans[addingDate.monthIndex].monthNumber}
-            sites={sites}
+            sites={unplannedSites}
             systemUsers={systemUsers}
             onClose={() => setAddingDate(null)}
-            onSubmit={(siteId, time, followers) => addPlan({
-              day: addingDate.day,
+            onSubmit={(siteId, time, followers, startDate, endDate) => addPlan({
+              endDate,
               followers,
-              monthNumber: monthPlans[addingDate.monthIndex].monthNumber,
               siteId,
+              startDate,
               time
             })}
           />
+        ) : null}
+        {editingJob ? (
+          <AddPlanModal
+            allSites={includeSiteInOptions(allUnplannedSites, data.siteCatalog, editingJob.siteId)}
+            day={Number(editingJob.date.slice(8, 10))}
+            initialEndDate={editingJob.date}
+            initialFollowers={editingJob.followers}
+            initialSiteId={editingJob.siteId}
+            initialTime={editingJob.time}
+            mode="edit"
+            monthNumber={editingJob.date.slice(5, 7)}
+            sites={includeSiteInOptions(unplannedSites, data.siteCatalog, editingJob.siteId)}
+            systemUsers={systemUsers}
+            deleting={deletingJobId === editingJob.id}
+            onClose={() => setEditingJob(null)}
+            onDelete={() => deletePlan(editingJob.id)}
+            onSubmit={(siteId, time, followers, startDate, endDate) => updatePlan(editingJob.id, {
+              endDate,
+              followers,
+              siteId,
+              startDate,
+              time
+            })}
+          />
+        ) : null}
+        {viewingJob ? (
+          <PlanDetailModal job={viewingJob} onClose={() => setViewingJob(null)} />
         ) : null}
       </div>
     </AppShell>
   );
 }
 
+function PlanDetailModal({ job, onClose }: { job: DisplayPlanJob; onClose: () => void }) {
+  const { t } = useUi();
+
+  return (
+    <div className="overlay" role="dialog" aria-modal="true" aria-label={t("schedule.jobDetailTitle")}>
+      <article className="scheduleModal">
+        <header className="modalHeader">
+          <h2>{t("schedule.jobDetailTitle")}</h2>
+          <button type="button" onClick={onClose} aria-label={t("common.close")}>
+            <X size={18} />
+          </button>
+        </header>
+        <div className="planDetailGrid">
+          <InfoLine label={t("common.site")} value={job.site} />
+          <InfoLine label={t("common.customer")} value={job.customer} />
+          <InfoLine label={t("fields.date")} value={job.date} />
+          <InfoLine label={t("fields.operationTime")} value={job.time} />
+          <InfoLine label={t("schedule.followers")} value={job.followers.length > 0 ? job.followers.join(", ") : "-"} />
+        </div>
+        <footer className="modalActions">
+          <button className="button primary" type="button" onClick={onClose}>{t("common.close")}</button>
+        </footer>
+      </article>
+    </div>
+  );
+}
+
+function InfoLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
 function AddPlanModal({
+  allSites,
+  deleting = false,
   day,
+  initialEndDate,
+  initialFollowers = [],
+  initialSiteId,
+  initialTime = "09:00",
+  mode = "add",
   monthNumber,
   sites,
   systemUsers,
   onClose,
+  onDelete,
   onSubmit
 }: {
+  allSites: SiteCatalogRecord[];
+  deleting?: boolean;
   day: number;
+  initialEndDate?: string;
+  initialFollowers?: string[];
+  initialSiteId?: string;
+  initialTime?: string;
+  mode?: "add" | "edit";
   monthNumber: string;
   sites: SiteCatalogRecord[];
   systemUsers: SystemUser[];
   onClose: () => void;
-  onSubmit: (siteId: string, time: string, followers: string[]) => Promise<void>;
+  onDelete?: () => Promise<void>;
+  onSubmit: (
+    siteId: string,
+    time: string,
+    followers: string[],
+    startDate: string,
+    endDate: string
+  ) => Promise<void>;
 }) {
   const { lang, t } = useUi();
-  const [siteId, setSiteId] = useState(sites[4]?.id ?? sites[0]?.id ?? "");
-  const [time, setTime] = useState("09:00");
-  const [followers, setFollowers] = useState<string[]>([]);
+  const initialDate = `2026-${monthNumber}-${String(day).padStart(2, "0")}`;
+  const todayDate = getDateString();
+  const firstDate = todayDate.startsWith(`2026-${monthNumber}`) ? todayDate : `2026-${monthNumber}-01`;
+  const lastDate = getMonthLastDate(monthNumber);
+  const [showAllSitesInModal, setShowAllSitesInModal] = useState(false);
+  const availableSites = showAllSitesInModal ? allSites : sites;
+  const [siteId, setSiteId] = useState(initialSiteId ?? sites[0]?.id ?? "");
+  const [time, setTime] = useState(initialTime);
+  const [startDate, setStartDate] = useState(initialDate);
+  const [endDate, setEndDate] = useState(initialEndDate ?? initialDate);
+  const [followers, setFollowers] = useState<string[]>(initialFollowers);
+  const [followerSelect, setFollowerSelect] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
-  const selectedSiteId = sites.some((site) => site.id === siteId) ? siteId : sites[0]?.id ?? "";
-  const selectedSite = sites.find((site) => site.id === selectedSiteId) ?? null;
+  const selectedSiteId = availableSites.some((site) => site.id === siteId) ? siteId : availableSites[0]?.id ?? "";
+  const selectedSite = availableSites.find((site) => site.id === selectedSiteId) ?? null;
   const followerUsers = systemUsers.filter((user) => normalizeOwnerName(user.name) !== normalizeOwnerName(selectedSite?.owner));
+  const availableFollowerUsers = followerUsers.filter((user) => !followers.includes(user.name));
   const followersLabel = lang === "th" ? "ผู้ติดตาม" : "Followers";
+  const modalTitle = mode === "edit" ? t("schedule.editModalTitle") : t("schedule.addModalTitle");
 
-  const toggleFollower = (name: string, checked: boolean) => {
+  const addFollower = (name: string) => {
+    if (!name) {
+      return;
+    }
+
     setFollowers((current) => {
-      if (checked) {
-        return current.includes(name) ? current : [...current, name];
+      if (current.includes(name)) {
+        return current;
       }
 
-      return current.filter((item) => item !== name);
+      return [...current, name];
     });
+    setFollowerSelect("");
+  };
+
+  const removeFollower = (name: string) => {
+    setFollowers((current) => current.filter((item) => item !== name));
+  };
+
+  const updateStartDate = (value: string) => {
+    setStartDate(value);
+
+    if (endDate < value) {
+      setEndDate(value);
+    }
   };
 
   return (
-    <div className="overlay" role="dialog" aria-modal="true" aria-label={t("schedule.addModalTitle")}>
+    <div className="overlay" role="dialog" aria-modal="true" aria-label={modalTitle}>
       <form
         className="scheduleModal"
         onSubmit={async (event) => {
@@ -326,7 +607,7 @@ function AddPlanModal({
           setSaveError("");
 
           try {
-            await onSubmit(selectedSiteId, time, followers);
+            await onSubmit(selectedSiteId, time, followers, startDate, endDate);
             onClose();
           } catch (error) {
             setSaveError(error instanceof Error ? error.message : "Cannot add PM job.");
@@ -335,48 +616,114 @@ function AddPlanModal({
         }}
       >
         <header className="modalHeader">
-          <h2>{t("schedule.addModalTitle")} - {formatModalDate(day, monthNumber)}</h2>
+          <h2>{modalTitle} - {formatModalDate(day, monthNumber)}</h2>
           <button type="button" onClick={onClose} aria-label={t("common.close")}>
             <X size={18} />
           </button>
         </header>
+        <button className="button subtle allSitesButton" type="button" onClick={() => setShowAllSitesInModal((current) => !current)}>
+          <ListFilter size={15} />
+          {showAllSitesInModal ? t("schedule.mySites") : t("schedule.viewAllSites")}
+        </button>
         <label className="label">
           {t("fields.siteSelect")}
           <select className="select" value={selectedSiteId} onChange={(event) => setSiteId(event.target.value)}>
-            {sites.map((site) => (
+            {availableSites.map((site) => (
               <option key={site.id} value={site.id}>
                 {site.site} - {site.customer}
               </option>
             ))}
           </select>
         </label>
+        <div className="scheduleDateRange">
+          <label className="label">
+            {t("schedule.startDate")}
+            <input
+              className="field"
+              type="date"
+              value={startDate}
+              min={firstDate}
+              max={lastDate}
+              onChange={(event) => updateStartDate(event.target.value)}
+            />
+          </label>
+          <label className="label">
+            {t("schedule.endDate")}
+            <input
+              className="field"
+              type="date"
+              value={endDate}
+              min={startDate}
+              max={lastDate}
+              onChange={(event) => setEndDate(event.target.value)}
+            />
+          </label>
+        </div>
         <label className="label">
           {t("fields.operationTime")}
           <input className="field" type="time" value={time} onChange={(event) => setTime(event.target.value)} />
         </label>
         <label className="label">
           {followersLabel}
-          <div className="followerList">
-            {followerUsers.map((user) => (
-              <label className="followerOption" key={user.id}>
-                <input
-                  type="checkbox"
-                  checked={followers.includes(user.name)}
-                  onChange={(event) => toggleFollower(user.name, event.target.checked)}
-                />
-                <span>{user.name}</span>
-              </label>
+          <select
+            className="select"
+            value={followerSelect}
+            disabled={availableFollowerUsers.length === 0}
+            onChange={(event) => {
+              setFollowerSelect(event.target.value);
+              addFollower(event.target.value);
+            }}
+          >
+            <option value="">{availableFollowerUsers.length > 0 ? t("schedule.selectFollower") : t("schedule.noFollowers")}</option>
+            {availableFollowerUsers.map((user) => (
+              <option key={user.id} value={user.name}>{user.name}</option>
+            ))}
+          </select>
+        </label>
+        {followers.length > 0 ? (
+          <div className="selectedFollowers">
+            {followers.map((name) => (
+              <span key={name}>
+                {name}
+                <button type="button" aria-label={`${t("schedule.removeFollower")} ${name}`} onClick={() => removeFollower(name)}>
+                  <X size={12} />
+                </button>
+              </span>
             ))}
           </div>
-        </label>
+        ) : null}
         <AlertPopup open={Boolean(saveError)} tone="error" message={saveError} onClose={() => setSaveError("")} />
         <footer className="modalActions">
+          {mode === "edit" && onDelete ? (
+            <button className="button danger" type="button" disabled={deleting || isSaving} onClick={onDelete}>
+              <Trash2 size={15} />
+              {t("schedule.deleteJob")}
+            </button>
+          ) : null}
           <button className="button ghost" type="button" onClick={onClose}>{t("common.cancel")}</button>
-          <button className="button primary" type="submit" disabled={!selectedSiteId || isSaving}>{t("schedule.addJob")}</button>
+          <button className="button primary" type="submit" disabled={!selectedSiteId || isSaving}>
+            {mode === "edit" ? t("common.save") : t("schedule.addJob")}
+          </button>
         </footer>
       </form>
     </div>
   );
+}
+
+function getMonthLastDate(monthNumber: string) {
+  const monthIndex = Number(monthNumber);
+  const dayCount = new Date(Date.UTC(2026, monthIndex, 0)).getUTCDate();
+
+  return `2026-${monthNumber}-${String(dayCount).padStart(2, "0")}`;
+}
+
+function includeSiteInOptions(options: SiteCatalogRecord[], catalog: SiteCatalogRecord[], siteId: string) {
+  if (options.some((site) => site.id === siteId)) {
+    return options;
+  }
+
+  const currentSite = catalog.find((site) => site.id === siteId);
+  return currentSite ? [currentSite, ...options] : options;
 }
 
 function getDisplayPlanJobs(pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecord[]) {
@@ -390,9 +737,10 @@ function getDisplayPlanJobs(pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecor
       return;
     }
 
-    const id = `${job.siteId}:${job.visitDate}:${job.visitTime}`;
-    const displayJob = jobs.get(id) ?? {
-      id,
+    const groupKey = `${job.siteId}:${job.visitDate}:${job.visitTime}`;
+    const displayJob = jobs.get(groupKey) ?? {
+      id: job.id,
+      groupKey,
       siteId: job.siteId,
       date: job.visitDate,
       time: job.visitTime,
@@ -405,7 +753,7 @@ function getDisplayPlanJobs(pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecor
       displayJob.followers.push(job.owner);
     }
 
-    jobs.set(id, displayJob);
+    jobs.set(groupKey, displayJob);
   });
 
   return Array.from(jobs.values()).sort((first, second) => (

@@ -5,10 +5,14 @@ export type CheckResult = "ok" | "bad";
 export type FinalStatus = "normal" | "abnormal";
 
 export type SiteContractDetails = {
+  contractEndDate?: string;
   contractEndMonth?: string;
   contractNote?: string;
+  contractStartDate?: string;
   contractStartMonth?: string;
   pmCycle?: string;
+  visitCount?: string;
+  visitMonths?: string[];
 };
 
 export type SavedSparePart = {
@@ -41,14 +45,25 @@ export type SavedChecklistGroup = {
   sets: SavedChecklistSet[];
 };
 
+export type PmExpenseDetails = {
+  carRental?: string;
+  fuel?: string;
+  general?: string;
+  lodging?: string;
+  other?: string;
+  toll?: string;
+};
+
 export type PmWorkDetails = {
   checkNotes?: Record<string, string>;
   checkResults?: Record<string, CheckResult>;
   checklistSnapshot?: SavedChecklistGroup[];
   draftStatus?: "draft" | "submitted";
+  expenses?: PmExpenseDetails;
   fieldValues?: Record<string, string>;
   finalStatus?: FinalStatus | null;
   inspector?: string;
+  photoNotes?: Record<string, string>;
   photos?: Record<string, string[]>;
   radioValues?: Record<string, string>;
   savedAt?: string;
@@ -182,6 +197,46 @@ export function getWorkSiteBySiteId(sites: SiteRecord[], siteId: string) {
 
 export function getWorkSiteByJobId(sites: SiteRecord[], jobId: string) {
   return sites.find((site) => site.jobId === jobId) ?? null;
+}
+
+export function getVisitCountForPmCycle(pmCycle: string | null | undefined) {
+  const normalizedCycle = (pmCycle ?? "").trim().toLowerCase().replace(/\s+/g, "");
+
+  if (!normalizedCycle) {
+    return 0;
+  }
+
+  if (normalizedCycle.includes("รายเดือน") || normalizedCycle.includes("monthly")) {
+    return 12;
+  }
+
+  if (normalizedCycle.includes("ราย3") || normalizedCycle.includes("ไตรมาส") || normalizedCycle.includes("quarter")) {
+    return 4;
+  }
+
+  if (normalizedCycle.includes("ราย4")) {
+    return 3;
+  }
+
+  if (normalizedCycle.includes("ครึ่ง") || normalizedCycle.includes("semi")) {
+    return 2;
+  }
+
+  if (normalizedCycle.includes("รายปี") || normalizedCycle.includes("annual") || normalizedCycle.includes("year")) {
+    return 1;
+  }
+
+  return 0;
+}
+
+export function getContractVisitTotal(contractDetails: SiteContractDetails | undefined, fallbackPmCycle?: string) {
+  const savedVisitCount = Number(contractDetails?.visitCount ?? "0");
+
+  if (Number.isFinite(savedVisitCount) && savedVisitCount > 0) {
+    return savedVisitCount;
+  }
+
+  return getVisitCountForPmCycle(contractDetails?.pmCycle ?? fallbackPmCycle);
 }
 
 export function normalizeOwnerName(owner: string | null | undefined) {
