@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getNextPmOrderNos, getPmOrderNoFromWorkDetails, normalizePmOrderNo } from "@/lib/pm-order-no";
 import { normalizeOwnerName } from "@/lib/pm-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database, Json } from "@/lib/supabase/database.types";
@@ -44,6 +45,10 @@ function readStatus(value: unknown): WorkStatus | null {
 
 function readDetails(value: unknown): Json {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Json : {};
+}
+
+function readJsonObject(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 function uniqueNames(names: string[]) {
@@ -116,6 +121,55 @@ function getDateRangeValues(startValue: string, endValue: string) {
   return values;
 }
 
+async function getNextJobOrderNos(supabase: ReturnType<typeof createAdminClient>, count: number) {
+  const { data, error } = await supabase
+    .from("pm_jobs")
+    .select("id, work_details");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const existingOrderNos = (data ?? []).flatMap((job) => [
+    normalizePmOrderNo(job.id),
+    getPmOrderNoFromWorkDetails(job.work_details)
+  ]);
+
+  return getNextPmOrderNos(existingOrderNos, count);
+}
+
+function assignPmOrderNos({
+  oldOrderNo,
+  oldVisitDate,
+  visitDates,
+  generatedOrderNos
+}: {
+  generatedOrderNos: string[];
+  oldOrderNo: string;
+  oldVisitDate: string;
+  visitDates: string[];
+}) {
+  const preserveFirstOrderNo = Boolean(oldOrderNo && visitDates[0] === oldVisitDate);
+  let generatedIndex = 0;
+
+  return visitDates.map((date, index) => {
+    if (preserveFirstOrderNo && index === 0) {
+      return oldOrderNo;
+    }
+
+    const orderNo = generatedOrderNos[generatedIndex];
+    generatedIndex += 1;
+    return orderNo;
+  });
+}
+
+function buildWorkDetails(pmOrderNo: string, oldWorkDetails: unknown): Json {
+  return {
+    ...readJsonObject(oldWorkDetails),
+    pmOrderNo
+  };
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ jobId: string }> }
@@ -146,7 +200,7 @@ export async function PATCH(
       const supabase = createAdminClient();
       const { data: oldJob, error: oldJobError } = await supabase
         .from("pm_jobs")
-        .select("site_id, visit_date, visit_time, pm_cycle")
+        .select("site_id, visit_date, visit_time, pm_cycle, work_details")
         .eq("id", jobId)
         .maybeSingle();
 
@@ -209,14 +263,24 @@ export async function PATCH(
       }
 
       const pmCycle = readRequiredString(body.pmCycle) || oldJob.pm_cycle || "semi annual";
-      const rows: PmJobInsert[] = visitDates.flatMap((date) => participants.map((owner) => ({
+      const oldOrderNo = getPmOrderNoFromWorkDetails(oldJob.work_details);
+      const generatedOrderCount = visitDates.length - (oldOrderNo && visitDates[0] === oldJob.visit_date ? 1 : 0);
+      const generatedOrderNos = await getNextJobOrderNos(supabase, generatedOrderCount);
+      const pmOrderNos = assignPmOrderNos({
+        generatedOrderNos,
+        oldOrderNo,
+        oldVisitDate: oldJob.visit_date,
+        visitDates
+      });
+      const rows: PmJobInsert[] = visitDates.flatMap((date, dateIndex) => participants.map((owner) => ({
         id: `PM-${crypto.randomUUID()}`,
         site_id: site.id,
         status: "pending",
         pm_cycle: pmCycle,
         visit_date: date,
         visit_time: visitTime,
-        owner
+        owner,
+        work_details: buildWorkDetails(pmOrderNos[dateIndex], oldJob.work_details)
       })));
 
       const { error: insertError } = await supabase.from("pm_jobs").insert(rows);

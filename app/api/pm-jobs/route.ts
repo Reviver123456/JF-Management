@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getNextPmOrderNos, getPmOrderNoFromWorkDetails, normalizePmOrderNo } from "@/lib/pm-order-no";
 import { normalizeOwnerName } from "@/lib/pm-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database, Json } from "@/lib/supabase/database.types";
@@ -111,6 +112,33 @@ function getDateRangeValues(startValue: string, endValue: string) {
   return values;
 }
 
+async function getNextJobOrderNos(supabase: ReturnType<typeof createAdminClient>, count: number) {
+  const { data, error } = await supabase
+    .from("pm_jobs")
+    .select("id, work_details");
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const existingOrderNos = (data ?? []).flatMap((job) => [
+    normalizePmOrderNo(job.id),
+    getPmOrderNoFromWorkDetails(job.work_details)
+  ]);
+
+  return getNextPmOrderNos(existingOrderNos, count);
+}
+
+function buildWorkDetails(pmOrderNo: string, expenses: Record<string, string>): Json {
+  const details: Record<string, unknown> = { pmOrderNo };
+
+  if (Object.keys(expenses).length > 0) {
+    details.expenses = expenses;
+  }
+
+  return details as Json;
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json() as CreatePmJobBody;
@@ -176,8 +204,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Please assign a site owner or follower." }, { status: 400 });
     }
 
-    const workDetails: Json | undefined = Object.keys(expenses).length > 0 ? { expenses } : undefined;
-    const rows: PmJobInsert[] = visitDates.flatMap((date) => participants.map((owner) => ({
+    const pmOrderNos = await getNextJobOrderNos(supabase, visitDates.length);
+    const rows: PmJobInsert[] = visitDates.flatMap((date, dateIndex) => participants.map((owner) => ({
       id: `PM-${crypto.randomUUID()}`,
       site_id: site.id,
       status: "pending",
@@ -185,7 +213,7 @@ export async function POST(request: Request) {
       visit_date: date,
       visit_time: visitTime,
       owner,
-      ...(workDetails ? { work_details: workDetails } : {})
+      work_details: buildWorkDetails(pmOrderNos[dateIndex], expenses)
     })));
 
     const { error } = await supabase.from("pm_jobs").insert(rows);

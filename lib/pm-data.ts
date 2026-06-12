@@ -63,6 +63,7 @@ export type PmWorkDetails = {
   fieldValues?: Record<string, string>;
   finalStatus?: FinalStatus | null;
   inspector?: string;
+  pmOrderNo?: string;
   photoNotes?: Record<string, string>;
   photos?: Record<string, string[]>;
   radioValues?: Record<string, string>;

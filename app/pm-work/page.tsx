@@ -34,6 +34,7 @@ import {
   type PmChecklistConfig,
   type PmChecklistKey
 } from "@/lib/pm-checklist-config";
+import { getPmOrderNoFromWorkDetails } from "@/lib/pm-order-no";
 import {
   checklistTabs,
   configurationBackup,
@@ -199,6 +200,14 @@ function radioKey(groupKey: string, setTitle: string, blockIndex: number, label:
 
 function checkKey(resultPrefix: string, title: string, item: string) {
   return `${resultPrefix}:${title}:${item}`;
+}
+
+function isDiagCalibrateFieldsBlock(groupKey: string, block: ChecklistBlock) {
+  return groupKey === "diag" && block.type === "fields" && block.title.toLowerCase().startsWith("calibrate: monitor");
+}
+
+function diagCalibrateStatusKey(groupKey: string, setTitle: string, blockIndex: number, title: string) {
+  return `${groupKey}:calibrate-status:${setTitle}:${blockIndex}:${title}`;
 }
 
 function getMissingRequiredCount({
@@ -373,6 +382,7 @@ function DetailView({
   const { lang, t } = useUi();
   const status = statusMeta[site.status];
   const savedDetails = site.workDetails;
+  const pmOrderNo = getPmOrderNoFromWorkDetails(savedDetails);
   const [checkResults, setCheckResults] = useState<Record<string, CheckResult>>(savedDetails?.checkResults ?? {});
   const [checkNotes, setCheckNotes] = useState<Record<string, string>>(savedDetails?.checkNotes ?? {});
   const [activeCheckNoteKey, setActiveCheckNoteKey] = useState("");
@@ -516,6 +526,7 @@ function DetailView({
     fieldValues: trimRecordValues(fieldValues),
     finalStatus,
     inspector,
+    ...(pmOrderNo ? { pmOrderNo } : {}),
     photoNotes: trimPhotoNotes(photoNotes),
     photos,
     radioValues: trimRecordValues(radioValues),
@@ -1048,6 +1059,11 @@ function ChecklistBlockView({
   const { lang, t } = useUi();
 
   if (block.type === "fields") {
+    const calibrateStatusKey = isDiagCalibrateFieldsBlock(groupKey, block)
+      ? diagCalibrateStatusKey(groupKey, setTitle, blockIndex, block.title)
+      : "";
+    const calibrateStatus = calibrateStatusKey ? checkResults[calibrateStatusKey] : undefined;
+
     return (
       <section className="templateBlock">
         <h4>{localizeLabel(block.title, lang)}</h4>
@@ -1070,6 +1086,33 @@ function ChecklistBlockView({
             );
           })}
         </div>
+        {calibrateStatusKey ? (
+          <div className="calibrateStatusPicker">
+            <strong>Calibrate Status</strong>
+            <div className="vx">
+              <button
+                className={calibrateStatus === "ok" ? "resultDot resultOk" : "resultDot resultChoiceOk"}
+                type="button"
+                aria-label={`ปกติ ${block.title}`}
+                aria-pressed={calibrateStatus === "ok"}
+                onClick={() => setCheckResult(calibrateStatusKey, "ok")}
+              >
+                <Check size={13} />
+              </button>
+              <span>ปกติ</span>
+              <button
+                className={calibrateStatus === "bad" ? "resultDot resultBad" : "resultDot resultChoiceBad"}
+                type="button"
+                aria-label={`ผิดปกติ ${block.title}`}
+                aria-pressed={calibrateStatus === "bad"}
+                onClick={() => setCheckResult(calibrateStatusKey, "bad")}
+              >
+                <X size={13} />
+              </button>
+              <span>ผิดปกติ</span>
+            </div>
+          </div>
+        ) : null}
       </section>
     );
   }

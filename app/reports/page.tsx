@@ -16,6 +16,7 @@ import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { useUi, type Lang } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
+import { getDisplayPmOrderNo } from "@/lib/pm-order-no";
 import {
   configurationBackup,
   diagColumns,
@@ -29,8 +30,11 @@ import {
   synapseSystem
 } from "@/lib/pm-checklist-data";
 import {
+  getContractVisitTotal,
+  getUniquePmJobs,
   normalizeOwnerName,
   type CheckResult,
+  type PmJobRecord,
   type PmWorkDetails,
   type ReportRow,
   type SavedChecklistBlock,
@@ -130,6 +134,7 @@ export default function ReportsPage() {
 
         {preview ? (
           <PreviewModal
+            pmJobs={data.pmJobs}
             preview={preview}
             responsibleName={responsibleName}
             responsibleSignature={responsibleSignature}
@@ -261,11 +266,13 @@ const standardTemplatePages: StandardTemplatePage[] = [
 ];
 
 function ReportDocumentPacket({
+  pmJobs,
   responsibleName,
   responsibleSignature,
   row,
   site
 }: {
+  pmJobs: PmJobRecord[];
   responsibleName: string;
   responsibleSignature: string;
   row: ReportRow;
@@ -275,14 +282,19 @@ function ReportDocumentPacket({
 
   return (
     <div className="reportDocumentStack">
-      <CoverTemplatePage groups={reportGroups} row={row} site={site} />
+      <CoverTemplatePage
+        groups={reportGroups}
+        pmJobs={pmJobs}
+        responsibleName={responsibleName}
+        responsibleSignature={responsibleSignature}
+        row={row}
+        site={site}
+      />
       {reportGroups.map((group) => (
         group.sets.map((set, setIndex) => (
           <ChecklistSetPage
             group={group}
             key={`${group.key}-${set.title}-${setIndex}`}
-            responsibleName={responsibleName}
-            responsibleSignature={responsibleSignature}
             row={row}
             set={set}
             site={site}
@@ -295,19 +307,27 @@ function ReportDocumentPacket({
 
 function CoverTemplatePage({
   groups,
+  pmJobs,
+  responsibleName,
+  responsibleSignature,
   row,
   site
 }: {
   groups: SavedChecklistGroup[];
+  pmJobs: PmJobRecord[];
+  responsibleName: string;
+  responsibleSignature: string;
   row: ReportRow;
   site: SiteCatalogRecord | null;
 }) {
+  const customerSignerName = row.workDetails?.signerName?.trim() || row.customer;
+  const visitRoundText = getVisitRoundText(pmJobs, row, site);
+
   return (
     <section className="templateSheet coverSheet">
-      <div className="coverServiceText">Service Report</div>
-      <Image className="coverLogo" src="/report-templates/LOGO-JF.webp" alt="JF Advance Med" width={360} height={168} />
+      <TemplateHeader heading="Preventive Maintenance" row={row} />
       <h2>Preventive Maintenance</h2>
-      <p className="coverRound">ครั้งที่ ........ / ........</p>
+      <p className="coverRound">ครั้งที่ {visitRoundText}</p>
 
       <table className="templateTable coverInfoTable">
         <tbody>
@@ -345,7 +365,7 @@ function CoverTemplatePage({
               <td>{index + 1}</td>
               <td>{getChecklistHeading(group.key, group.title)}</td>
               <td>{group.sets.length}</td>
-              <td className="reportStatusCell">√</td>
+              <td className="reportStatusCell"><StatusMark variant="ok" /></td>
               <td />
             </tr>
           ))}
@@ -353,30 +373,59 @@ function CoverTemplatePage({
       </table>
 
       <div className="signatureGrid">
-        <div>
-          <strong>ผู้เข้าดำเนินการ</strong>
-          <span>ลายเซ็น</span>
-        </div>
-        <div>
-          <strong>ผู้ตรวจสอบ</strong>
-          <span>ลายเซ็น</span>
-        </div>
+        <SignaturePersonBox
+          label="ผู้เข้าดำเนินการ"
+          name={responsibleName || row.inspector}
+          placeholder="ลายเซ็นผู้เข้าดำเนินการ"
+          signature={responsibleSignature}
+        />
+        <SignaturePersonBox
+          label="ผู้ตรวจสอบ"
+          name={customerSignerName}
+          placeholder="ลายเซ็นลูกค้า"
+        />
       </div>
     </section>
   );
 }
 
+function SignaturePersonBox({
+  label,
+  name,
+  placeholder,
+  signature
+}: {
+  label: string;
+  name: string;
+  placeholder: string;
+  signature?: string;
+}) {
+  return (
+    <div className="coverSignatureCard">
+      <strong>{label}</strong>
+      <div className="coverSignatureLine">
+        {signature ? (
+          <Image
+            src={signature}
+            alt={placeholder}
+            width={220}
+            height={54}
+            unoptimized
+          />
+        ) : placeholder}
+      </div>
+      <span>{name}</span>
+    </div>
+  );
+}
+
 function ChecklistSetPage({
   group,
-  responsibleName,
-  responsibleSignature,
   row,
   set,
   site
 }: {
   group: SavedChecklistGroup;
-  responsibleName: string;
-  responsibleSignature: string;
   row: ReportRow;
   set: SavedChecklistSet;
   site: SiteCatalogRecord | null;
@@ -417,8 +466,6 @@ function ChecklistSetPage({
       ))}
       <TemplateFooter
         compact={group.key === "environment" || group.key === "diag"}
-        responsibleName={responsibleName}
-        responsibleSignature={responsibleSignature}
         row={row}
       />
     </section>
@@ -436,8 +483,8 @@ function TemplateHeader({ heading, row }: { heading: string; row?: ReportRow }) 
       <Image src="/report-templates/LOGO-JF.webp" alt="JF Advance Med" width={132} height={62} />
       <strong>JF Advance Med CO., LTD</strong>
       <div>
-        <span className="pmOrderNo">PM Order No. : {row?.jobId ?? ""}</span>
-        <span>Service Report</span>
+        <span className="pmOrderNo">PM Order No. : {row ? getDisplayPmOrderNo(row) : ""}</span>
+        <span>{row?.date ?? ""}</span>
         <b>{heading}</b>
       </div>
     </header>
@@ -609,10 +656,7 @@ function DiagCalibrateTable({
     <table className="templateTable diagCalibrateTable">
       <thead>
         <tr>
-          <th className="diagCalibrateTitle" colSpan={8}>CALIBRATE</th>
-        </tr>
-        <tr>
-          <th className="diagCalibrateSpacer" colSpan={4} />
+          <th className="diagCalibrateTitle" colSpan={4}>CALIBRATE</th>
           <th colSpan={4}>LUMINANCE (cd/m²)</th>
         </tr>
         <tr>
@@ -632,7 +676,7 @@ function DiagCalibrateTable({
             <th>Monitor {getDiagMonitorNumber(entry.block.title) ?? index + 1}</th>
             <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label.includes("brand / model"), groupKey, row, setTitle, site })}</td>
             <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label === "s/n", groupKey, row, setTitle, site })}</td>
-            <td />
+            <td className="reportStatusCell">{resultSymbol(details?.checkResults?.[diagCalibrateStatusKey(groupKey, setTitle, entry.blockIndex, entry.block.title)])}</td>
             <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label.includes("target min"), groupKey, row, setTitle, site })}</td>
             <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label.includes("target max"), groupKey, row, setTitle, site })}</td>
             <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label.includes("result min"), groupKey, row, setTitle, site })}</td>
@@ -660,6 +704,10 @@ function getDiagCalibrateBlocks(blocks: SavedChecklistBlock[]): DiagCalibrateBlo
 
 function getDiagMonitorNumber(title: string) {
   return title.match(/monitor\s*(\d+)/i)?.[1] ?? "";
+}
+
+function diagCalibrateStatusKey(groupKey: string, setTitle: string, blockIndex: number, title: string) {
+  return `${groupKey}:calibrate-status:${setTitle}:${blockIndex}:${title}`;
 }
 
 function getDiagCalibrateValue({
@@ -734,6 +782,10 @@ function DiagReportInfoGrid({
 
   return (
     <section className="reportInfoBlock">
+      <div className="reportCustomerRow">
+        <strong>Customer Name :</strong>
+        <span>{fieldValue("Customer Name")}</span>
+      </div>
       <div className="reportInfoGrid">
         <ReportFieldValue label="Location" value={fieldValue("Location")} />
         <ReportFieldValue label="Brand" value={fieldValue("Brand")} />
@@ -934,13 +986,9 @@ function getSavedFieldValueByLabels(
 
 function TemplateFooter({
   compact = false,
-  responsibleName,
-  responsibleSignature,
   row
 }: {
   compact?: boolean;
-  responsibleName: string;
-  responsibleSignature: string;
   row: ReportRow;
 }) {
   const details = row.workDetails;
@@ -971,8 +1019,8 @@ function TemplateFooter({
         <div className="workTimeGrid">
           <div>
             <strong>STATUS</strong>
-            <span>√ : Normal</span>
-            <span>X : Abnormal</span>
+            <span><StatusMark variant="ok" compact /> : Normal</span>
+            <span><StatusMark variant="bad" compact /> : Abnormal</span>
           </div>
           <div>
             <strong>Work Time</strong>
@@ -980,28 +1028,22 @@ function TemplateFooter({
             <span>เวลาเสร็จงาน {details?.endTime ?? row.endTime}</span>
           </div>
         </div>
-        <div className="checkedByBox">
-          <div className="checkedBySignatureLine">
-            {responsibleSignature ? (
-              <Image
-                src={responsibleSignature}
-                alt="ลายเซ็นผู้รับผิดชอบ"
-                width={220}
-                height={54}
-                unoptimized
-              />
-            ) : "ลายเซ็นผู้รับผิดชอบ"}
-          </div>
-          <div className="checkedByNameLine">{responsibleName || row.inspector}</div>
-          <div className="checkedByNameCaption">ชื่อจริงผู้รับผิดชอบ</div>
-        </div>
       </div>
     </footer>
   );
 }
 
 function CheckBoxMark({ checked = false }: { checked?: boolean }) {
-  return <span className="checkbox">{checked ? "√" : ""}</span>;
+  return <span className="checkbox">{checked ? <StatusMark variant="ok" compact /> : ""}</span>;
+}
+
+function StatusMark({ compact = false, variant }: { compact?: boolean; variant: CheckResult }) {
+  return (
+    <span
+      aria-label={variant === "ok" ? "Normal" : "Abnormal"}
+      className={["reportMark", variant === "ok" ? "reportMarkCheck" : "reportMarkCross", compact ? "compact" : ""].filter(Boolean).join(" ")}
+    />
+  );
 }
 
 function getReportGroups(details: PmWorkDetails | undefined): SavedChecklistGroup[] {
@@ -1122,7 +1164,7 @@ function getFallbackFieldValue(label: string, row: ReportRow, site: SiteCatalogR
   }
 
   if (normalizedLabel === "pm order no" || normalizedLabel === "pm order no.") {
-    return row.jobId;
+    return getDisplayPmOrderNo(row);
   }
 
   return "";
@@ -1151,14 +1193,14 @@ function checkKey(resultPrefix: string, title: string, item: string) {
 
 function resultSymbol(result: CheckResult | undefined) {
   if (result === "ok") {
-    return "√";
+    return <StatusMark variant="ok" />;
   }
 
   if (result === "bad") {
-    return "X";
+    return <StatusMark variant="bad" />;
   }
 
-  return "√";
+  return <StatusMark variant="ok" />;
 }
 
 function formatSparePart(part: SavedSparePart | undefined) {
@@ -1179,11 +1221,13 @@ function getStoredUserSignature(email: string) {
 
 function PreviewModal({
   onClose,
+  pmJobs,
   preview,
   responsibleName,
   responsibleSignature
 }: {
   onClose: () => void;
+  pmJobs: PmJobRecord[];
   preview: PreviewState;
   responsibleName: string;
   responsibleSignature: string;
@@ -1198,6 +1242,7 @@ function PreviewModal({
           <button type="button" onClick={onClose} aria-label={t("common.close")}><X size={18} /></button>
         </div>
         <ReportDocumentPacket
+          pmJobs={pmJobs}
           responsibleName={responsibleName}
           responsibleSignature={responsibleSignature}
           row={preview.row}
@@ -1233,6 +1278,38 @@ function getOwnerOptions(reportRows: ReportRow[], siteCatalog: SiteCatalogRecord
       seenOwners.add(normalizedOwner);
       return true;
     });
+}
+
+function getVisitRoundText(pmJobs: PmJobRecord[], row: ReportRow, site: SiteCatalogRecord | null) {
+  const matchedJob = getMatchingReportJob(pmJobs, row);
+  const visitRound = getVisitRoundForReport(pmJobs, row);
+  const visitTotal = getContractVisitTotal(site?.contractDetails, matchedJob?.pmCycle);
+
+  return `${visitRound}/${visitTotal || "-"}`;
+}
+
+function getMatchingReportJob(pmJobs: PmJobRecord[], row: ReportRow) {
+  const rowDate = toInputDate(row.date);
+
+  return pmJobs.find((job) => job.id === row.jobId)
+    ?? pmJobs.find((job) => job.siteId === row.siteId && job.visitDate === rowDate)
+    ?? null;
+}
+
+function getVisitRoundForReport(pmJobs: PmJobRecord[], row: ReportRow) {
+  const rowDate = toInputDate(row.date);
+  const uniqueJobs = getUniquePmJobs(pmJobs.filter((job) => job.siteId === row.siteId))
+    .sort((first, second) => (
+      first.visitDate.localeCompare(second.visitDate) ||
+      first.visitTime.localeCompare(second.visitTime)
+    ));
+  const jobIndex = uniqueJobs.findIndex((job) => job.id === row.jobId);
+
+  if (jobIndex >= 0) {
+    return jobIndex + 1;
+  }
+
+  return uniqueJobs.findIndex((job) => job.visitDate === rowDate) + 1 || 1;
 }
 
 function rowMatchesFilters({

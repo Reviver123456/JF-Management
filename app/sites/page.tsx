@@ -1238,6 +1238,7 @@ function Calibrate({ title }: { title: string }) {
           <Field key={field} label={field} placeholder={field} />
         ))}
       </div>
+      <RadioGroup label="Calibrate Status" items={["ปกติ", "ผิดปกติ"]} />
     </section>
   );
 }

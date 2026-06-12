@@ -1055,6 +1055,26 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.pmWorkPage .calibrateStatusPicker {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-3);
+}
+
+.pmWorkPage .calibrateStatusPicker>strong {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pmWorkPage .calibrateStatusPicker .vx {
+  justify-content: flex-start;
+}
+
 .pmWorkPage .savedDetailGrid,
 .pmWorkPage .savedChecklistRows,
 .pmWorkPage .historyChecklistDetail {
@@ -1960,9 +1980,9 @@
   min-height: 1123px;
   background: #ffffff;
   color: #111827;
-  border: 1px solid #cbd5e1;
-  border-radius: 2px;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   padding: 38px 50px;
   display: flex;
   flex-direction: column;
@@ -2032,14 +2052,15 @@
 
 .reportsPage .templateTable {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   table-layout: fixed;
   margin: 0;
 }
 
 .reportsPage .templateTable th,
 .reportsPage .templateTable td {
-  border: 1px solid #334155;
+  border: 0;
   height: 24px;
   padding: 5px 8px;
   color: #111827;
@@ -2048,8 +2069,8 @@
 }
 
 .reportsPage .templateTable th {
-  background: #2f5f8f;
-  color: #ffffff;
+  background: #e7f0fb;
+  color: #102a4c;
   font-weight: 800;
 }
 
@@ -2088,42 +2109,59 @@
 
 .reportsPage .reportInfoBlock {
   margin-top: 8px;
+  padding: 8px 10px 10px;
+  background: #f8fbff;
+  border-radius: 4px;
 }
 
 .reportsPage .reportCustomerRow {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
   align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  padding: 2px 8px;
+  background: #eaf2fb;
+  border-radius: 3px;
 }
 
 .reportsPage .reportCustomerRow strong {
-  min-height: 22px;
-  background: #2f5f8f;
-  color: #ffffff;
+  min-height: 18px;
+  background: transparent;
+  color: #111827;
   display: flex;
   align-items: center;
-  padding: 2px 6px;
+  padding: 0;
   font-size: 12px;
+  font-weight: 800;
 }
 
 .reportsPage .reportCustomerRow span {
-  min-height: 22px;
+  min-height: 18px;
   display: flex;
   align-items: center;
-  padding: 2px 8px;
+  padding: 0;
   font-weight: 700;
 }
 
 .reportsPage .reportInfoGrid {
-  margin-top: 16px;
+  margin-top: 10px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 9px 48px;
+  gap: 7px 38px;
   padding: 0;
 }
 
 .reportsPage .reportInfoGrid .fieldLabel {
   grid-template-columns: auto minmax(0, 1fr);
+  min-height: 23px;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+.reportsPage .reportInfoGrid .fieldLabel:nth-child(4n+1),
+.reportsPage .reportInfoGrid .fieldLabel:nth-child(4n+2) {
+  background: rgba(231, 240, 251, 0.58);
 }
 
 .reportsPage .reportInfoGrid .fieldLabel span {
@@ -2135,6 +2173,7 @@
 .reportsPage .reportInfoGrid .fieldLabel i {
   min-height: 16px;
   padding: 0 6px;
+  font-weight: 700;
 }
 
 .reportsPage .fieldCell {
@@ -2184,13 +2223,13 @@
 }
 
 .reportsPage .referenceTable td:first-child {
-  background: #eaf2fb;
+  background: transparent;
   font-weight: 800;
 }
 
 .reportsPage .checklistTemplateTable {
   margin-top: 10px;
-  border-spacing: 0;
+  border-spacing: 0 3px;
 }
 
 .reportsPage .reportFieldBlock {
@@ -2200,15 +2239,16 @@
 .reportsPage .templateSetTitle {
   min-height: 24px;
   margin-top: 8px;
-  background: #ffffff;
+  background: #f0f6ff;
   border: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 3px 7px;
-  color: #111827;
+  color: #102a4c;
   font-weight: 800;
   font-size: 12px;
+  border-radius: 4px;
 }
 
 .reportsPage .checklistTemplateTable th:first-child {
@@ -2227,11 +2267,11 @@
 }
 
 .reportsPage .checklistTemplateTable tbody tr td {
-  padding: 6px 8px;
+  padding: 6px 9px;
 }
 
 .reportsPage .checklistTemplateTable tbody tr:nth-child(odd) td {
-  background: #f3f6fb;
+  background: #f7fbff;
 }
 
 .reportsPage .checklistTemplateTable tbody tr:nth-child(even) td {
@@ -2240,38 +2280,58 @@
 
 .reportsPage .checklistTemplateTable td {
   min-height: 28px;
+  line-height: 1.28;
+}
+
+.reportsPage .checklistTemplateTable thead th {
+  background: #dceafe;
+  color: #102a4c;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.reportsPage .checklistTemplateTable tbody td:first-child {
+  color: #16263f;
+  font-weight: 700;
+}
+
+.reportsPage .checklistTemplateTable tbody td:nth-child(3) {
+  color: #334155;
 }
 
 .reportsPage .reportStatusCell {
   text-align: center;
-  font-size: 14px;
-  font-weight: 900;
+  color: #000000;
+  vertical-align: middle;
 }
 
 .reportsPage .templateBlockBox {
-  border: 1px solid #334155;
+  border: 0;
   margin-top: 8px;
 }
 
 .reportsPage .templateBlockBox>strong {
   min-height: 24px;
-  background: #bcd3f2;
-  border-bottom: 1px solid #334155;
+  background: #eaf2fb;
+  border-bottom: 0;
   display: flex;
   align-items: center;
-  padding: 3px 7px;
-  color: #111827;
+  padding: 4px 8px;
+  color: #102a4c;
+  border-radius: 3px;
 }
 
 .reportsPage .backupChoiceRow,
 .reportsPage .lineRow,
 .reportsPage .dualMonitorRow {
   min-height: 24px;
-  border-bottom: 1px solid #334155;
+  border-bottom: 0;
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 3px 7px;
+  padding: 5px 8px;
+  background: #fbfdff;
+  border-radius: 3px;
 }
 
 .reportsPage .backupChoiceRow b,
@@ -2289,18 +2349,87 @@
 }
 
 .reportsPage .checkbox {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   border: 1px solid #334155;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 2px;
-  font-size: 10px;
-  font-weight: 900;
-  line-height: 14px;
-  flex: 0 0 14px;
-  padding-bottom: 1px;
+  flex: 0 0 16px;
+  padding: 0;
+}
+
+.reportsPage .reportMark {
+  position: relative;
+  display: inline-block;
+  width: 23px;
+  height: 23px;
+  color: #000000;
+  vertical-align: middle;
+}
+
+.reportsPage .reportMark.compact {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+}
+
+.reportsPage .reportMarkCheck::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 3px;
+  height: 12px;
+  border-right: 4px solid currentColor;
+  border-bottom: 4px solid currentColor;
+  border-radius: 2px;
+  transform: rotate(45deg);
+  transform-origin: center;
+}
+
+.reportsPage .reportMarkCheck.compact::before {
+  left: 2px;
+  top: 0;
+  width: 6px;
+  height: 10px;
+  border-right-width: 4px;
+  border-bottom-width: 4px;
+  border-radius: 1px;
+}
+
+.reportsPage .reportMarkCross::before,
+.reportsPage .reportMarkCross::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: 9px;
+  width: 22px;
+  height: 7px;
+  background: currentColor;
+  border-radius: 999px;
+  transform-origin: center;
+}
+
+.reportsPage .reportMarkCross::before {
+  transform: rotate(45deg);
+}
+
+.reportsPage .reportMarkCross::after {
+  transform: rotate(-45deg);
+}
+
+.reportsPage .reportMarkCross.compact::before,
+.reportsPage .reportMarkCross.compact::after {
+  left: 0;
+  top: 5px;
+  width: 12px;
+  height: 2px;
+}
+
+.reportsPage .workTimeGrid span .reportMark {
+  margin-right: 4px;
 }
 
 .reportsPage .templateFooter {
@@ -2314,8 +2443,8 @@
 
 .reportsPage .footerBottomGrid {
   display: grid;
-  grid-template-columns: minmax(0, 360px) minmax(220px, 280px);
-  justify-content: space-between;
+  grid-template-columns: minmax(0, 360px);
+  justify-content: start;
   align-items: end;
   gap: 24px;
   margin-top: auto;
@@ -2330,7 +2459,10 @@
 
 .reportsPage .statusBlock {
   display: grid;
-  gap: 6px;
+  gap: 7px;
+  padding: 8px 10px;
+  background: #f8fbff;
+  border-radius: 4px;
 }
 
 .reportsPage .statusRow {
@@ -2342,11 +2474,12 @@
 
 .reportsPage .statusRow span,
 .reportsPage .statusRow .statusOption {
-  padding: 4px 6px;
+  padding: 5px 6px;
 }
 
 .reportsPage .statusRow span {
   font-weight: 700;
+  color: #102a4c;
 }
 
 .reportsPage .noteLine {
@@ -2375,6 +2508,8 @@
   overflow-wrap: anywhere;
   word-break: break-word;
   line-height: 1.35;
+  background: #ffffff;
+  border-radius: 3px;
 }
 
 .reportsPage .compactFooter {
@@ -2389,46 +2524,13 @@
   border: 0;
 }
 
-.reportsPage .checkedByBox {
-  display: grid;
-  align-items: end;
-  justify-items: stretch;
-  padding: 0;
-  text-align: center;
-}
-
-.reportsPage .checkedBySignatureLine,
-.reportsPage .checkedByNameLine {
-  min-height: 34px;
-  display: grid;
-  place-items: center;
-  color: #111827;
-}
-
-.reportsPage .checkedBySignatureLine {
-  color: #64748b;
-  font-weight: 700;
-  min-height: 54px;
-}
-
-.reportsPage .checkedBySignatureLine img {
-  max-width: 100%;
-  max-height: 54px;
-  object-fit: contain;
-}
-
-.reportsPage .checkedByNameLine {
-  font-weight: 800;
-}
-
-.reportsPage .checkedByNameCaption {
-  padding-top: 4px;
-  font-weight: 700;
-}
-
 .reportsPage .partsBox {
   display: grid;
   grid-template-columns: 1.7fr 0.9fr 0.9fr;
+  gap: 6px;
+  padding: 7px 10px;
+  background: #f8fbff;
+  border-radius: 4px;
 }
 
 .reportsPage .partsBox span {
@@ -2436,6 +2538,8 @@
   display: flex;
   align-items: center;
   padding: 4px 6px;
+  background: #ffffff;
+  border-radius: 3px;
 }
 
 .reportsPage .partsBox span:first-child {
@@ -2447,11 +2551,15 @@
   grid-template-columns: 1fr 1fr;
   width: 100%;
   margin-left: 0;
+  gap: 8px;
 }
 
 .reportsPage .workTimeGrid div {
   display: grid;
   grid-template-columns: 1fr;
+  padding: 6px 8px;
+  background: #f8fbff;
+  border-radius: 4px;
 }
 
 .reportsPage .workTimeGrid div:first-child {
@@ -2459,10 +2567,12 @@
 }
 
 .reportsPage .workTimeGrid strong {
-  /* background: #eaf2fb; */
+  background: #eaf2fb;
   font-weight: 800;
   display: block;
   padding: 4px 6px;
+  color: #102a4c;
+  border-radius: 3px;
 }
 
 .reportsPage .workTimeGrid span {
@@ -2474,24 +2584,11 @@
 
 .reportsPage .coverSheet {
   align-items: stretch;
-  padding-top: 34px;
-}
-
-.reportsPage .coverServiceText {
-  align-self: flex-end;
-  font-weight: 800;
-  margin-bottom: 54px;
-}
-
-.reportsPage .coverLogo {
-  width: 370px;
-  height: auto;
-  align-self: center;
-  margin: 0 auto 28px;
+  padding-top: 38px;
 }
 
 .reportsPage .coverSheet h2 {
-  margin: 0 0 20px;
+  margin: 18px 0 20px;
   color: #111827;
   text-align: center;
   font-size: 24px;
@@ -2509,14 +2606,20 @@
 .reportsPage .coverInfoTable th {
   width: 120px;
   text-align: left;
+  background: #eaf2fb !important;
+  color: #102a4c;
+  border-radius: 3px 0 0 3px;
 }
 
 .reportsPage .coverInfoTable td {
   height: 34px;
+  background: #f8fbff !important;
+  border-radius: 0 3px 3px 0;
 }
 
 .reportsPage .coverDeviceTable {
   margin-top: 18px;
+  border-spacing: 0 3px;
 }
 
 .reportsPage .coverDeviceTable th:first-child,
@@ -2534,6 +2637,19 @@
   height: 30px;
 }
 
+.reportsPage .coverDeviceTable thead th {
+  background: #dceafe;
+  color: #102a4c;
+}
+
+.reportsPage .coverDeviceTable tbody tr:nth-child(odd) td {
+  background: #f7fbff;
+}
+
+.reportsPage .coverDeviceTable tbody tr:nth-child(even) td {
+  background: #ffffff;
+}
+
 .reportsPage .signatureGrid {
   margin-top: auto;
   display: grid;
@@ -2541,17 +2657,50 @@
   gap: 80px;
 }
 
-.reportsPage .signatureGrid div {
+.reportsPage .coverSignatureCard {
   display: grid;
-  gap: 44px;
+  gap: 7px;
   justify-items: center;
+  align-content: end;
+  min-height: 112px;
+  padding: 10px 12px;
+  background: #f8fbff;
+  border-radius: 4px;
   color: #111827;
+  text-align: center;
+}
+
+.reportsPage .coverSignatureCard strong {
+  color: #102a4c;
+  font-size: 11px;
   font-weight: 800;
+}
+
+.reportsPage .coverSignatureCard span {
+  min-height: 18px;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.reportsPage .coverSignatureLine {
+  min-height: 54px;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.reportsPage .coverSignatureLine img {
+  max-width: 100%;
+  max-height: 54px;
+  object-fit: contain;
 }
 
 .reportsPage .diagCalibrateTable,
 .reportsPage .diagDeviceTable {
   margin-top: 8px;
+  border-spacing: 0 3px;
 }
 
 .reportsPage .diagCalibrateTable {
@@ -2567,12 +2716,12 @@
 .reportsPage .diagCalibrateTable th,
 .reportsPage .diagCalibrateTable td {
   height: 21px;
-  border-color: #111827;
+  border: 0;
   padding: 2px 5px;
 }
 
 .reportsPage .diagCalibrateTable th {
-  background: #dbe8f5;
+  background: #dceafe;
   color: #111827;
 }
 
@@ -2590,6 +2739,14 @@
   background: #eaf2fb;
   color: #111827;
   width: 16%;
+}
+
+.reportsPage .diagCalibrateTable tbody tr:nth-child(odd) td {
+  background: #f7fbff;
+}
+
+.reportsPage .diagCalibrateTable tbody tr:nth-child(even) td {
+  background: #ffffff;
 }
 
 .reportsPage .diagCalibrateTable td:nth-child(2) {
@@ -2615,18 +2772,31 @@
   text-align: left;
 }
 
+.reportsPage .diagDeviceTable thead th {
+  background: #dceafe;
+  color: #102a4c;
+}
+
+.reportsPage .diagDeviceTable tbody tr:nth-child(odd) td {
+  background: #f7fbff;
+}
+
+.reportsPage .diagDeviceTable tbody tr:nth-child(even) td {
+  background: #ffffff;
+}
+
 .reportsPage .reportPaper {
   width: 100%;
   max-width: 920px;
   margin: 0 auto;
   background: #ffffff;
   color: #0f172a;
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
+  border: 0;
+  border-radius: 0;
   padding: 18px;
   display: grid;
   gap: 12px;
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.24);
+  box-shadow: none;
 }
 
 .reportsPage .previewPaper {
@@ -2640,7 +2810,7 @@
   grid-template-columns: 150px minmax(0, 1fr);
   gap: 14px;
   align-items: center;
-  border-bottom: 2px solid #1f3b70;
+  border-bottom: 0;
   padding-bottom: 10px;
 }
 
@@ -2676,15 +2846,15 @@
 }
 
 .reportsPage .paperSection {
-  border: 1px solid #334155;
+  border: 0;
   display: grid;
   gap: 0;
 }
 
 .reportsPage .paperSection h4 {
   margin: 0;
-  background: #1f3b70;
-  color: #ffffff;
+  background: transparent;
+  color: #111827;
   padding: 5px 8px;
   font-size: 11px;
   font-weight: 900;
@@ -2709,8 +2879,8 @@
 .reportsPage .paperFieldGrid label,
 .reportsPage .paperSingleField {
   min-height: 34px;
-  border-right: 1px solid #334155;
-  border-bottom: 1px solid #334155;
+  border-right: 0;
+  border-bottom: 0;
   display: grid;
   grid-template-columns: 130px minmax(0, 1fr);
   align-items: center;
@@ -2729,8 +2899,8 @@
 .reportsPage .paperFieldGrid span,
 .reportsPage .paperSingleField span {
   height: 100%;
-  border-right: 1px solid #334155;
-  background: #eaf2fb;
+  border-right: 0;
+  background: transparent;
   color: #0f172a;
   display: flex;
   align-items: center;
@@ -2765,12 +2935,12 @@
 }
 
 .reportsPage .paperChecklistBlock {
-  border-top: 1px solid #334155;
+  border-top: 0;
 }
 
 .reportsPage .paperChecklistBlock>strong {
   min-height: 28px;
-  background: #dbeafe;
+  background: transparent;
   color: #0f172a;
   display: flex;
   align-items: center;
@@ -2787,7 +2957,7 @@
   min-height: 32px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 110px minmax(130px, 0.55fr);
-  border-top: 1px solid #334155;
+  border-top: 0;
 }
 
 .reportsPage .paperCheckRow span,
@@ -2796,7 +2966,7 @@
 .reportsPage .paperDiagValue {
   display: flex;
   align-items: center;
-  border-right: 1px solid #334155;
+  border-right: 0;
   padding: 5px 7px;
   color: #0f172a;
   font-size: 11px;
@@ -2812,15 +2982,15 @@
 .reportsPage .paperCheckTable {
   display: grid;
   grid-template-columns: minmax(120px, 1fr) repeat(4, minmax(100px, 0.6fr));
-  border-top: 1px solid #334155;
+  border-top: 0;
 }
 
 .reportsPage .paperCheckTable .tableHeader,
 .reportsPage .paperCheckTable .deviceName {
   min-height: 30px;
-  border-right: 1px solid #334155;
-  border-bottom: 1px solid #334155;
-  background: #dbeafe;
+  border-right: 0;
+  border-bottom: 0;
+  background: transparent;
   color: #0f172a;
   padding: 5px 7px;
   font-size: 11px;
@@ -2828,18 +2998,18 @@
 }
 
 .reportsPage .paperCheckTable .deviceName {
-  background: #ffffff;
+  background: transparent;
 }
 
 .reportsPage .paperCheckTable .reportInput,
 .reportsPage .paperDiagValue {
-  border-right: 1px solid #334155;
-  border-bottom: 1px solid #334155;
+  border-right: 0;
+  border-bottom: 0;
 }
 
 .reportsPage .pdfReference {
-  border: 1px solid #cbd5e1;
-  border-radius: 4px;
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -2922,7 +3092,7 @@
 
 .reportsPage .previewSummarySheet h3 {
   margin: 0 0 14px;
-  border-bottom: 2px solid #1f3b70;
+  border-bottom: 0;
   padding-bottom: 8px;
 }
 
@@ -2932,15 +3102,15 @@
 }
 
 .reportsPage .previewSummaryRows div {
-  border: 1px solid #334155;
+  border: 0;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .reportsPage .previewSummaryRows span {
   min-height: 30px;
-  border-right: 1px solid #334155;
-  border-bottom: 1px solid #334155;
+  border-right: 0;
+  border-bottom: 0;
   display: grid;
   grid-template-columns: 90px minmax(0, 1fr);
   align-items: center;
@@ -2949,7 +3119,7 @@
 
 .reportsPage .previewSummaryRows b {
   height: 100%;
-  background: #eaf2fb;
+  background: transparent;
   display: flex;
   align-items: center;
   padding: 4px 6px;
