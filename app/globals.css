@@ -168,10 +168,76 @@ a {
   min-height: 36px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--field);
+  background-color: var(--field);
   color: var(--text);
   padding: 8px 11px;
   outline: none;
+}
+
+.select {
+  min-height: 40px;
+  appearance: none;
+  cursor: pointer;
+  padding: 8px 40px 8px 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #aab5c8 50%),
+    linear-gradient(135deg, #aab5c8 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%;
+  background-size:
+    6px 6px,
+    6px 6px;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  font-weight: 900;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.select:hover {
+  border-color: var(--border-strong);
+  background-color: var(--panel-3);
+}
+
+.select:focus {
+  background-color: var(--field);
+}
+
+.select:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.select option {
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 800;
+}
+
+.select option:checked {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.select::-ms-expand {
+  display: none;
+}
+
+@media (max-width: 900px) {
+
+  .select {
+    min-height: 44px;
+    font-size: 13px;
+    padding-left: 12px;
+    padding-right: 40px;
+  }
 }
 
 .field::placeholder,

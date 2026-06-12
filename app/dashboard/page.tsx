@@ -73,9 +73,10 @@ export default function DashboardPage() {
   const ownerWorkloadJobs = getUniquePmJobs(filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, userName));
   const ownerWorkloadKeys = new Set(ownerWorkloadJobs.map((job) => `${job.siteId}:${job.visitDate}:${job.visitTime}`));
   const workloadSites = data.sites.filter((site) => ownerWorkloadKeys.has(getSiteRecordJobKey(site)));
+  const currentMonth = todayDate.slice(0, 7);
   const metrics: Metric[] = [
     { id: "sites", value: String(assignedSites.length), trend: "+0", color: "blue" },
-    { id: "monthly", value: String(visiblePmJobs.filter((job) => job.visitDate.startsWith("2026-06")).length), trend: "+0", color: "purple" },
+    { id: "monthly", value: String(visiblePmJobs.filter((job) => job.visitDate.startsWith(currentMonth)).length), trend: "+0", color: "purple" },
     { id: "done", value: String(visiblePmJobs.filter((job) => job.status === "completed").length), trend: "+0", color: "green" },
     { id: "backlog", value: String(visiblePmJobs.filter((job) => job.status === "pending" || job.status === "inProgress").length), trend: "", color: "orange" }
   ];
@@ -112,7 +113,13 @@ export default function DashboardPage() {
           {metrics.map((metric) => {
             const Icon = metricIcons[metric.id];
             return (
-              <article className="metricCard" data-color={metric.color} key={metric.id}>
+              <Link
+                aria-label={t(metricLabelKeys[metric.id])}
+                className="metricCard"
+                data-color={metric.color}
+                href={getMetricHref(metric.id, activeOwner)}
+                key={metric.id}
+              >
                 <div>
                   <span>{t(metricLabelKeys[metric.id])}</span>
                   <strong>{metric.value}</strong>
@@ -120,7 +127,7 @@ export default function DashboardPage() {
                 <i>
                   <Icon size={18} />
                 </i>
-              </article>
+              </Link>
             );
           })}
         </section>
@@ -192,4 +199,19 @@ export default function DashboardPage() {
       </div>
     </AppShell>
   );
+}
+
+function getMetricHref(metricId: Metric["id"], activeOwner: string) {
+  const ownerQuery = activeOwner ? `&owner=${encodeURIComponent(activeOwner)}` : "";
+
+  switch (metricId) {
+    case "sites":
+      return "/sites";
+    case "monthly":
+      return "/schedule";
+    case "done":
+      return "/history";
+    case "backlog":
+      return `/pm-work?view=all&status=backlog${ownerQuery}`;
+  }
 }

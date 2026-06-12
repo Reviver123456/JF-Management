@@ -97,24 +97,33 @@ export default function HistoryPage() {
           <FeedbackPopups loading={isLoading || isUserLoading} loadingMessage={t("pm.loadingSubtitle")} alertMessage={error ?? userError} />
           <PageTitle title={t("history.title")} subtitle={t("history.subtitle")} />
           <section className="toolbar">
-            <SearchControl placeholder={`${t("common.search")}...`} value={query} onChange={setQuery} />
-            <select className="select" value={resultFilter} onChange={(event) => setResultFilter(event.target.value)}>
+            <div className="historyFilterField">
+              <span>{t("common.search")}</span>
+              <SearchControl placeholder={`${t("common.search")}...`} value={query} onChange={setQuery} />
+            </div>
+            <label className="historyFilterField">
+              <span>{t("common.result")}</span>
+              <select className="select" value={resultFilter} onChange={(event) => setResultFilter(event.target.value)}>
               <option value="">{t("common.all")}</option>
               <option value="ปกติ">{t("common.normal")}</option>
               <option value="ผิดปกติ">{t("common.abnormal")}</option>
-            </select>
-            <select className="select" value={activeOwnerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
+              </select>
+            </label>
+            <label className="historyFilterField">
+              <span>{t("common.inspector")}</span>
+              <select className="select" value={activeOwnerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
               <option value={allOwnersValue}>{t("common.all")}</option>
               {ownerOptions.map((owner) => (
                 <option key={owner} value={owner}>{owner}</option>
               ))}
-            </select>
+              </select>
+            </label>
             <label className="dateField">
-              {t("common.datePlaceholder")}
+              {t("reports.startDate")}
               <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
             </label>
             <label className="dateField">
-              {t("common.datePlaceholder")}
+              {t("reports.endDate")}
               <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
             </label>
           </section>

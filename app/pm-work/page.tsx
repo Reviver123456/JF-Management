@@ -65,6 +65,7 @@ import {
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
 
+const allOwnersValue = "__all";
 type CheckResult = "ok" | "bad";
 type FinalStatus = "normal" | "abnormal";
 type PhotoKey = "device" | "overview" | "issue" | "part";
@@ -292,13 +293,20 @@ function PmWorkContent() {
   const searchParams = useSearchParams();
   const siteIdParam = searchParams.get("siteId");
   const jobIdParam = searchParams.get("jobId");
+  const ownerParam = searchParams.get("owner") ?? "";
+  const statusParam = searchParams.get("status") ?? "";
+  const viewParam = searchParams.get("view") ?? "";
+  const showAllJobs = viewParam === "all";
   const todayDate = useMemo(() => getDateString(), []);
   const visibleSites = useMemo(() => {
-    const visibleJobs = getUniquePmJobs(filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, userName));
+    const activeOwner = ownerParam || userName;
+    const visibleJobs = getUniquePmJobs(activeOwner === allOwnersValue
+      ? data.pmJobs
+      : filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, activeOwner));
     const visibleJobKeys = new Set(visibleJobs.map((job) => `${job.siteId}:${job.visitDate}:${job.visitTime}`));
 
     return data.sites.filter((site) => visibleJobKeys.has(getSiteRecordJobKey(site)));
-  }, [data.pmJobs, data.siteCatalog, data.sites, userName]);
+  }, [data.pmJobs, data.siteCatalog, data.sites, ownerParam, userName]);
 
   const [activeTab, setActiveTab] = useState<PmChecklistKey>("synapse");
 
@@ -322,16 +330,35 @@ function PmWorkContent() {
     [data.pmJobs, jobIdParam, visibleSites, siteIdParam]
   );
 
+  const listQuery = showAllJobs
+    ? `view=all${statusParam ? `&status=${encodeURIComponent(statusParam)}` : ""}${ownerParam ? `&owner=${encodeURIComponent(ownerParam)}` : ""}`
+    : "";
+
   const openSite = (site: SiteRecord) => {
-    router.push(`/pm-work?siteId=${encodeURIComponent(site.id)}`);
+    router.push(`/pm-work?jobId=${encodeURIComponent(site.jobId)}${listQuery ? `&${listQuery}` : ""}`);
   };
 
   const closeDetail = () => {
-    router.push("/pm-work");
+    router.push(listQuery ? `/pm-work?${listQuery}` : "/pm-work");
   };
 
-  const filteredSites = useMemo(() => getWorkSitesByDate(visibleSites, todayDate), [visibleSites, todayDate]);
+  const filteredSites = useMemo(() => {
+    const sourceSites = showAllJobs ? visibleSites : getWorkSitesByDate(visibleSites, todayDate);
+
+    if (statusParam === "backlog") {
+      return sourceSites.filter((site) => site.status === "pending" || site.status === "inProgress");
+    }
+
+    if (statusParam === "completed" || statusParam === "abnormal" || statusParam === "pending" || statusParam === "inProgress") {
+      return sourceSites.filter((site) => site.status === statusParam);
+    }
+
+    return sourceSites;
+  }, [showAllJobs, statusParam, todayDate, visibleSites]);
   const pageIsLoading = isLoading || isUserLoading;
+  const listSubtitle = showAllJobs
+    ? `${statusParam === "backlog" ? t("dashboard.backlog") : t("pm.title")} · ${filteredSites.length} ${t("common.jobs")}`
+    : `${t("pm.todayOnlySubtitle")} · ${todayDate}`;
 
   return (
     <AppShell>
@@ -345,7 +372,7 @@ function PmWorkContent() {
           <DetailView key={selectedSite.jobId} site={selectedSite} activeTab={activeTab} setActiveTab={setActiveTab} onBack={closeDetail} onSaved={reload} />
         ) : (
           <>
-            <PageTitle title={t("pm.title")} subtitle={`${t("pm.todayOnlySubtitle")} · ${todayDate}`} />
+            <PageTitle title={t("pm.title")} subtitle={listSubtitle} />
             <section className="list">
               {filteredSites.length > 0 ? filteredSites.map((site) => {
                 const status = statusMeta[site.status];
@@ -364,7 +391,7 @@ function PmWorkContent() {
                     <ChevronRight size={18} />
                   </button>
                 );
-              }) : <p className="emptyState">{t("pm.noTodayJobs")}</p>}
+              }) : <p className="emptyState">{showAllJobs ? t("pm.noMatchingJobs") : t("pm.noTodayJobs")}</p>}
             </section>
           </>
         )}
@@ -636,15 +663,15 @@ function DetailView({
         <h2><Clock3 size={17} /> {t("pm.workTime")}</h2>
         <div className="formGrid">
           <label className={startTime.trim() ? "label" : "label missingRequired"}>
-            <RequiredLabel label={t("fields.startTime")} />
+            <RequiredLabel label={t("fields.startTime")} required={!startTime.trim()} />
             <input className="field" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
           </label>
           <label className={endTime.trim() ? "label" : "label missingRequired"}>
-            <RequiredLabel label={t("fields.endTime")} />
+            <RequiredLabel label={t("fields.endTime")} required={!endTime.trim()} />
             <input className="field" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
           </label>
           <label className={inspector.trim() ? "label" : "label missingRequired"}>
-            <RequiredLabel label={t("common.inspector")} />
+            <RequiredLabel label={t("common.inspector")} required={!inspector.trim()} />
             <input className="field" value={inspector} onChange={(event) => setInspector(event.target.value)} />
           </label>
         </div>
@@ -779,7 +806,7 @@ function DetailView({
       </section>
 
       <section className="card">
-        <h2><CircleCheck size={17} /> <RequiredLabel label={t("pm.result")} /></h2>
+        <h2><CircleCheck size={17} /> <RequiredLabel label={t("pm.result")} required={!finalStatus} /></h2>
         <div className={finalStatus ? "summaryChoices" : "summaryChoices missingRequiredChoice"}>
           <button
             className={finalStatus === "normal" ? "summaryChoice selected ok" : "summaryChoice"}
@@ -807,7 +834,7 @@ function DetailView({
       <section className="card">
         <h2><PenLine size={17} /> {t("pm.signature")}</h2>
         <label className={signerName.trim() ? "label" : "label missingRequired"}>
-          <RequiredLabel label={t("fields.signerName")} />
+          <RequiredLabel label={t("fields.signerName")} required={!signerName.trim()} />
           <input className="field" value={signerName} onChange={(event) => setSignerName(event.target.value)} />
         </label>
         <SignaturePad />
@@ -835,11 +862,11 @@ function Info({ label, value }: { label: string; value: string }) {
   );
 }
 
-function RequiredLabel({ label }: { label: string }) {
+function RequiredLabel({ label, required = true }: { label: string; required?: boolean }) {
   return (
     <span className="requiredLabel">
       {label}
-      <b aria-hidden="true">*</b>
+      {required ? <b aria-hidden="true">*</b> : null}
     </span>
   );
 }
@@ -1082,7 +1109,7 @@ function ChecklistBlockView({
 
             return (
               <label className={missingValue ? "label missingRequired" : "label"} key={`${block.title}-${field.label}`}>
-                <RequiredLabel label={localizeLabel(field.label, lang)} />
+                <RequiredLabel label={localizeLabel(field.label, lang)} required={missingValue} />
                 <input
                   className="field"
                   value={value}

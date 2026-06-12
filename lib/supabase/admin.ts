@@ -8,7 +8,7 @@ export function createAdminClient() {
   const secretKey = process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!secretKey) {
-    throw new Error("Missing SUPABASE_SECRET_KEY. Add a Supabase secret/service-role key to .env.local for local seeding.");
+    throw new Error("Missing SUPABASE_SECRET_KEY. Add a Supabase secret/service-role key for server-side admin operations.");
   }
 
   const { url } = getSupabaseConfig();

@@ -27,7 +27,10 @@ const weekDaysByLang: Record<Lang, string[]> = {
 type MonthPlan = {
   label: string;
   dateLabel: string;
+  displayYear?: string;
   monthNumber: string;
+  year?: number;
+  yearMonth?: string;
   dayCount: number;
   leadingBlankDays: number;
   events: ScheduleDay[];
@@ -52,19 +55,37 @@ type DisplayPlanJob = {
   followers: string[];
 };
 
-function getMonthPlansByLang(pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecord[]): Record<Lang, MonthPlan[]> {
-  const mayJobs = pmJobs.filter((job) => job.visitDate.startsWith("2026-05"));
-  const juneJobs = pmJobs.filter((job) => job.visitDate.startsWith("2026-06"));
+const monthLabelsByLang: Record<Lang, { long: string[]; short: string[] }> = {
+  th: {
+    long: ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"],
+    short: ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."]
+  },
+  en: {
+    long: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    short: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+  }
+};
+
+function getMonthPlan(lang: Lang, pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecord[], yearMonth: string): MonthPlan {
+  const { monthIndex, year } = parseYearMonth(yearMonth);
+  const monthNumber = String(monthIndex + 1).padStart(2, "0");
+  const normalizedYearMonth = `${year}-${monthNumber}`;
+  const dayCount = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  const leadingBlankDays = new Date(Date.UTC(year, monthIndex, 1)).getUTCDay();
+  const displayYear = lang === "th" ? String(year + 543) : String(year);
+  const monthLabels = monthLabelsByLang[lang];
+  const monthJobs = pmJobs.filter((job) => job.visitDate.startsWith(normalizedYearMonth));
 
   return {
-    th: [
-      { label: "พฤษภาคม 2569", dateLabel: "พ.ค.", monthNumber: "05", dayCount: 31, leadingBlankDays: 5, events: getScheduleDaysForSites(mayJobs, siteCatalog) },
-      { label: "มิถุนายน 2569", dateLabel: "มิ.ย.", monthNumber: "06", dayCount: 30, leadingBlankDays: 1, events: getScheduleDaysForSites(juneJobs, siteCatalog) }
-    ],
-    en: [
-      { label: "May 2026", dateLabel: "May", monthNumber: "05", dayCount: 31, leadingBlankDays: 5, events: getScheduleDaysForSites(mayJobs, siteCatalog) },
-      { label: "June 2026", dateLabel: "Jun", monthNumber: "06", dayCount: 30, leadingBlankDays: 1, events: getScheduleDaysForSites(juneJobs, siteCatalog) }
-    ]
+    label: `${monthLabels.long[monthIndex]} ${displayYear}`,
+    dateLabel: monthLabels.short[monthIndex],
+    displayYear,
+    monthNumber,
+    year,
+    yearMonth: normalizedYearMonth,
+    dayCount,
+    leadingBlankDays,
+    events: getScheduleDaysForSites(monthJobs, siteCatalog)
   };
 }
 
@@ -74,9 +95,9 @@ export default function SchedulePage() {
   const { error: userError, isLoading: isUserLoading, userName } = useCurrentUser();
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [usersError, setUsersError] = useState("");
-  const [monthIndex, setMonthIndex] = useState(1);
-  const [selectedDay, setSelectedDay] = useState<number | null>(2);
-  const [addingDate, setAddingDate] = useState<{ monthIndex: number; day: number; siteId?: string } | null>(null);
+  const [yearMonth, setYearMonth] = useState(() => getDateString().slice(0, 7));
+  const [selectedDay, setSelectedDay] = useState<number | null>(() => Number(getDateString().slice(-2)));
+  const [addingDate, setAddingDate] = useState<{ yearMonth: string; day: number; siteId?: string } | null>(null);
   const [editingJob, setEditingJob] = useState<DisplayPlanJob | null>(null);
   const [viewingJob, setViewingJob] = useState<DisplayPlanJob | null>(null);
   const [selectedOwner, setSelectedOwner] = useState("");
@@ -90,20 +111,18 @@ export default function SchedulePage() {
     () => filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, activeOwner),
     [activeOwner, data.pmJobs, data.siteCatalog]
   );
-  const monthPlansByLang = useMemo(() => getMonthPlansByLang(visiblePmJobs, data.siteCatalog), [data.siteCatalog, visiblePmJobs]);
-  const monthPlans = monthPlansByLang[lang];
   const weekDays = weekDaysByLang[lang];
-  const month = monthPlans[monthIndex];
+  const month = useMemo(() => getMonthPlan(lang, visiblePmJobs, data.siteCatalog, yearMonth), [data.siteCatalog, lang, visiblePmJobs, yearMonth]);
   const plannedSiteIds = useMemo(() => new Set(
     visiblePmJobs
-      .filter((job) => job.visitDate.startsWith(`2026-${month.monthNumber}`))
+      .filter((job) => job.visitDate.startsWith(month.yearMonth ?? yearMonth))
       .map((job) => job.siteId)
-  ), [month.monthNumber, visiblePmJobs]);
+  ), [month.yearMonth, visiblePmJobs, yearMonth]);
   const allPlannedSiteIds = useMemo(() => new Set(
     data.pmJobs
-      .filter((job) => job.visitDate.startsWith(`2026-${month.monthNumber}`))
+      .filter((job) => job.visitDate.startsWith(month.yearMonth ?? yearMonth))
       .map((job) => job.siteId)
-  ), [data.pmJobs, month.monthNumber]);
+  ), [data.pmJobs, month.yearMonth, yearMonth]);
   const unplannedSites = useMemo(
     () => sites.filter((site) => !allPlannedSiteIds.has(site.id)),
     [allPlannedSiteIds, sites]
@@ -130,7 +149,7 @@ export default function SchedulePage() {
       });
   }, [data.siteCatalog, systemUsers, userName]);
   const days = useMemo(() => Array.from({ length: month.dayCount }, (_, index) => index + 1), [month.dayCount]);
-  const selectedDate = selectedDay ? `2026-${month.monthNumber}-${String(selectedDay).padStart(2, "0")}` : "";
+  const selectedDate = selectedDay ? `${month.yearMonth ?? yearMonth}-${String(selectedDay).padStart(2, "0")}` : "";
   const selectedDateIsPast = Boolean(selectedDate && selectedDate < todayDate);
   const selectedJobs = useMemo(
     () => getDisplayPlanJobs(visiblePmJobs, data.siteCatalog).filter((job) => job.date === selectedDate),
@@ -172,7 +191,7 @@ export default function SchedulePage() {
 
   const moveMonth = (direction: -1 | 1) => {
     setSelectedDay(1);
-    setMonthIndex((current) => (current + direction + monthPlans.length) % monthPlans.length);
+    setYearMonth((current) => shiftYearMonth(current, direction));
   };
 
   const openAddPlan = (siteId?: string) => {
@@ -184,7 +203,7 @@ export default function SchedulePage() {
       return;
     }
 
-    setAddingDate({ monthIndex, day: selectedDay, siteId });
+    setAddingDate({ yearMonth: month.yearMonth ?? yearMonth, day: selectedDay, siteId });
   };
 
   const openEditPlan = (job: DisplayPlanJob) => {
@@ -313,10 +332,10 @@ export default function SchedulePage() {
                 <ChevronRight size={18} />
               </button>
             </div>
-            <div className="calendarLegend" aria-label={t("schedule.calendarLegend")}>
+            {/* <div className="calendarLegend" aria-label={t("schedule.calendarLegend")}>
               <span><b className="todayLegend" />{t("common.today")}</span>
               <span><b className="pastLegend" />{t("schedule.pastDate")}</span>
-            </div>
+            </div> */}
 
             <div className="weekHeader">
               {weekDays.map((day) => (
@@ -330,7 +349,7 @@ export default function SchedulePage() {
               ))}
               {days.map((day) => {
                 const initialJobs = month.events.find((event) => event.day === day)?.jobs ?? [];
-                const dayDate = `2026-${month.monthNumber}-${String(day).padStart(2, "0")}`;
+                const dayDate = `${month.yearMonth ?? yearMonth}-${String(day).padStart(2, "0")}`;
                 const dayClassName = [
                   "dayCell",
                   selectedDay === day ? "selectedDay" : "",
@@ -363,7 +382,7 @@ export default function SchedulePage() {
 
             <section className="dayDetailCard">
               <div>
-                <h3>{selectedDay ? formatDisplayDate(selectedDay, month.dateLabel) : t("schedule.chooseDate")}</h3>
+                <h3>{selectedDay ? formatDisplayDate(selectedDay, month.dateLabel, month.displayYear) : t("schedule.chooseDate")}</h3>
                 {selectedJobs.length > 0 ? (
                   <div className="plannedList">
                     {selectedJobs.map((job) => (
@@ -430,7 +449,7 @@ export default function SchedulePage() {
             allSites={allUnplannedSites}
             day={addingDate.day}
             initialSiteId={addingDate.siteId}
-            monthNumber={monthPlans[addingDate.monthIndex].monthNumber}
+            yearMonth={addingDate.yearMonth}
             sites={unplannedSites}
             systemUsers={systemUsers}
             onClose={() => setAddingDate(null)}
@@ -452,7 +471,7 @@ export default function SchedulePage() {
             initialSiteId={editingJob.siteId}
             initialTime={editingJob.time}
             mode="edit"
-            monthNumber={editingJob.date.slice(5, 7)}
+            yearMonth={editingJob.date.slice(0, 7)}
             sites={includeSiteInOptions(unplannedSites, data.siteCatalog, editingJob.siteId)}
             systemUsers={systemUsers}
             deleting={deletingJobId === editingJob.id}
@@ -520,7 +539,7 @@ function AddPlanModal({
   initialSiteId,
   initialTime = "09:00",
   mode = "add",
-  monthNumber,
+  yearMonth,
   sites,
   systemUsers,
   onClose,
@@ -535,7 +554,7 @@ function AddPlanModal({
   initialSiteId?: string;
   initialTime?: string;
   mode?: "add" | "edit";
-  monthNumber: string;
+  yearMonth: string;
   sites: SiteCatalogRecord[];
   systemUsers: SystemUser[];
   onClose: () => void;
@@ -549,10 +568,10 @@ function AddPlanModal({
   ) => Promise<void>;
 }) {
   const { lang, t } = useUi();
-  const initialDate = `2026-${monthNumber}-${String(day).padStart(2, "0")}`;
+  const initialDate = `${yearMonth}-${String(day).padStart(2, "0")}`;
   const todayDate = getDateString();
-  const firstDate = todayDate.startsWith(`2026-${monthNumber}`) ? todayDate : `2026-${monthNumber}-01`;
-  const lastDate = getMonthLastDate(monthNumber);
+  const firstDate = todayDate.startsWith(yearMonth) ? todayDate : `${yearMonth}-01`;
+  const lastDate = getMonthLastDate(yearMonth);
   const [showAllSitesInModal, setShowAllSitesInModal] = useState(false);
   const availableSites = showAllSitesInModal ? allSites : sites;
   const [siteId, setSiteId] = useState(initialSiteId ?? sites[0]?.id ?? "");
@@ -616,7 +635,7 @@ function AddPlanModal({
         }}
       >
         <header className="modalHeader">
-          <h2>{modalTitle} - {formatModalDate(day, monthNumber)}</h2>
+          <h2>{modalTitle} - {formatModalDate(day, yearMonth)}</h2>
           <button type="button" onClick={onClose} aria-label={t("common.close")}>
             <X size={18} />
           </button>
@@ -710,11 +729,29 @@ function AddPlanModal({
   );
 }
 
-function getMonthLastDate(monthNumber: string) {
-  const monthIndex = Number(monthNumber);
-  const dayCount = new Date(Date.UTC(2026, monthIndex, 0)).getUTCDate();
+function parseYearMonth(yearMonth: string) {
+  const [yearValue, monthValue] = yearMonth.split("-");
+  const year = Number(yearValue);
+  const month = Number(monthValue);
 
-  return `2026-${monthNumber}-${String(dayCount).padStart(2, "0")}`;
+  return {
+    monthIndex: Number.isFinite(month) ? Math.min(11, Math.max(0, month - 1)) : new Date().getMonth(),
+    year: Number.isFinite(year) ? year : new Date().getFullYear()
+  };
+}
+
+function shiftYearMonth(yearMonth: string, direction: -1 | 1) {
+  const { monthIndex, year } = parseYearMonth(yearMonth);
+  const nextDate = new Date(Date.UTC(year, monthIndex + direction, 1));
+
+  return `${nextDate.getUTCFullYear()}-${String(nextDate.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function getMonthLastDate(yearMonth: string) {
+  const { monthIndex, year } = parseYearMonth(yearMonth);
+  const dayCount = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+
+  return `${yearMonth}-${String(dayCount).padStart(2, "0")}`;
 }
 
 function includeSiteInOptions(options: SiteCatalogRecord[], catalog: SiteCatalogRecord[], siteId: string) {
@@ -761,10 +798,12 @@ function getDisplayPlanJobs(pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecor
   ));
 }
 
-function formatDisplayDate(day: number, monthLabel: string) {
-  return `${String(day).padStart(2, "0")} ${monthLabel} 2026`;
+function formatDisplayDate(day: number, monthLabel: string, displayYear?: string) {
+  return `${String(day).padStart(2, "0")} ${monthLabel} ${displayYear ?? ""}`.trim();
 }
 
-function formatModalDate(day: number, monthNumber: string) {
-  return `${String(day).padStart(2, "0")}/${monthNumber}/2026`;
+function formatModalDate(day: number, yearMonth: string) {
+  const { monthIndex, year } = parseYearMonth(yearMonth);
+
+  return `${String(day).padStart(2, "0")}/${String(monthIndex + 1).padStart(2, "0")}/${year}`;
 }

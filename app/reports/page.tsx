@@ -116,7 +116,10 @@ export default function ReportsPage() {
         <PageTitle title={t("reports.title")} subtitle={t("reports.subtitle")} />
 
         <section className="toolbar reportToolbar">
-          <SearchControl placeholder={t("reports.searchInput")} value={query} onChange={setQuery} />
+          <div className="reportFilterField">
+            <span>{t("common.search")}</span>
+            <SearchControl placeholder={t("reports.searchInput")} value={query} onChange={setQuery} />
+          </div>
           <label className="dateField">
             {t("reports.startDate")}
             <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
@@ -125,12 +128,15 @@ export default function ReportsPage() {
             {t("reports.endDate")}
             <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
           </label>
-          <select className="select" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
-            <option value={allOwnersValue}>{t("common.all")}</option>
-            {ownerOptions.map((owner) => (
-              <option key={owner} value={owner}>{owner}</option>
-            ))}
-          </select>
+          <label className="reportFilterField">
+            <span>{t("common.inspector")}</span>
+            <select className="select" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
+              <option value={allOwnersValue}>{t("common.all")}</option>
+              {ownerOptions.map((owner) => (
+                <option key={owner} value={owner}>{owner}</option>
+              ))}
+            </select>
+          </label>
         </section>
 
         <ChecklistReportPanel

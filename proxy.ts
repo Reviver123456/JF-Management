@@ -4,9 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const publicPaths = [
   "/login",
   "/reset-password",
-  "/api/auth/bootstrap-user",
-  "/api/db/health",
-  "/api/db/seed"
+  "/api/db/health"
 ];
 
 function isLocalAuthBypass(request: NextRequest) {

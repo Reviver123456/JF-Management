@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { Eye, EyeOff, Languages, LockKeyhole, Moon, PenLine, RotateCcw, Save, Sun, UserRound, X } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { FeedbackPopups } from "@/components/AppPopup";
-import { defaultLoginUser } from "@/lib/auth/default-user";
 import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
@@ -13,9 +12,9 @@ export default function SettingsPage() {
   const { lang, theme, setLang, setTheme, t } = useUi();
   const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState("");
-  const [profileName, setProfileName] = useState<string>(defaultLoginUser.name);
-  const [phone, setPhone] = useState<string>(defaultLoginUser.phone);
-  const [email, setEmail] = useState<string>(defaultLoginUser.email);
+  const [profileName, setProfileName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -29,9 +28,9 @@ export default function SettingsPage() {
       } = await supabase.auth.getUser();
       const metadata = user?.user_metadata ?? {};
 
-      setEmail(user?.email ?? defaultLoginUser.email);
-      setProfileName(typeof metadata.full_name === "string" ? metadata.full_name : defaultLoginUser.name);
-      setPhone(typeof metadata.phone === "string" ? metadata.phone : defaultLoginUser.phone);
+      setEmail(user?.email ?? "");
+      setProfileName(typeof metadata.full_name === "string" ? metadata.full_name : user?.email ?? "");
+      setPhone(typeof metadata.phone === "string" ? metadata.phone : "");
     }
 
     loadProfile();
