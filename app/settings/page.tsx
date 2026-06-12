@@ -5,6 +5,7 @@ import { Eye, EyeOff, Languages, LockKeyhole, Moon, PenLine, RotateCcw, Save, Su
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { defaultLoginUser } from "@/lib/auth/default-user";
+import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 
@@ -139,7 +140,7 @@ export default function SettingsPage() {
 
         <article className="card">
           <h2><PenLine size={17} /> {t("settings.mySignature")}</h2>
-          <SettingsSignaturePad />
+          <SettingsSignaturePad email={email} />
         </article>
 
         <article className="card">
@@ -188,7 +189,7 @@ function PasswordField({
   );
 }
 
-function SettingsSignaturePad() {
+function SettingsSignaturePad({ email }: { email: string }) {
   const { t } = useUi();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -217,12 +218,31 @@ function SettingsSignaturePad() {
       context.lineWidth = 2.4;
       context.lineCap = "round";
       context.lineJoin = "round";
+
+      const savedSignature = window.localStorage.getItem(getUserSignatureStorageKey(email));
+      if (savedSignature) {
+        const image = new window.Image();
+        image.onload = () => {
+          context.drawImage(image, 0, 0, width, height);
+        };
+        image.src = savedSignature;
+      }
     };
 
     setupCanvas();
     window.addEventListener("resize", setupCanvas);
     return () => window.removeEventListener("resize", setupCanvas);
-  }, []);
+  }, [email]);
+
+  const saveSignature = () => {
+    const canvas = canvasRef.current;
+
+    if (!canvas) {
+      return;
+    }
+
+    window.localStorage.setItem(getUserSignatureStorageKey(email), canvas.toDataURL("image/png"));
+  };
 
   const getPoint = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -264,6 +284,7 @@ function SettingsSignaturePad() {
 
     event.currentTarget.releasePointerCapture(event.pointerId);
     setIsDrawing(false);
+    saveSignature();
   };
   const clearSignature = () => {
     const canvas = canvasRef.current;
@@ -274,6 +295,7 @@ function SettingsSignaturePad() {
 
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    window.localStorage.removeItem(getUserSignatureStorageKey(email));
   };
 
   return (

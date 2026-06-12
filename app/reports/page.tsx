@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
 import { FeedbackPopups } from "@/components/AppPopup";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
+import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { useUi, type Lang } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
 import {
@@ -28,7 +30,14 @@ import {
 } from "@/lib/pm-checklist-data";
 import {
   normalizeOwnerName,
+  type CheckResult,
+  type PmWorkDetails,
   type ReportRow,
+  type SavedChecklistBlock,
+  type SavedChecklistField,
+  type SavedChecklistGroup,
+  type SavedChecklistSet,
+  type SavedSparePart,
   type SiteCatalogRecord
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
@@ -41,7 +50,11 @@ type ChecklistTemplate = {
   title: string;
 };
 
-type PreviewState = { title: string };
+type PreviewState = {
+  row: ReportRow;
+  site: SiteCatalogRecord | null;
+  title: string;
+};
 
 const allOwnersValue = "__all";
 
@@ -56,12 +69,15 @@ const checklistTemplates: ChecklistTemplate[] = [
 
 export default function ReportsPage() {
   const { lang, t } = useUi();
+  const { email, userName } = useCurrentUser();
   const { data, error, isLoading } = usePmData();
   const [query, setQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [ownerFilter, setOwnerFilter] = useState(allOwnersValue);
   const [preview, setPreview] = useState<PreviewState | null>(null);
+  const responsibleName = userName.trim() || email || "";
+  const responsibleSignature = getStoredUserSignature(email);
   const ownerOptions = useMemo(() => getOwnerOptions(data.reportRows, data.siteCatalog), [data.reportRows, data.siteCatalog]);
   const filteredReports = useMemo(() => (
     data.reportRows.filter((row) => rowMatchesFilters({
@@ -75,7 +91,11 @@ export default function ReportsPage() {
     }))
   ), [data.reportRows, endDate, ownerFilter, query, startDate]);
   const openReportPreview = (row: ReportRow) => {
-    setPreview({ title: `รายงาน PM - ${row.site}` });
+    setPreview({
+      row,
+      site: data.siteCatalog.find((site) => site.id === row.siteId) ?? null,
+      title: `รายงาน PM - ${row.site}`
+    });
   };
 
   return (
@@ -111,6 +131,8 @@ export default function ReportsPage() {
         {preview ? (
           <PreviewModal
             preview={preview}
+            responsibleName={responsibleName}
+            responsibleSignature={responsibleSignature}
             onClose={() => setPreview(null)}
           />
         ) : null}
@@ -166,10 +188,11 @@ function ChecklistReportPanel({
   );
 }
 
-type FieldRow = string[];
+type ReportField = { label: string; value?: string };
+type FieldRow = ReportField[];
 
 type StandardTemplatePage = ChecklistTemplate & {
-  fields: FieldRow[];
+  fields: string[][];
   sections: { items: string[]; title: string }[];
   variant?: "synapse" | "environment" | "equipment";
 };
@@ -237,19 +260,48 @@ const standardTemplatePages: StandardTemplatePage[] = [
   }
 ];
 
-function ReportDocumentPacket() {
+function ReportDocumentPacket({
+  responsibleName,
+  responsibleSignature,
+  row,
+  site
+}: {
+  responsibleName: string;
+  responsibleSignature: string;
+  row: ReportRow;
+  site: SiteCatalogRecord | null;
+}) {
+  const reportGroups = getReportGroups(row.workDetails);
+
   return (
     <div className="reportDocumentStack">
-      <CoverTemplatePage />
-      {standardTemplatePages.map((template) => (
-        <StandardTemplatePageView key={template.key} template={template} />
+      <CoverTemplatePage groups={reportGroups} row={row} site={site} />
+      {reportGroups.map((group) => (
+        group.sets.map((set, setIndex) => (
+          <ChecklistSetPage
+            group={group}
+            key={`${group.key}-${set.title}-${setIndex}`}
+            responsibleName={responsibleName}
+            responsibleSignature={responsibleSignature}
+            row={row}
+            set={set}
+            site={site}
+          />
+        ))
       ))}
-      <DiagTemplatePage />
     </div>
   );
 }
 
-function CoverTemplatePage() {
+function CoverTemplatePage({
+  groups,
+  row,
+  site
+}: {
+  groups: SavedChecklistGroup[];
+  row: ReportRow;
+  site: SiteCatalogRecord | null;
+}) {
   return (
     <section className="templateSheet coverSheet">
       <div className="coverServiceText">Service Report</div>
@@ -261,15 +313,15 @@ function CoverTemplatePage() {
         <tbody>
           <tr>
             <th>โครงการ</th>
-            <td />
+            <td>{row.site}</td>
           </tr>
           <tr>
             <th>หน่วยงาน</th>
-            <td />
+            <td>{site?.department ?? ""}</td>
           </tr>
           <tr>
             <th>สถาบัน</th>
-            <td />
+            <td>{row.customer}</td>
           </tr>
         </tbody>
       </table>
@@ -288,23 +340,17 @@ function CoverTemplatePage() {
           </tr>
         </thead>
         <tbody>
-          {["Synapse PM Checklist", "Server PM Checklist", "Switch PM Checklist", "Storage PM Checklist", "Environment PM Checklist", "DIAG PM Checklist"].map((item, index) => (
-            <tr key={item}>
+          {groups.map((group, index) => (
+            <tr key={`${group.key}-${group.title}`}>
               <td>{index + 1}</td>
-              <td>{item}</td>
-              <td />
-              <td />
+              <td>{getChecklistHeading(group.key, group.title)}</td>
+              <td>{group.sets.length}</td>
+              <td className="reportStatusCell">√</td>
               <td />
             </tr>
           ))}
         </tbody>
       </table>
-
-      <section className="coverSuggestion">
-        <strong>ข้อเสนอแนะ</strong>
-        <span />
-        <span />
-      </section>
 
       <div className="signatureGrid">
         <div>
@@ -320,29 +366,77 @@ function CoverTemplatePage() {
   );
 }
 
-function StandardTemplatePageView({ template }: { template: StandardTemplatePage }) {
+function ChecklistSetPage({
+  group,
+  responsibleName,
+  responsibleSignature,
+  row,
+  set,
+  site
+}: {
+  group: SavedChecklistGroup;
+  responsibleName: string;
+  responsibleSignature: string;
+  row: ReportRow;
+  set: SavedChecklistSet;
+  site: SiteCatalogRecord | null;
+}) {
+  const heading = getChecklistHeading(group.key, group.title);
+  const showSetTitle = group.sets.length > 1 || !set.title.toLowerCase().includes(String(group.title).toLowerCase());
+
   return (
     <section className="templateSheet">
-      <TemplateHeader heading={template.heading} />
-      <TemplateInfoGrid fields={template.fields} />
-
-      {template.sections.map((section, index) => (
-        <ChecklistTemplateTable key={`${template.key}-${section.title}-${index}`} items={section.items} title={section.title} />
+      <TemplateHeader heading={heading} row={row} />
+      {showSetTitle ? <div className="templateSetTitle">{set.title}</div> : null}
+      {group.key === "diag" ? (
+        <DiagReportInfoGrid groupKey={group.key} row={row} set={set} site={site} />
+      ) : null}
+      {set.blocks.map((block, blockIndex) => (
+        group.key === "diag" && isDiagCalibrateBlock(block) ? (
+          isFirstDiagCalibrateBlock(set.blocks, blockIndex) ? (
+            <DiagCalibrateTable
+              blocks={getDiagCalibrateBlocks(set.blocks)}
+              groupKey={group.key}
+              key={`${set.title}-diag-calibrate`}
+              row={row}
+              setTitle={set.title}
+              site={site}
+            />
+          ) : null
+        ) : shouldSkipReportBlock(group.key, block) ? null : (
+          <ReportChecklistBlock
+            block={block}
+            blockIndex={blockIndex}
+            groupKey={group.key}
+            key={`${set.title}-${blockIndex}`}
+            row={row}
+            setTitle={set.title}
+            site={site}
+          />
+        )
       ))}
-
-      {template.variant === "synapse" ? <SynapseBackupBlock /> : null}
-      <TemplateFooter compact={template.variant === "environment"} />
+      <TemplateFooter
+        compact={group.key === "environment" || group.key === "diag"}
+        responsibleName={responsibleName}
+        responsibleSignature={responsibleSignature}
+        row={row}
+      />
     </section>
   );
 }
 
-function TemplateHeader({ heading }: { heading: string }) {
+type DiagCalibrateBlockEntry = {
+  block: Extract<SavedChecklistBlock, { type: "fields" }>;
+  blockIndex: number;
+};
+
+function TemplateHeader({ heading, row }: { heading: string; row?: ReportRow }) {
   return (
     <header className="templateHeader">
       <Image src="/report-templates/LOGO-JF.webp" alt="JF Advance Med" width={132} height={62} />
       <strong>JF Advance Med CO., LTD</strong>
       <div>
-        <span className="pmOrderNo">PM Order No. :</span>
+        <span className="pmOrderNo">PM Order No. : {row?.jobId ?? ""}</span>
         <span>Service Report</span>
         <b>{heading}</b>
       </div>
@@ -350,17 +444,17 @@ function TemplateHeader({ heading }: { heading: string }) {
   );
 }
 
-function TemplateInfoGrid({ fields }: { fields: FieldRow[] }) {
+function TemplateInfoGrid({ rows }: { rows: FieldRow[] }) {
   return (
     <table className="templateTable infoTemplateTable">
       <tbody>
-        {fields.map((row, index) => (
-          <tr key={`${row.join("-")}-${index}`}>
+        {rows.map((row, index) => (
+          <tr key={`${row.map((field) => field.label).join("-")}-${index}`}>
             {row.map((field) => (
-              <td className="fieldCell" key={field}>
+              <td className="fieldCell" key={field.label}>
                 <div className="fieldLabel">
-                  <span>{field}</span>
-                  <i />
+                  <span>{formatFieldLabel(field.label)}</span>
+                  <i>{field.value ?? ""}</i>
                 </div>
               </td>
             ))}
@@ -372,165 +466,78 @@ function TemplateInfoGrid({ fields }: { fields: FieldRow[] }) {
   );
 }
 
-function ChecklistTemplateTable({ items, title }: { items: string[]; title: string }) {
-  return (
-    <table className="templateTable checklistTemplateTable">
-      <thead>
-        <tr>
-          <th>{title}</th>
-          <th>STATUS</th>
-          <th>DETAIL</th>
-        </tr>
-      </thead>
-      <tbody>
-        {items.map((item) => (
-          <tr key={item}>
-            <td>{item}</td>
-            <td />
-            <td />
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
+function ReportChecklistBlock({
+  block,
+  blockIndex,
+  groupKey,
+  row,
+  setTitle,
+  site
+}: {
+  block: SavedChecklistBlock;
+  blockIndex: number;
+  groupKey: string;
+  row: ReportRow;
+  setTitle: string;
+  site: SiteCatalogRecord | null;
+}) {
+  const details = row.workDetails;
 
-function SynapseBackupBlock() {
-  return (
-    <section className="templateBlockBox">
-      <strong>BACKUP DEVICE / DATA BACKUP CHECKING</strong>
-      <div className="backupChoiceRow">
-        <span>Backup Type :</span>
-        <label className="choiceItem"><span className="checkbox" />DR Site</label>
-        <label className="choiceItem"><span className="checkbox" />NAS</label>
-        <label className="choiceItem"><span className="checkbox" />Other</label>
-      </div>
-      {["Location :", "Hardware Status :", "Backup Status :", "Runing Date :"].map((label) => (
-        <div className="lineRow" key={label}>
-          <span>{label}</span>
-          <i />
-        </div>
-      ))}
-    </section>
-  );
-}
+  if (block.type === "fields") {
+    if (shouldHideReportFieldBlock(groupKey, block)) {
+      return null;
+    }
 
-function TemplateFooter({ compact = false }: { compact?: boolean }) {
-  return (
-    <footer className={compact ? "templateFooter compactFooter" : "templateFooter"}>
-      <div className="footerTopGrid">
-        <div className="suggestionBox">
-          <strong>ข้อเสนอแนะ :</strong>
-        </div>
-        <div className="checkedByBox">
-          <div className="checkedByTitle">Checked By :</div>
-          <div className="checkedByValue" />
-        </div>
-      </div>
-      <div className="statusBlock">
-        <div className="statusRow">
-          <span>สรุปผลการดำเนินงาน :</span>
-          <label className="statusOption"><span className="checkbox" />สภาพปกติ</label>
-          <label className="statusOption"><span className="checkbox" />ผิดปกติ</label>
-        </div>
-        <div className="noteLine">
-          <span>หมายเหตุ :</span>
-          <span />
-        </div>
-      </div>
-      <div className="partsBox">
-        <span>อะไหล่ที่เปลี่ยน :</span>
-        <span>1.</span>
-        <span>2.</span>
-      </div>
-      <div className="workTimeGrid">
-        <div>
-          <strong>STATUS</strong>
-          <span>√ : Normal</span>
-          <span>X : Abnormal</span>
-        </div>
-        <div>
-          <strong>Work Time</strong>
-          <span>เวลาเริ่มงาน</span>
-          <span>เวลาเสร็จงาน</span>
-        </div>
-      </div>
-    </footer>
-  );
-}
+    const fields = getVisibleReportFields(groupKey, block).map((field) => ({
+      label: field.label,
+      value: getReportFieldValue({
+        blockIndex,
+        details,
+        field,
+        groupKey,
+        row,
+        setTitle,
+        site
+      })
+    }));
 
-function DiagTemplatePage() {
-  return (
-    <section className="templateSheet diagSheet">
-      <TemplateHeader heading="DIAG Maintenance Checklist" />
-      <TemplateInfoGrid fields={[
-        ["Customer Name :", "Location :"],
-        ["Brand :", "Model :"],
-        ["S/N :", "IP Address :"],
-        ["OS :", "Antivirus :"],
-        ["Definition Date :"]
-      ]} />
+    if (isReportInfoBlock(block)) {
+      return <ReportInfoGrid fields={fields} groupKey={groupKey} row={row} site={site} />;
+    }
 
-      <table className="templateTable diagCalibrateTable">
-        <thead>
-          <tr>
-            <th colSpan={6}>CALIBRATE</th>
-          </tr>
-          <tr>
-            <th>Monitor</th>
-            <th>Brand / Model</th>
-            <th>S/N</th>
-            <th>Status</th>
-            <th colSpan={2}>LUMINANCE (cd/m2)</th>
-          </tr>
-          <tr>
-            <th />
-            <th />
-            <th />
-            <th />
-            <th>Target</th>
-            <th>Result</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Monitor 1</td>
-            <td />
-            <td />
-            <td />
-            <td>Min : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; MAX :</td>
-            <td>Min : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; MAX :</td>
-          </tr>
-          <tr>
-            <td>Monitor 2</td>
-            <td />
-            <td />
-            <td />
-            <td>Min : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; MAX :</td>
-            <td>Min : &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; MAX :</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <section className="templateBlockBox">
-        <strong>DIAGNOSTIC MONITOR / SMPTE PATTERN</strong>
-        <div className="lineRow"><span>สถานะการทดสอบ :</span><i /></div>
-        <div className="lineRow"><span>(ผิดปกติระบุอาการ)</span><i /></div>
+    return (
+      <section className="reportFieldBlock">
+        <TemplateInfoGrid rows={chunkReportFields(fields)} />
       </section>
+    );
+  }
 
+  if (block.type === "radios") {
+    const selectedValue = getReportRadioValue({
+      block,
+      blockIndex,
+      details,
+      groupKey,
+      setTitle
+    });
+
+    return (
       <section className="templateBlockBox">
-        <strong>PHYSICAL STATUS</strong>
-        {["Act. Times", "Backlight Times", "Manufacturing date"].map((label) => (
-          <div className="dualMonitorRow" key={label}>
-            <span>{label}</span>
-            <b>Monitor1:</b>
-            <i />
-            <b>Monitor2:</b>
-            <i />
-          </div>
-        ))}
+        <strong>{block.label}</strong>
+        <div className="backupChoiceRow">
+          {block.items.map((item) => (
+            <label className="choiceItem" key={item}>
+              <CheckBoxMark checked={item === selectedValue} />
+              {item}
+            </label>
+          ))}
+        </div>
       </section>
+    );
+  }
 
+  if (block.type === "diagTable") {
+    return (
       <table className="templateTable diagDeviceTable">
         <thead>
           <tr>
@@ -542,20 +549,645 @@ function DiagTemplatePage() {
           {diagColumns.map((column) => (
             <tr key={column}>
               <th>{column}</th>
-              {diagDevices.map((device) => <td key={`${column}-${device}`} />)}
+              {diagDevices.map((device) => {
+                const resultKey = `${groupKey}:${setTitle}:${blockIndex}:${device}:${column}`;
+                return (
+                  <td className="reportStatusCell" key={`${column}-${device}`}>
+                    {resultSymbol(details?.checkResults?.[resultKey])}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
       </table>
+    );
+  }
 
-      <TemplateFooter compact />
+  return (
+    <table className="templateTable checklistTemplateTable">
+      <thead>
+        <tr>
+          <th>{block.title}</th>
+          <th>STATUS</th>
+          <th>DETAIL</th>
+        </tr>
+      </thead>
+      <tbody>
+        {block.items.map((item) => {
+          const resultKey = checkKey(`${groupKey}:${setTitle}:${blockIndex}`, block.title, item);
+
+          return (
+            <tr key={item}>
+              <td>{item}</td>
+              <td className="reportStatusCell">{resultSymbol(details?.checkResults?.[resultKey])}</td>
+              <td>{getChecklistDetail({ details, groupKey, item, resultKey, setTitle })}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function DiagCalibrateTable({
+  blocks,
+  groupKey,
+  row,
+  setTitle,
+  site
+}: {
+  blocks: DiagCalibrateBlockEntry[];
+  groupKey: string;
+  row: ReportRow;
+  setTitle: string;
+  site: SiteCatalogRecord | null;
+}) {
+  const details = row.workDetails;
+
+  return (
+    <table className="templateTable diagCalibrateTable">
+      <thead>
+        <tr>
+          <th className="diagCalibrateTitle" colSpan={8}>CALIBRATE</th>
+        </tr>
+        <tr>
+          <th className="diagCalibrateSpacer" colSpan={4} />
+          <th colSpan={4}>LUMINANCE (cd/m²)</th>
+        </tr>
+        <tr>
+          <th />
+          <th>Brand /Model</th>
+          <th>S/N</th>
+          <th>Status</th>
+          <th>Target<br />Min :</th>
+          <th>Target<br />MAX :</th>
+          <th>Result<br />Min :</th>
+          <th>Result<br />MAX :</th>
+        </tr>
+      </thead>
+      <tbody>
+        {blocks.map((entry, index) => (
+          <tr key={entry.block.title}>
+            <th>Monitor {getDiagMonitorNumber(entry.block.title) ?? index + 1}</th>
+            <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label.includes("brand / model"), groupKey, row, setTitle, site })}</td>
+            <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label === "s/n", groupKey, row, setTitle, site })}</td>
+            <td />
+            <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label.includes("target min"), groupKey, row, setTitle, site })}</td>
+            <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label.includes("target max"), groupKey, row, setTitle, site })}</td>
+            <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label.includes("result min"), groupKey, row, setTitle, site })}</td>
+            <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label.includes("result max"), groupKey, row, setTitle, site })}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function isDiagCalibrateBlock(block: SavedChecklistBlock) {
+  return block.type === "fields" && block.title.toLowerCase().startsWith("calibrate: monitor");
+}
+
+function isFirstDiagCalibrateBlock(blocks: SavedChecklistBlock[], blockIndex: number) {
+  return blocks.findIndex(isDiagCalibrateBlock) === blockIndex;
+}
+
+function getDiagCalibrateBlocks(blocks: SavedChecklistBlock[]): DiagCalibrateBlockEntry[] {
+  return blocks
+    .map((block, blockIndex) => ({ block, blockIndex }))
+    .filter((entry): entry is DiagCalibrateBlockEntry => isDiagCalibrateBlock(entry.block));
+}
+
+function getDiagMonitorNumber(title: string) {
+  return title.match(/monitor\s*(\d+)/i)?.[1] ?? "";
+}
+
+function getDiagCalibrateValue({
+  details,
+  entry,
+  fieldMatcher,
+  groupKey,
+  row,
+  setTitle,
+  site
+}: {
+  details: PmWorkDetails | undefined;
+  entry: DiagCalibrateBlockEntry;
+  fieldMatcher: (normalizedLabel: string) => boolean;
+  groupKey: string;
+  row: ReportRow;
+  setTitle: string;
+  site: SiteCatalogRecord | null;
+}) {
+  const field = entry.block.fields.find((candidate) => fieldMatcher(normalizeCalibrateLabel(candidate.label)));
+
+  if (!field) {
+    return "";
+  }
+
+  return getReportFieldValue({
+    blockIndex: entry.blockIndex,
+    details,
+    field,
+    groupKey,
+    row,
+    setTitle,
+    site
+  });
+}
+
+function normalizeCalibrateLabel(label: string) {
+  return label
+    .replace(/\s+/g, " ")
+    .replace(/Â²/g, "²")
+    .trim()
+    .toLowerCase();
+}
+
+function DiagReportInfoGrid({
+  groupKey,
+  row,
+  set,
+  site
+}: {
+  groupKey: string;
+  row: ReportRow;
+  set: SavedChecklistSet;
+  site: SiteCatalogRecord | null;
+}) {
+  const details = row.workDetails;
+  const radioEntry = set.blocks
+    .map((block, blockIndex) => ({ block, blockIndex }))
+    .find(({ block }) => block.type === "radios" && block.label === "Antivirus");
+  const selectedAntivirus = radioEntry?.block.type === "radios"
+    ? getReportRadioValue({
+      block: radioEntry.block,
+      blockIndex: radioEntry.blockIndex,
+      details,
+      groupKey,
+      setTitle: set.title
+    })
+    : "Installed";
+  const fieldValue = (label: string) => (
+    getSavedFieldValueByLabel(details, groupKey, set.title, label) || getFallbackFieldValue(label, row, site)
+  );
+
+  return (
+    <section className="reportInfoBlock">
+      <div className="reportInfoGrid">
+        <ReportFieldValue label="Location" value={fieldValue("Location")} />
+        <ReportFieldValue label="Brand" value={fieldValue("Brand")} />
+        <ReportFieldValue label="Model" value={fieldValue("Model")} />
+        <ReportFieldValue label="S/N" value={fieldValue("S/N")} />
+        <ReportFieldValue label="IP Address" value={fieldValue("IP Address")} />
+        <ReportFieldValue label="OS" value={fieldValue("OS")} />
+        <div className="fieldLabel diagAntivirusField">
+          <span>Antivirus :</span>
+          <div className="diagCheckboxRow">
+            {["Installed", "No Installation"].map((item) => (
+              <label className="choiceItem" key={item}>
+                <CheckBoxMark checked={selectedAntivirus === item} />
+                {item}
+              </label>
+            ))}
+          </div>
+        </div>
+        <ReportFieldValue label="Definition Date" value={fieldValue("Definition Date")} />
+      </div>
     </section>
   );
 }
 
-// `chunkFields` removed — templates now provide explicit row definitions (FieldRow[])
+function ReportInfoGrid({
+  fields,
+  groupKey,
+  row,
+  site
+}: {
+  fields: ReportField[];
+  groupKey: string;
+  row: ReportRow;
+  site: SiteCatalogRecord | null;
+}) {
+  const fieldValue = (label: string) => fields.find((field) => field.label === label)?.value ?? "";
+  const customerName = fieldValue("Customer Name") || getFallbackFieldValue("Customer Name", row, site);
+  const orderedFields = getReportInfoFieldOrder(groupKey, fields)
+    .map((label) => ({ label, value: fieldValue(label) }))
+    .filter((field) => field.label !== "Customer Name");
 
-function PreviewModal({ preview, onClose }: { preview: PreviewState; onClose: () => void }) {
+  return (
+    <section className="reportInfoBlock">
+      <div className="reportCustomerRow">
+        <strong>Customer Name :</strong>
+        <span>{customerName}</span>
+      </div>
+      <div className="reportInfoGrid">
+        {orderedFields.map((field) => (
+          <ReportFieldValue key={field.label} label={field.label} value={field.value} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ReportFieldValue({ label, value }: ReportField) {
+  return (
+    <div className="fieldLabel">
+      <span>{formatFieldLabel(label)}</span>
+      <i>{value ?? ""}</i>
+    </div>
+  );
+}
+
+function shouldSkipReportBlock(groupKey: string, block: SavedChecklistBlock) {
+  if (groupKey !== "diag") {
+    return false;
+  }
+
+  return (block.type === "fields" && (block.title === "DIAG INFORMATION" || block.title === "DEFINITION DATE"))
+    || (block.type === "radios" && block.label === "Antivirus");
+}
+
+function isReportInfoBlock(block: Extract<SavedChecklistBlock, { type: "fields" }>) {
+  return block.title.includes("INFORMATION");
+}
+
+function getReportInfoFieldOrder(groupKey: string, fields: ReportField[]) {
+  const fallbackOrder = fields.map((field) => field.label);
+  const orders: Record<string, string[]> = {
+    environment: ["Customer Name", "Location"],
+    server: ["Customer Name", "Location", "Manufacturer", "Host Name", "S/N or S/T", "Model", "IP Address", "MT", "ESX Version"],
+    storage: ["Customer Name", "Location", "Manufacturer", "Model", "S/N or S/T", "MT"],
+    switch: ["Customer Name", "Location", "Brand", "Model", "S/N", "Host Name", "IP Address"],
+    synapse: ["Customer Name", "Synapse Version", "Host Name", "License Studies", "Current Studies Per Year"]
+  };
+  const preferredOrder = orders[groupKey] ?? fallbackOrder;
+  const knownLabels = new Set(fields.map((field) => field.label));
+
+  return [
+    ...preferredOrder.filter((label) => knownLabels.has(label)),
+    ...fallbackOrder.filter((label) => !preferredOrder.includes(label))
+  ];
+}
+
+function shouldHideReportFieldBlock(groupKey: string, block: Extract<SavedChecklistBlock, { type: "fields" }>) {
+  return groupKey === "synapse" && block.title === "FREE SPACE (GB)";
+}
+
+function getVisibleReportFields(groupKey: string, block: Extract<SavedChecklistBlock, { type: "fields" }>) {
+  if (groupKey === "synapse") {
+    return block.fields.filter((field) => field.label !== "Antivirus Definition Date");
+  }
+
+  return block.fields;
+}
+
+function getChecklistDetail({
+  details,
+  groupKey,
+  item,
+  resultKey,
+  setTitle
+}: {
+  details: PmWorkDetails | undefined;
+  groupKey: string;
+  item: string;
+  resultKey: string;
+  setTitle: string;
+}) {
+  const synapseDetail = getSynapseChecklistDetail(details, groupKey, setTitle, item);
+
+  if (synapseDetail !== null) {
+    return synapseDetail;
+  }
+
+  return details?.checkNotes?.[resultKey] ?? "";
+}
+
+function getSynapseChecklistDetail(details: PmWorkDetails | undefined, groupKey: string, setTitle: string, item: string) {
+  if (groupKey !== "synapse") {
+    return null;
+  }
+
+  const normalizedItem = item.trim().toLowerCase();
+
+  if (normalizedItem === "free space capacity: database o:") {
+    return formatFreeTotalDetail(
+      getSavedFieldValueByLabel(details, groupKey, setTitle, "Database O: Free (GB)"),
+      getSavedFieldValueByLabel(details, groupKey, setTitle, "Database O: Total (GB)")
+    );
+  }
+
+  if (normalizedItem === "free space capacity: warm database") {
+    return formatFreeTotalDetail(
+      getSavedFieldValueByLabel(details, groupKey, setTitle, "Warm DB Free (GB)"),
+      getSavedFieldValueByLabel(details, groupKey, setTitle, "Warm DB Total (GB)")
+    );
+  }
+
+  if (normalizedItem === "antivirus definition" || normalizedItem === "antivirus definition date") {
+    const definitionDate = getSavedFieldValueByLabels(details, groupKey, setTitle, ["Antivirus Definition Date", "Definition Date"]);
+    return ["Definition Date", definitionDate].filter(Boolean).join(" ");
+  }
+
+  return null;
+}
+
+function formatFreeTotalDetail(freeValue: string, totalValue: string) {
+  return freeValue || totalValue ? `Free/Total(GB) ${freeValue}/${totalValue}` : "";
+}
+
+function getSavedFieldValueByLabel(
+  details: PmWorkDetails | undefined,
+  groupKey: string,
+  setTitle: string,
+  label: string
+) {
+  return getSavedFieldValueByLabels(details, groupKey, setTitle, [label]);
+}
+
+function getSavedFieldValueByLabels(
+  details: PmWorkDetails | undefined,
+  groupKey: string,
+  setTitle: string,
+  labels: string[]
+) {
+  const fieldValues = details?.fieldValues;
+
+  if (!fieldValues) {
+    return "";
+  }
+
+  const keyPrefix = `${groupKey}:field:${setTitle}:`;
+
+  for (const label of labels) {
+    const keySuffix = `:${label}`;
+    const value = Object.entries(fieldValues).find(([key]) => key.startsWith(keyPrefix) && key.endsWith(keySuffix))?.[1] ?? "";
+
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+function TemplateFooter({
+  compact = false,
+  responsibleName,
+  responsibleSignature,
+  row
+}: {
+  compact?: boolean;
+  responsibleName: string;
+  responsibleSignature: string;
+  row: ReportRow;
+}) {
+  const details = row.workDetails;
+  const finalStatus = details?.finalStatus ?? (row.result === "ผิดปกติ" ? "abnormal" : "normal");
+  const spareParts = details?.spareParts?.filter((part) => part.name.trim() || part.quantity.trim() || part.note.trim()) ?? [];
+
+  return (
+    <footer className={compact ? "templateFooter compactFooter" : "templateFooter"}>
+      <div className="statusBlock">
+        <div className="statusRow">
+          <span>สรุปผลการดำเนินงาน :</span>
+          <label className="statusOption"><CheckBoxMark checked={finalStatus === "normal"} />สภาพปกติ</label>
+          <label className="statusOption"><CheckBoxMark checked={finalStatus === "abnormal"} />ผิดปกติ</label>
+        </div>
+        <div className="noteLine">
+          <span>หมายเหตุ :</span>
+          <span>{details?.summaryNote ?? ""}</span>
+        </div>
+      </div>
+      {spareParts.length > 0 ? (
+        <div className="partsBox">
+          <span>อะไหล่ที่เปลี่ยน :</span>
+          <span>1. {formatSparePart(spareParts[0])}</span>
+          <span>2. {formatSparePart(spareParts[1])}</span>
+        </div>
+      ) : null}
+      <div className="footerBottomGrid">
+        <div className="workTimeGrid">
+          <div>
+            <strong>STATUS</strong>
+            <span>√ : Normal</span>
+            <span>X : Abnormal</span>
+          </div>
+          <div>
+            <strong>Work Time</strong>
+            <span>เวลาเริ่มงาน {details?.startTime ?? row.startTime}</span>
+            <span>เวลาเสร็จงาน {details?.endTime ?? row.endTime}</span>
+          </div>
+        </div>
+        <div className="checkedByBox">
+          <div className="checkedBySignatureLine">
+            {responsibleSignature ? (
+              <Image
+                src={responsibleSignature}
+                alt="ลายเซ็นผู้รับผิดชอบ"
+                width={220}
+                height={54}
+                unoptimized
+              />
+            ) : "ลายเซ็นผู้รับผิดชอบ"}
+          </div>
+          <div className="checkedByNameLine">{responsibleName || row.inspector}</div>
+          <div className="checkedByNameCaption">ชื่อจริงผู้รับผิดชอบ</div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+function CheckBoxMark({ checked = false }: { checked?: boolean }) {
+  return <span className="checkbox">{checked ? "√" : ""}</span>;
+}
+
+function getReportGroups(details: PmWorkDetails | undefined): SavedChecklistGroup[] {
+  const snapshot = details?.checklistSnapshot?.filter((group) => group.sets.length > 0);
+  return snapshot && snapshot.length > 0 ? snapshot : buildFallbackChecklistGroups();
+}
+
+function buildFallbackChecklistGroups(): SavedChecklistGroup[] {
+  const standardGroups = standardTemplatePages.map<SavedChecklistGroup>((template) => ({
+    key: template.key,
+    title: template.title,
+    sets: [{
+      title: `${template.title.toUpperCase()} #1`,
+      blocks: [
+        {
+          type: "fields",
+          title: `${template.title.toUpperCase()} INFORMATION`,
+          fields: template.fields.flat().map((label) => ({ label: stripFieldColon(label) }))
+        },
+        ...template.sections.map((section) => ({
+          type: "checks" as const,
+          title: section.title,
+          items: section.items
+        }))
+      ]
+    }]
+  }));
+
+  return [
+    ...standardGroups,
+    {
+      key: "diag",
+      title: "DIAG",
+      sets: [{
+        title: "DIAG #1",
+        blocks: [
+          {
+            type: "fields",
+            title: "DIAG INFORMATION",
+            fields: ["Customer Name", "Location", "Brand", "Model", "S/N", "IP Address", "OS", "Antivirus", "Definition Date"].map((label) => ({ label }))
+          },
+          { type: "diagTable", title: "รายการตรวจสอบอุปกรณ์" }
+        ]
+      }]
+    }
+  ];
+}
+
+function getChecklistHeading(key: string, title: string) {
+  return checklistTemplates.find((template) => template.key === key)?.heading ?? `${title} Maintenance Checklist`;
+}
+
+function chunkReportFields(fields: ReportField[]) {
+  const rows: FieldRow[] = [];
+
+  for (let index = 0; index < fields.length; index += 2) {
+    rows.push(fields.slice(index, index + 2));
+  }
+
+  return rows;
+}
+
+function getReportFieldValue({
+  blockIndex,
+  details,
+  field,
+  groupKey,
+  row,
+  setTitle,
+  site
+}: {
+  blockIndex: number;
+  details: PmWorkDetails | undefined;
+  field: SavedChecklistField;
+  groupKey: string;
+  row: ReportRow;
+  setTitle: string;
+  site: SiteCatalogRecord | null;
+}) {
+  const savedValue = details?.fieldValues?.[fieldKey(groupKey, setTitle, blockIndex, field.label)];
+
+  if (savedValue?.trim()) {
+    return savedValue;
+  }
+
+  if (field.value?.trim()) {
+    return field.value;
+  }
+
+  return getFallbackFieldValue(field.label, row, site);
+}
+
+function getReportRadioValue({
+  block,
+  blockIndex,
+  details,
+  groupKey,
+  setTitle
+}: {
+  block: Extract<SavedChecklistBlock, { type: "radios" }>;
+  blockIndex: number;
+  details: PmWorkDetails | undefined;
+  groupKey: string;
+  setTitle: string;
+}) {
+  return details?.radioValues?.[radioKey(groupKey, setTitle, blockIndex, block.label)] ?? block.items[0] ?? "";
+}
+
+function getFallbackFieldValue(label: string, row: ReportRow, site: SiteCatalogRecord | null) {
+  const normalizedLabel = stripFieldColon(label).toLowerCase();
+
+  if (normalizedLabel === "customer name") {
+    return row.customer;
+  }
+
+  if (normalizedLabel === "location") {
+    return site?.address || site?.department || row.province;
+  }
+
+  if (normalizedLabel === "pm order no" || normalizedLabel === "pm order no.") {
+    return row.jobId;
+  }
+
+  return "";
+}
+
+function formatFieldLabel(label: string) {
+  const trimmedLabel = label.trim();
+  return trimmedLabel.endsWith(":") ? trimmedLabel : `${trimmedLabel} :`;
+}
+
+function stripFieldColon(label: string) {
+  return label.trim().replace(/\s*:$/, "");
+}
+
+function fieldKey(groupKey: string, setTitle: string, blockIndex: number, label: string) {
+  return `${groupKey}:field:${setTitle}:${blockIndex}:${label}`;
+}
+
+function radioKey(groupKey: string, setTitle: string, blockIndex: number, label: string) {
+  return `${groupKey}:radio:${setTitle}:${blockIndex}:${label}`;
+}
+
+function checkKey(resultPrefix: string, title: string, item: string) {
+  return `${resultPrefix}:${title}:${item}`;
+}
+
+function resultSymbol(result: CheckResult | undefined) {
+  if (result === "ok") {
+    return "√";
+  }
+
+  if (result === "bad") {
+    return "X";
+  }
+
+  return "√";
+}
+
+function formatSparePart(part: SavedSparePart | undefined) {
+  if (!part) {
+    return "";
+  }
+
+  return [part.name, part.quantity ? `(${part.quantity})` : "", part.note].filter(Boolean).join(" ");
+}
+
+function getStoredUserSignature(email: string) {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  return window.localStorage.getItem(getUserSignatureStorageKey(email)) ?? "";
+}
+
+function PreviewModal({
+  onClose,
+  preview,
+  responsibleName,
+  responsibleSignature
+}: {
+  onClose: () => void;
+  preview: PreviewState;
+  responsibleName: string;
+  responsibleSignature: string;
+}) {
   const { t } = useUi();
 
   return (
@@ -565,7 +1197,12 @@ function PreviewModal({ preview, onClose }: { preview: PreviewState; onClose: ()
           <h2>{preview.title}</h2>
           <button type="button" onClick={onClose} aria-label={t("common.close")}><X size={18} /></button>
         </div>
-        <ReportDocumentPacket />
+        <ReportDocumentPacket
+          responsibleName={responsibleName}
+          responsibleSignature={responsibleSignature}
+          row={preview.row}
+          site={preview.site}
+        />
         <div className="modalActions">
           <button className="button subtle" type="button" onClick={() => window.print()}>
             <Printer size={16} />

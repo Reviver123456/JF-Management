@@ -2074,6 +2074,69 @@
   height: 33px;
 }
 
+.reportsPage .diagAntivirusField {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.reportsPage .diagCheckboxRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  min-width: 0;
+}
+
+.reportsPage .reportInfoBlock {
+  margin-top: 8px;
+}
+
+.reportsPage .reportCustomerRow {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+}
+
+.reportsPage .reportCustomerRow strong {
+  min-height: 22px;
+  background: #2f5f8f;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.reportsPage .reportCustomerRow span {
+  min-height: 22px;
+  display: flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-weight: 700;
+}
+
+.reportsPage .reportInfoGrid {
+  margin-top: 16px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 9px 48px;
+  padding: 0;
+}
+
+.reportsPage .reportInfoGrid .fieldLabel {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.reportsPage .reportInfoGrid .fieldLabel span {
+  min-width: 0;
+  justify-self: start;
+  text-align: left;
+}
+
+.reportsPage .reportInfoGrid .fieldLabel i {
+  min-height: 16px;
+  padding: 0 6px;
+}
+
 .reportsPage .fieldCell {
   width: 50%;
   padding: 0 8px 0 0;
@@ -2105,7 +2168,9 @@
   width: 100%;
   border-bottom: 0;
   /* removed underline across report pages */
-  height: 12px;
+  font-style: normal;
+  font-weight: 400;
+  min-height: 12px;
 }
 
 .reportsPage .fieldCell i {
@@ -2126,6 +2191,24 @@
 .reportsPage .checklistTemplateTable {
   margin-top: 10px;
   border-spacing: 0;
+}
+
+.reportsPage .reportFieldBlock {
+  margin-top: 8px;
+}
+
+.reportsPage .templateSetTitle {
+  min-height: 24px;
+  margin-top: 8px;
+  background: #ffffff;
+  border: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 7px;
+  color: #111827;
+  font-weight: 800;
+  font-size: 12px;
 }
 
 .reportsPage .checklistTemplateTable th:first-child {
@@ -2157,6 +2240,12 @@
 
 .reportsPage .checklistTemplateTable td {
   min-height: 28px;
+}
+
+.reportsPage .reportStatusCell {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 900;
 }
 
 .reportsPage .templateBlockBox {
@@ -2203,15 +2292,33 @@
   width: 14px;
   height: 14px;
   border: 1px solid #334155;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 2px;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 14px;
+  flex: 0 0 14px;
+  padding-bottom: 1px;
 }
 
 .reportsPage .templateFooter {
-  margin-top: auto;
-  display: grid;
+  margin-top: 10px;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   gap: 7px;
   padding-top: 10px;
+}
+
+.reportsPage .footerBottomGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 360px) minmax(220px, 280px);
+  justify-content: space-between;
+  align-items: end;
+  gap: 24px;
+  margin-top: auto;
 }
 
 .reportsPage .footerTopGrid {
@@ -2244,8 +2351,8 @@
 
 .reportsPage .noteLine {
   display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  align-items: center;
+  grid-template-columns: 82px minmax(0, 1fr);
+  align-items: start;
   gap: 8px;
   padding: 2px 0;
 }
@@ -2254,14 +2361,20 @@
   padding: 4px 6px;
   display: flex;
   align-items: center;
+  min-width: 0;
 }
 
 .reportsPage .noteLine span:first-child {
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .reportsPage .noteLine span:last-child {
   min-height: 28px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.35;
 }
 
 .reportsPage .compactFooter {
@@ -2269,35 +2382,48 @@
 }
 
 .reportsPage .workTimeGrid {
-  border: 1px solid #334155;
+  border: 0;
 }
 
-/* Remove borders for suggestion and parts boxes to match PDF */
-.reportsPage .suggestionBox,
 .reportsPage .partsBox {
   border: 0;
 }
 
-.reportsPage .suggestionBox {
-  min-height: 58px;
-  padding: 8px 9px;
-}
-
 .reportsPage .checkedByBox {
   display: grid;
-  align-items: start;
+  align-items: end;
+  justify-items: stretch;
   padding: 0;
+  text-align: center;
 }
 
-.reportsPage .checkedByTitle {
+.reportsPage .checkedBySignatureLine,
+.reportsPage .checkedByNameLine {
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  color: #111827;
+}
+
+.reportsPage .checkedBySignatureLine {
+  color: #64748b;
+  font-weight: 700;
+  min-height: 54px;
+}
+
+.reportsPage .checkedBySignatureLine img {
+  max-width: 100%;
+  max-height: 54px;
+  object-fit: contain;
+}
+
+.reportsPage .checkedByNameLine {
   font-weight: 800;
-  margin-bottom: 0;
-  padding: 4px 0;
 }
 
-.reportsPage .checkedByValue {
-  min-height: 28px;
-  border-bottom: 0;
+.reportsPage .checkedByNameCaption {
+  padding-top: 4px;
+  font-weight: 700;
 }
 
 .reportsPage .partsBox {
@@ -2319,8 +2445,8 @@
 .reportsPage .workTimeGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  width: 52%;
-  margin-left: auto;
+  width: 100%;
+  margin-left: 0;
 }
 
 .reportsPage .workTimeGrid div {
@@ -2329,11 +2455,11 @@
 }
 
 .reportsPage .workTimeGrid div:first-child {
-  border-right: 1px solid #334155;
+  border-right: 0;
 }
 
 .reportsPage .workTimeGrid strong {
-  background: #eaf2fb;
+  /* background: #eaf2fb; */
   font-weight: 800;
   display: block;
   padding: 4px 6px;
@@ -2408,18 +2534,6 @@
   height: 30px;
 }
 
-.reportsPage .coverSuggestion {
-  margin-top: 22px;
-  display: grid;
-  gap: 8px;
-  color: #111827;
-}
-
-.reportsPage .coverSuggestion span {
-  height: 22px;
-  border-bottom: 1px dotted #111827;
-}
-
 .reportsPage .signatureGrid {
   margin-top: auto;
   display: grid;
@@ -2440,9 +2554,54 @@
   margin-top: 8px;
 }
 
+.reportsPage .diagCalibrateTable {
+  font-size: 10px;
+}
+
 .reportsPage .diagCalibrateTable th,
+.reportsPage .diagCalibrateTable td,
 .reportsPage .diagDeviceTable th {
   text-align: center;
+}
+
+.reportsPage .diagCalibrateTable th,
+.reportsPage .diagCalibrateTable td {
+  height: 21px;
+  border-color: #111827;
+  padding: 2px 5px;
+}
+
+.reportsPage .diagCalibrateTable th {
+  background: #dbe8f5;
+  color: #111827;
+}
+
+.reportsPage .diagCalibrateTitle {
+  text-align: left !important;
+  font-weight: 900;
+}
+
+.reportsPage .diagCalibrateSpacer {
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.reportsPage .diagCalibrateTable tbody th {
+  background: #eaf2fb;
+  color: #111827;
+  width: 16%;
+}
+
+.reportsPage .diagCalibrateTable td:nth-child(2) {
+  width: 20%;
+}
+
+.reportsPage .diagCalibrateTable td:nth-child(3) {
+  width: 16%;
+}
+
+.reportsPage .diagCalibrateTable td:nth-child(4) {
+  width: 12%;
 }
 
 .reportsPage .diagDeviceTable th,
