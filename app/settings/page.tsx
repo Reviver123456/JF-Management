@@ -72,28 +72,29 @@ export default function SettingsPage() {
       return;
     }
 
+    const response = await fetch("/api/auth/change-password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        currentPassword,
+        email,
+        newPassword
+      })
+    });
+    const payload = await response.json() as { message?: string; ok?: boolean };
+
+    if (!response.ok || !payload.ok) {
+      setMessage(payload.message ?? "Cannot change password.");
+      return;
+    }
+
     const supabase = createClient();
-    const { error: verifyError } = await supabase.auth.signInWithPassword({
+    await supabase.auth.signInWithPassword({
       email,
-      password: currentPassword
+      password: newPassword
     });
-
-    if (verifyError) {
-      setMessage(verifyError.message);
-      return;
-    }
-
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-      data: {
-        must_change_password: false
-      }
-    });
-
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
 
     setCurrentPassword("");
     setNewPassword("");
