@@ -124,6 +124,12 @@ function normalizeConfig(value: Partial<PmChecklistConfig> | undefined): PmCheck
   };
 }
 
+export function normalizePmChecklistConfig(value: unknown): PmChecklistConfig {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? normalizeConfig(value as Partial<PmChecklistConfig>)
+    : defaultPmChecklistConfig;
+}
+
 function readStore(): Record<string, PmChecklistConfig> {
   if (typeof window === "undefined") {
     return {};

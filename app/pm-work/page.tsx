@@ -30,6 +30,7 @@ import { FeedbackPopups, LoadingPopup } from "@/components/AppPopup";
 import { useUi, type Lang } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
 import {
+  normalizePmChecklistConfig,
   readSitePmChecklistConfig,
   type PmChecklistConfig,
   type PmChecklistKey
@@ -210,6 +211,12 @@ function diagCalibrateStatusKey(groupKey: string, setTitle: string, blockIndex: 
   return `${groupKey}:calibrate-status:${setTitle}:${blockIndex}:${title}`;
 }
 
+function readChecklistConfigForSite(site: SiteRecord): PmChecklistConfig {
+  return site.contractDetails?.checklistConfig
+    ? normalizePmChecklistConfig(site.contractDetails.checklistConfig)
+    : readSitePmChecklistConfig(site.id);
+}
+
 function getMissingRequiredCount({
   fieldValues,
   finalStatus,
@@ -386,7 +393,7 @@ function DetailView({
   const [checkResults, setCheckResults] = useState<Record<string, CheckResult>>(savedDetails?.checkResults ?? {});
   const [checkNotes, setCheckNotes] = useState<Record<string, string>>(savedDetails?.checkNotes ?? {});
   const [activeCheckNoteKey, setActiveCheckNoteKey] = useState("");
-  const [checklistConfig, setChecklistConfig] = useState<PmChecklistConfig>(() => readSitePmChecklistConfig(site.id));
+  const [checklistConfig, setChecklistConfig] = useState<PmChecklistConfig>(() => readChecklistConfigForSite(site));
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(savedDetails?.fieldValues ?? {});
   const [radioValues, setRadioValues] = useState<Record<string, string>>(savedDetails?.radioValues ?? {});
   const [photos, setPhotos] = useState<PhotoState>(() => mergePhotoState(savedDetails?.photos));
@@ -437,7 +444,7 @@ function DetailView({
   const saveSuccessMessage = lang === "th" ? "บันทึกข้อมูลงาน PM แล้ว" : "PM job saved.";
 
   useEffect(() => {
-    const refreshConfig = () => setChecklistConfig(readSitePmChecklistConfig(site.id));
+    const refreshConfig = () => setChecklistConfig(readChecklistConfigForSite(site));
 
     refreshConfig();
     window.addEventListener("focus", refreshConfig);
@@ -446,7 +453,7 @@ function DetailView({
       window.removeEventListener("focus", refreshConfig);
       window.removeEventListener("storage", refreshConfig);
     };
-  }, [site.id]);
+  }, [site]);
 
   useEffect(() => {
     if (configuredGroups.length > 0 && !configuredGroups.some((item) => item.key === activeTab)) {

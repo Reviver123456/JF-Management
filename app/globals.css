@@ -347,7 +347,7 @@ a {
 
 .alertPopupCard header {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) 32px;
+  grid-template-columns: 38px minmax(0, 1fr);
   gap: 12px;
   align-items: start;
   padding: 18px;
@@ -386,22 +386,6 @@ a {
   font-size: 13px;
   font-weight: 800;
   overflow-wrap: anywhere;
-}
-
-.alertPopupCard button {
-  width: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-soft);
-  display: grid;
-  place-items: center;
-}
-
-.alertPopupCard button:hover {
-  background: var(--field);
-  color: var(--text);
 }
 
 @keyframes loadingPopupPulse {

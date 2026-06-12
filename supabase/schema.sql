@@ -61,16 +61,16 @@ execute function public.set_updated_at();
 alter table public.sites enable row level security;
 alter table public.pm_jobs enable row level security;
 
-create policy "Allow public read sites"
+create policy "Allow authenticated read sites"
 on public.sites
 for select
-to anon, authenticated
+to authenticated
 using (true);
 
-create policy "Allow public read pm jobs"
+create policy "Allow authenticated read pm jobs"
 on public.pm_jobs
 for select
-to anon, authenticated
+to authenticated
 using (true);
 
 create policy "Allow authenticated writes sites"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Eye, EyeOff, Languages, LockKeyhole, Moon, PenLine, RotateCcw, Save, Sun, UserRound } from "lucide-react";
+import { Eye, EyeOff, Languages, LockKeyhole, Moon, PenLine, RotateCcw, Save, Sun, UserRound, X } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { defaultLoginUser } from "@/lib/auth/default-user";
@@ -59,6 +59,11 @@ export default function SettingsPage() {
   const changePassword = async () => {
     if (!currentPassword || !newPassword) {
       setMessage("Please fill in current and new password.");
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setMessage("New password must be at least 8 characters.");
       return;
     }
 
@@ -180,7 +185,7 @@ function PasswordField({
     <label className="label">
       {label}
       <span className="passwordField">
-        <input className="field" type={visible ? "text" : "password"} value={value} onChange={(event) => onChange(event.target.value)} />
+        <input className="field" minLength={8} type={visible ? "text" : "password"} value={value} onChange={(event) => onChange(event.target.value)} />
         <button className="iconButton" type="button" onClick={() => setVisible((current) => !current)} aria-label={visible ? t("settings.hidePassword") : t("settings.showPassword")}>
           {visible ? <EyeOff size={15} /> : <Eye size={15} />}
         </button>
@@ -193,8 +198,15 @@ function SettingsSignaturePad({ email }: { email: string }) {
   const { t } = useUi();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [, setSignatureRevision] = useState(0);
+  const hasSignature = typeof window !== "undefined" && Boolean(window.localStorage.getItem(getUserSignatureStorageKey(email)));
 
   useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
     const canvas = canvasRef.current;
     if (!canvas) {
       return;
@@ -232,16 +244,25 @@ function SettingsSignaturePad({ email }: { email: string }) {
     setupCanvas();
     window.addEventListener("resize", setupCanvas);
     return () => window.removeEventListener("resize", setupCanvas);
-  }, [email]);
+  }, [email, isOpen]);
 
-  const saveSignature = () => {
+  const saveSignature = async () => {
     const canvas = canvasRef.current;
 
     if (!canvas) {
       return;
     }
 
-    window.localStorage.setItem(getUserSignatureStorageKey(email), canvas.toDataURL("image/png"));
+    const signature = canvas.toDataURL("image/png");
+    window.localStorage.setItem(getUserSignatureStorageKey(email), signature);
+    setSignatureRevision((current) => current + 1);
+
+    const supabase = createClient();
+    await supabase.auth.updateUser({
+      data: {
+        signature
+      }
+    });
   };
 
   const getPoint = (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -284,7 +305,7 @@ function SettingsSignaturePad({ email }: { email: string }) {
 
     event.currentTarget.releasePointerCapture(event.pointerId);
     setIsDrawing(false);
-    saveSignature();
+    void saveSignature();
   };
   const clearSignature = () => {
     const canvas = canvasRef.current;
@@ -296,21 +317,52 @@ function SettingsSignaturePad({ email }: { email: string }) {
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     window.localStorage.removeItem(getUserSignatureStorageKey(email));
+    setSignatureRevision((current) => current + 1);
   };
 
   return (
     <div className="settingsSignaturePad">
-      <canvas
-        ref={canvasRef}
-        onPointerDown={startDrawing}
-        onPointerMove={draw}
-        onPointerUp={stopDrawing}
-        onPointerLeave={stopDrawing}
-      />
-      <button className="button ghost" type="button" onClick={clearSignature}>
-        <RotateCcw size={15} />
-        {t("pm.clearSignature")}
+      <button className="button subtle" type="button" onClick={() => setIsOpen(true)}>
+        <PenLine size={16} />
+        {hasSignature ? "แก้ไขลายเซ็นของฉัน" : "เซ็นลายเซ็นของฉัน"}
       </button>
+      {hasSignature ? <span className="signatureSavedText">บันทึกลายเซ็นแล้ว</span> : null}
+      {isOpen ? (
+        <div className="settingsSignatureOverlay" role="dialog" aria-modal="true" aria-label={t("settings.mySignature")}>
+          <article className="settingsSignatureModal">
+            <div className="modalHeader">
+              <h2>{t("settings.mySignature")}</h2>
+              <button type="button" onClick={() => setIsOpen(false)} aria-label={t("common.close")}>
+                <X size={18} />
+              </button>
+            </div>
+            <canvas
+              ref={canvasRef}
+              onPointerDown={startDrawing}
+              onPointerMove={draw}
+              onPointerUp={stopDrawing}
+              onPointerLeave={stopDrawing}
+            />
+            <div className="modalActions">
+              <button className="button ghost" type="button" onClick={clearSignature}>
+                <RotateCcw size={15} />
+                {t("pm.clearSignature")}
+              </button>
+              <button
+                className="button primary"
+                type="button"
+                onClick={() => {
+                  void saveSignature();
+                  setIsOpen(false);
+                }}
+              >
+                <Save size={15} />
+                {t("common.save")}
+              </button>
+            </div>
+          </article>
+        </div>
+      ) : null}
     </div>
   );
 }

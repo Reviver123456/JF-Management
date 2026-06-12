@@ -10,7 +10,23 @@ export type SiteContractDetails = {
   contractNote?: string;
   contractStartDate?: string;
   contractStartMonth?: string;
+  contractCount?: string;
+  contractNumber?: string;
+  contracts?: SiteContractItem[];
+  projectName?: string;
   pmCycle?: string;
+  visitCount?: string;
+  visitMonths?: string[];
+  checklistConfig?: unknown;
+};
+
+export type SiteContractItem = {
+  contractEndDate?: string;
+  contractNote?: string;
+  contractNumber?: string;
+  contractStartDate?: string;
+  pmCycle?: string;
+  projectName?: string;
   visitCount?: string;
   visitMonths?: string[];
 };
@@ -238,6 +254,53 @@ export function getContractVisitTotal(contractDetails: SiteContractDetails | und
   }
 
   return getVisitCountForPmCycle(contractDetails?.pmCycle ?? fallbackPmCycle);
+}
+
+export const contractCountOptions = [1, 2, 3, 4, 5, 6] as const;
+
+export function getContractCount(contractDetails: SiteContractDetails | undefined) {
+  const rawCount = Number(contractDetails?.contractCount ?? contractDetails?.contracts?.length ?? 1);
+
+  if (!Number.isFinite(rawCount)) {
+    return 1;
+  }
+
+  return Math.min(6, Math.max(1, Math.trunc(rawCount)));
+}
+
+export function getSiteContractItems(site: Pick<SiteCatalogRecord, "contract" | "contractDetails"> | null | undefined) {
+  const details = site?.contractDetails;
+  const count = getContractCount(details);
+  const savedContracts = Array.isArray(details?.contracts) ? details.contracts : [];
+  const legacyContract: SiteContractItem = {
+    contractEndDate: details?.contractEndDate,
+    contractNote: details?.contractNote,
+    contractNumber: details?.contractNumber ?? site?.contract,
+    contractStartDate: details?.contractStartDate,
+    pmCycle: details?.pmCycle,
+    projectName: details?.projectName,
+    visitCount: details?.visitCount,
+    visitMonths: details?.visitMonths
+  };
+
+  return Array.from({ length: count }, (_, index) => ({
+    ...(index === 0 ? legacyContract : {}),
+    ...(savedContracts[index] ?? {})
+  }));
+}
+
+export function getSiteContractAt(site: Pick<SiteCatalogRecord, "contract" | "contractDetails"> | null | undefined, index: number) {
+  const contracts = getSiteContractItems(site);
+  return contracts[Math.min(Math.max(index, 0), contracts.length - 1)] ?? contracts[0] ?? {};
+}
+
+export function getSiteContractLabel(contract: SiteContractItem | undefined, index: number) {
+  const contractNumber = contract?.contractNumber?.trim();
+  return contractNumber ? `สัญญา ${index + 1} - ${contractNumber}` : `สัญญา ${index + 1}`;
+}
+
+export function getSiteProjectName(site: Pick<SiteCatalogRecord, "contract" | "contractDetails" | "site"> | null | undefined, index: number) {
+  return getSiteContractAt(site, index).projectName?.trim() || site?.site || "";
 }
 
 export function normalizeOwnerName(owner: string | null | undefined) {

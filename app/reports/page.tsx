@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   CalendarDays,
+  Download,
   Eye,
   MapPin,
   Printer,
@@ -31,6 +32,10 @@ import {
 } from "@/lib/pm-checklist-data";
 import {
   getContractVisitTotal,
+  getSiteContractAt,
+  getSiteContractItems,
+  getSiteContractLabel,
+  getSiteProjectName,
   getUniquePmJobs,
   normalizeOwnerName,
   type CheckResult,
@@ -55,6 +60,7 @@ type ChecklistTemplate = {
 };
 
 type PreviewState = {
+  contractIndex: number;
   row: ReportRow;
   site: SiteCatalogRecord | null;
   title: string;
@@ -73,7 +79,7 @@ const checklistTemplates: ChecklistTemplate[] = [
 
 export default function ReportsPage() {
   const { lang, t } = useUi();
-  const { email, userName } = useCurrentUser();
+  const { email, signature, userName } = useCurrentUser();
   const { data, error, isLoading } = usePmData();
   const [query, setQuery] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -81,7 +87,7 @@ export default function ReportsPage() {
   const [ownerFilter, setOwnerFilter] = useState(allOwnersValue);
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const responsibleName = userName.trim() || email || "";
-  const responsibleSignature = getStoredUserSignature(email);
+  const responsibleSignature = signature || getStoredUserSignature(email);
   const ownerOptions = useMemo(() => getOwnerOptions(data.reportRows, data.siteCatalog), [data.reportRows, data.siteCatalog]);
   const filteredReports = useMemo(() => (
     data.reportRows.filter((row) => rowMatchesFilters({
@@ -96,6 +102,7 @@ export default function ReportsPage() {
   ), [data.reportRows, endDate, ownerFilter, query, startDate]);
   const openReportPreview = (row: ReportRow) => {
     setPreview({
+      contractIndex: 0,
       row,
       site: data.siteCatalog.find((site) => site.id === row.siteId) ?? null,
       title: `รายงาน PM - ${row.site}`
@@ -139,6 +146,7 @@ export default function ReportsPage() {
             responsibleName={responsibleName}
             responsibleSignature={responsibleSignature}
             onClose={() => setPreview(null)}
+            onContractIndexChange={(contractIndex) => setPreview((current) => current ? { ...current, contractIndex } : current)}
           />
         ) : null}
       </div>
@@ -266,12 +274,14 @@ const standardTemplatePages: StandardTemplatePage[] = [
 ];
 
 function ReportDocumentPacket({
+  contractIndex,
   pmJobs,
   responsibleName,
   responsibleSignature,
   row,
   site
 }: {
+  contractIndex: number;
   pmJobs: PmJobRecord[];
   responsibleName: string;
   responsibleSignature: string;
@@ -283,6 +293,7 @@ function ReportDocumentPacket({
   return (
     <div className="reportDocumentStack">
       <CoverTemplatePage
+        contractIndex={contractIndex}
         groups={reportGroups}
         pmJobs={pmJobs}
         responsibleName={responsibleName}
@@ -306,6 +317,7 @@ function ReportDocumentPacket({
 }
 
 function CoverTemplatePage({
+  contractIndex,
   groups,
   pmJobs,
   responsibleName,
@@ -313,6 +325,7 @@ function CoverTemplatePage({
   row,
   site
 }: {
+  contractIndex: number;
   groups: SavedChecklistGroup[];
   pmJobs: PmJobRecord[];
   responsibleName: string;
@@ -321,7 +334,8 @@ function CoverTemplatePage({
   site: SiteCatalogRecord | null;
 }) {
   const customerSignerName = row.workDetails?.signerName?.trim() || row.customer;
-  const visitRoundText = getVisitRoundText(pmJobs, row, site);
+  const projectName = getSiteProjectName(site, contractIndex) || row.site;
+  const visitRoundText = getVisitRoundText(pmJobs, row, site, contractIndex);
 
   return (
     <section className="templateSheet coverSheet">
@@ -330,7 +344,7 @@ function CoverTemplatePage({
         <tbody>
           <tr>
             <th>โครงการ</th>
-            <td>{row.site}</td>
+            <td>{projectName}</td>
           </tr>
           <tr>
             <th>หน่วยงาน</th>
@@ -1227,18 +1241,45 @@ function getStoredUserSignature(email: string) {
 
 function PreviewModal({
   onClose,
+  onContractIndexChange,
   pmJobs,
   preview,
   responsibleName,
   responsibleSignature
 }: {
   onClose: () => void;
+  onContractIndexChange: (contractIndex: number) => void;
   pmJobs: PmJobRecord[];
   preview: PreviewState;
   responsibleName: string;
   responsibleSignature: string;
 }) {
   const { t } = useUi();
+  const documentRef = useRef<HTMLDivElement | null>(null);
+  const [downloadType, setDownloadType] = useState<"pdf" | "word" | "excel">("pdf");
+  const [showPreview, setShowPreview] = useState(true);
+  const contracts = getSiteContractItems(preview.site);
+  const selectedContract = getSiteContractAt(preview.site, preview.contractIndex);
+  const selectedContractLabel = getSiteContractLabel(selectedContract, preview.contractIndex);
+  const downloadReport = () => {
+    if (downloadType === "pdf") {
+      setShowPreview(true);
+      window.setTimeout(() => window.print(), 0);
+      return;
+    }
+
+    const html = documentRef.current?.innerHTML ?? "";
+    const isExcel = downloadType === "excel";
+    const extension = isExcel ? "xls" : "doc";
+    const mimeType = isExcel ? "application/vnd.ms-excel;charset=utf-8" : "application/msword;charset=utf-8";
+    const blob = new Blob([buildExportHtml(html)], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${sanitizeFileName(preview.row.site)}-${selectedContractLabel}.${extension}`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label={preview.title}>
@@ -1247,22 +1288,59 @@ function PreviewModal({
           <h2>{preview.title}</h2>
           <button type="button" onClick={onClose} aria-label={t("common.close")}><X size={18} /></button>
         </div>
-        <ReportDocumentPacket
-          pmJobs={pmJobs}
-          responsibleName={responsibleName}
-          responsibleSignature={responsibleSignature}
-          row={preview.row}
-          site={preview.site}
-        />
-        <div className="modalActions">
+        <div className="reportModalControls">
+          <label className="label">
+            เลือกสัญญา
+            <select className="select" value={preview.contractIndex} onChange={(event) => onContractIndexChange(Number(event.target.value))}>
+              {contracts.map((contract, index) => (
+                <option key={index} value={index}>{getSiteContractLabel(contract, index)}</option>
+              ))}
+            </select>
+          </label>
+          <label className="label">
+            ประเภทไฟล์
+            <select className="select" value={downloadType} onChange={(event) => setDownloadType(event.target.value as "pdf" | "word" | "excel")}>
+              <option value="pdf">PDF</option>
+              <option value="word">Word</option>
+              <option value="excel">Excel</option>
+            </select>
+          </label>
           <button className="button subtle" type="button" onClick={() => window.print()}>
             <Printer size={16} />
             {t("common.print")}
           </button>
+          <button className="button subtle" type="button" onClick={downloadReport}>
+            <Download size={16} />
+            {t("common.download")}
+          </button>
+          <button className="button primary" type="button" onClick={() => setShowPreview((current) => !current)}>
+            <Eye size={16} />
+            {t("reports.preview")}
+          </button>
         </div>
+        {showPreview ? (
+          <div ref={documentRef}>
+            <ReportDocumentPacket
+              contractIndex={preview.contractIndex}
+              pmJobs={pmJobs}
+              responsibleName={responsibleName}
+              responsibleSignature={responsibleSignature}
+              row={preview.row}
+              site={preview.site}
+            />
+          </div>
+        ) : null}
       </article>
     </div>
   );
+}
+
+function buildExportHtml(content: string) {
+  return `<!doctype html><html><head><meta charset="utf-8"><title>PM Report</title></head><body>${content}</body></html>`;
+}
+
+function sanitizeFileName(value: string) {
+  return value.replace(/[\\/:*?"<>|]+/g, "-").trim() || "pm-report";
 }
 
 function getOwnerOptions(reportRows: ReportRow[], siteCatalog: SiteCatalogRecord[]) {
@@ -1286,10 +1364,11 @@ function getOwnerOptions(reportRows: ReportRow[], siteCatalog: SiteCatalogRecord
     });
 }
 
-function getVisitRoundText(pmJobs: PmJobRecord[], row: ReportRow, site: SiteCatalogRecord | null) {
+function getVisitRoundText(pmJobs: PmJobRecord[], row: ReportRow, site: SiteCatalogRecord | null, contractIndex = 0) {
   const matchedJob = getMatchingReportJob(pmJobs, row);
   const visitRound = getVisitRoundForReport(pmJobs, row);
-  const visitTotal = getContractVisitTotal(site?.contractDetails, matchedJob?.pmCycle);
+  const selectedContract = getSiteContractAt(site, contractIndex);
+  const visitTotal = getContractVisitTotal(selectedContract, matchedJob?.pmCycle);
 
   return `${visitRound}/${visitTotal || "-"}`;
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Info } from "lucide-react";
 
 type AlertTone = "error" | "success" | "info";
 
@@ -59,6 +59,15 @@ export function AlertPopup({
   message: string;
   onClose: () => void;
 }) {
+  useEffect(() => {
+    if (!open || !message) {
+      return;
+    }
+
+    const timeout = window.setTimeout(onClose, 2000);
+    return () => window.clearTimeout(timeout);
+  }, [message, onClose, open]);
+
   if (!open || !message) {
     return null;
   }
@@ -76,9 +85,6 @@ export function AlertPopup({
             {title ? <h2>{title}</h2> : null}
             <p>{message}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close">
-            <X size={18} />
-          </button>
         </header>
       </article>
     </div>

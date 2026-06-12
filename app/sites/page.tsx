@@ -38,7 +38,15 @@ import {
   synapseSystem,
   type DiagCheck
 } from "@/lib/pm-checklist-data";
-import { getVisitCountForPmCycle, type SiteCatalogRecord, type SiteContractDetails } from "@/lib/pm-data";
+import {
+  contractCountOptions,
+  getContractCount,
+  getSiteContractItems,
+  getVisitCountForPmCycle,
+  type SiteCatalogRecord,
+  type SiteContractDetails,
+  type SiteContractItem
+} from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
 
 type SiteTab = "customer" | "contract" | "synapse" | "server" | "switch" | "storage" | "environment" | "diag";
@@ -157,6 +165,43 @@ function readCustomItemsBySection(config: PmChecklistConfig) {
   });
 
   return customItemsBySection;
+}
+
+function emptyContractItem(): SiteContractItem {
+  return {
+    contractNumber: "",
+    projectName: "",
+    pmCycle: "ครึ่งปี",
+    visitCount: "2",
+    visitMonths: []
+  };
+}
+
+function normalizeContractItems(contractNumber: string, contractDetails: SiteContractDetails) {
+  const siteLike = { contract: contractNumber, contractDetails };
+  return getSiteContractItems(siteLike).map((contract) => ({
+    ...emptyContractItem(),
+    ...contract,
+    visitMonths: Array.isArray(contract.visitMonths) ? contract.visitMonths : []
+  }));
+}
+
+function writeContractDetailsRoot(contractDetails: SiteContractDetails, contracts: SiteContractItem[]) {
+  const primaryContract = contracts[0] ?? emptyContractItem();
+
+  return {
+    ...contractDetails,
+    contractCount: String(Math.min(6, Math.max(1, contracts.length))),
+    contractEndDate: primaryContract.contractEndDate ?? "",
+    contractNote: primaryContract.contractNote ?? "",
+    contractNumber: primaryContract.contractNumber ?? "",
+    contractStartDate: primaryContract.contractStartDate ?? "",
+    contracts,
+    pmCycle: primaryContract.pmCycle ?? "ครึ่งปี",
+    projectName: primaryContract.projectName ?? "",
+    visitCount: primaryContract.visitCount ?? "",
+    visitMonths: primaryContract.visitMonths ?? []
+  };
 }
 
 export default function SitesPage() {
@@ -317,6 +362,7 @@ function SiteModal({
   const [selectedOwner, setSelectedOwner] = useState(site.owner);
   const [contractNumber, setContractNumber] = useState(site.contract);
   const [contractDetails, setContractDetails] = useState<SiteContractDetails>(() => site.contractDetails ?? {});
+  const [selectedContractIndex, setSelectedContractIndex] = useState(0);
   const [saveError, setSaveError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -327,9 +373,35 @@ function SiteModal({
   const [diagMonitorCounts, setDiagMonitorCounts] = useState(() => readSitePmChecklistConfig(site.id).diagMonitorCounts);
   const [itemLabelsBySection, setItemLabelsBySection] = useState(() => readSitePmChecklistConfig(site.id).itemLabelsBySection);
   const title = mode === "add" ? t("sites.addModalTitle") : t("sites.editModalTitle");
+  const contractCount = getContractCount(contractDetails);
+  const contractItems = useMemo(() => normalizeContractItems(contractNumber, contractDetails), [contractDetails, contractNumber]);
+  const selectedContract = contractItems[Math.min(selectedContractIndex, contractItems.length - 1)] ?? emptyContractItem();
   const visibleTabs = useMemo(() => (
     tabs.filter((tab) => tab.id === "customer" || tab.id === "contract" || selectedInspectionTabs.includes(tab.id as InspectionTab))
   ), [selectedInspectionTabs]);
+
+  const updateContractCount = useCallback((count: number) => {
+    const nextCount = Math.min(6, Math.max(1, count));
+    const currentContracts = normalizeContractItems(contractNumber, contractDetails);
+    const nextContracts = Array.from({ length: nextCount }, (_, index) => currentContracts[index] ?? emptyContractItem());
+
+    setContractDetails((current) => writeContractDetailsRoot(current, nextContracts));
+    setContractNumber(nextContracts[0]?.contractNumber ?? "");
+    setSelectedContractIndex((current) => Math.min(current, nextCount - 1));
+  }, [contractDetails, contractNumber]);
+
+  const updateSelectedContract = useCallback((updates: Partial<SiteContractItem>) => {
+    const currentContracts = normalizeContractItems(contractNumber, contractDetails);
+    const nextContracts = currentContracts.map((contract, index) => (
+      index === selectedContractIndex ? { ...contract, ...updates } : contract
+    ));
+
+    setContractDetails((current) => writeContractDetailsRoot(current, nextContracts));
+
+    if (selectedContractIndex === 0 && "contractNumber" in updates) {
+      setContractNumber(updates.contractNumber ?? "");
+    }
+  }, [contractDetails, contractNumber, selectedContractIndex]);
 
   const toggleInspectionTab = useCallback((tabId: InspectionTab, checked: boolean) => {
     setSelectedInspectionTabs((current) => {
@@ -474,16 +546,7 @@ function SiteModal({
   }, []);
 
   const saveChecklistConfig = async () => {
-    const pmCycle = contractDetails.pmCycle ?? "ครึ่งปี";
-    const visitCount = getVisitCountForPmCycle(pmCycle);
-    const normalizedContractDetails: SiteContractDetails = {
-      ...contractDetails,
-      pmCycle,
-      visitCount: visitCount ? String(visitCount) : contractDetails.visitCount,
-      visitMonths: (contractDetails.visitMonths ?? []).slice(0, visitCount || undefined)
-    };
-
-    writeSitePmChecklistConfig(site.id, {
+    const checklistConfig: PmChecklistConfig = {
       customItems: {},
       customItemsBySection: customChecklistItemsBySection,
       diagMonitorCounts,
@@ -491,7 +554,25 @@ function SiteModal({
       selectedTabs: selectedInspectionTabs,
       setCounts: inspectionSetCounts,
       selectedItems: selectedChecklistItems
+    };
+    const normalizedContracts = normalizeContractItems(contractNumber, contractDetails).map((contract) => {
+      const pmCycle = contract.pmCycle ?? "ครึ่งปี";
+      const visitCount = getVisitCountForPmCycle(pmCycle);
+
+      return {
+        ...contract,
+        pmCycle,
+        visitCount: visitCount ? String(visitCount) : contract.visitCount,
+        visitMonths: (contract.visitMonths ?? []).slice(0, visitCount || undefined)
+      };
     });
+    const normalizedContractDetailsWithList: SiteContractDetails = {
+      ...writeContractDetailsRoot(contractDetails, normalizedContracts),
+      checklistConfig
+    };
+    const normalizedContractNumber = normalizedContracts[0]?.contractNumber ?? contractNumber;
+
+    writeSitePmChecklistConfig(site.id, checklistConfig);
 
     if (site.id) {
       const response = await fetch(`/api/sites/${encodeURIComponent(site.id)}`, {
@@ -500,8 +581,8 @@ function SiteModal({
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          contract: contractNumber,
-          contractDetails: normalizedContractDetails,
+          contract: normalizedContractNumber,
+          contractDetails: normalizedContractDetailsWithList,
           owner: selectedOwner
         })
       });
@@ -546,20 +627,23 @@ function SiteModal({
       case "customer":
         return (
           <CustomerTab
+            contractCount={contractCount}
             site={site}
             regions={regions}
             selectedOwner={selectedOwner}
             systemUsers={systemUsers}
+            onContractCountChange={updateContractCount}
             onOwnerChange={setSelectedOwner}
           />
         );
       case "contract":
         return (
           <ContractTab
-            contractDetails={contractDetails}
-            contractNumber={contractNumber}
-            onContractDetailsChange={setContractDetails}
-            onContractNumberChange={setContractNumber}
+            contract={selectedContract}
+            contractCount={contractCount}
+            selectedContractIndex={selectedContractIndex}
+            onContractChange={updateSelectedContract}
+            onSelectedContractIndexChange={setSelectedContractIndex}
             selectedInspectionTabs={selectedInspectionTabs}
             onToggleInspectionTab={toggleInspectionTab}
           />
@@ -579,7 +663,7 @@ function SiteModal({
       default:
         return null;
     }
-  }, [activeTab, addCustomChecklistItem, addInspectionSet, contractDetails, contractNumber, customChecklistItemsBySection, diagMonitorCounts, inspectionSetCounts, itemLabelsBySection, regions, removeCustomChecklistItem, selectedChecklistItems, selectedInspectionTabs, selectedOwner, site, systemUsers, t, toggleChecklistItem, toggleInspectionTab, updateCustomChecklistItem, updateDefaultChecklistItem, updateDiagMonitorCount]);
+  }, [activeTab, addCustomChecklistItem, addInspectionSet, contractCount, customChecklistItemsBySection, diagMonitorCounts, inspectionSetCounts, itemLabelsBySection, regions, removeCustomChecklistItem, selectedChecklistItems, selectedContract, selectedContractIndex, selectedInspectionTabs, selectedOwner, site, systemUsers, t, toggleChecklistItem, toggleInspectionTab, updateContractCount, updateCustomChecklistItem, updateDefaultChecklistItem, updateDiagMonitorCount, updateSelectedContract]);
 
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label={title}>
@@ -668,16 +752,20 @@ function EmptyState({ message }: { message: string }) {
 }
 
 function CustomerTab({
+  contractCount,
   site,
   regions,
   selectedOwner,
   systemUsers,
+  onContractCountChange,
   onOwnerChange
 }: {
+  contractCount: number;
   site: SiteCatalogRecord;
   regions: string[];
   selectedOwner: string;
   systemUsers: SystemUser[];
+  onContractCountChange: (count: number) => void;
   onOwnerChange: (owner: string) => void;
 }) {
   const { t } = useUi();
@@ -692,6 +780,14 @@ function CustomerTab({
         <Field label={t("fields.department")} value={site.department} />
         <Field label={t("fields.phone")} value={site.phone} />
         <Field label={t("fields.email")} value={site.email} />
+        <label className="label">
+          จำนวนสัญญา
+          <select className="select" value={contractCount} onChange={(event) => onContractCountChange(Number(event.target.value))}>
+            {contractCountOptions.map((count) => (
+              <option key={count} value={count}>{count} สัญญา</option>
+            ))}
+          </select>
+        </label>
         <Field label={t("common.province")} value={site.province} />
         <label className="label">
           {t("fields.regionArea")}
@@ -721,39 +817,37 @@ function CustomerTab({
 }
 
 function ContractTab({
-  contractDetails,
-  contractNumber,
-  onContractDetailsChange,
-  onContractNumberChange,
+  contract,
+  contractCount,
+  selectedContractIndex,
+  onContractChange,
+  onSelectedContractIndexChange,
   selectedInspectionTabs,
   onToggleInspectionTab
 }: {
-  contractDetails: SiteContractDetails;
-  contractNumber: string;
-  onContractDetailsChange: (details: SiteContractDetails) => void;
-  onContractNumberChange: (contractNumber: string) => void;
+  contract: SiteContractItem;
+  contractCount: number;
+  selectedContractIndex: number;
+  onContractChange: (updates: Partial<SiteContractItem>) => void;
+  onSelectedContractIndexChange: (index: number) => void;
   selectedInspectionTabs: InspectionTab[];
   onToggleInspectionTab: (tabId: InspectionTab, checked: boolean) => void;
 }) {
   const { lang, t } = useUi();
-  const selectedVisitMonths = Array.isArray(contractDetails.visitMonths) ? contractDetails.visitMonths : [];
-  const selectedPmCycle = contractDetails.pmCycle ?? "ครึ่งปี";
+  const selectedVisitMonths = Array.isArray(contract.visitMonths) ? contract.visitMonths : [];
+  const selectedPmCycle = contract.pmCycle ?? "ครึ่งปี";
   const visitLimit = getVisitCountForPmCycle(selectedPmCycle);
   const visitLimitLabel = lang === "th" ? `เลือกได้ ${selectedVisitMonths.length}/${visitLimit} เดือน` : `${selectedVisitMonths.length}/${visitLimit} months selected`;
   const availableVisitMonths = monthOptions.filter((month) => !selectedVisitMonths.includes(month.value));
   const orderedSelectedVisitMonths = monthOptions.filter((month) => selectedVisitMonths.includes(month.value));
   const canAddVisitMonth = visitLimit > selectedVisitMonths.length && availableVisitMonths.length > 0;
-  const updateContractDetails = <K extends keyof SiteContractDetails>(field: K, value: SiteContractDetails[K]) => {
-    onContractDetailsChange({
-      ...contractDetails,
-      [field]: value
-    });
+  const updateContractDetails = <K extends keyof SiteContractItem>(field: K, value: SiteContractItem[K]) => {
+    onContractChange({ [field]: value } as Partial<SiteContractItem>);
   };
   const updatePmCycle = (value: string) => {
     const nextVisitCount = getVisitCountForPmCycle(value);
 
-    onContractDetailsChange({
-      ...contractDetails,
+    onContractChange({
       pmCycle: value,
       visitCount: nextVisitCount ? String(nextVisitCount) : "",
       visitMonths: selectedVisitMonths.slice(0, nextVisitCount || undefined)
@@ -769,12 +863,20 @@ function ContractTab({
   const removeVisitMonth = (month: string) => {
     updateContractDetails("visitMonths", selectedVisitMonths.filter((item) => item !== month));
   };
-  const contractStartDate = contractDetails.contractStartDate ?? (contractDetails.contractStartMonth ? `${contractDetails.contractStartMonth}-01` : "");
-  const contractEndDate = contractDetails.contractEndDate ?? (contractDetails.contractEndMonth ? `${contractDetails.contractEndMonth}-01` : "");
+  const contractStartDate = contract.contractStartDate ?? "";
+  const contractEndDate = contract.contractEndDate ?? "";
 
   return (
     <div className="tabPane">
       <div className="formGrid">
+        <label className="label">
+          เลือกสัญญา
+          <select className="select" value={selectedContractIndex} onChange={(event) => onSelectedContractIndexChange(Number(event.target.value))}>
+            {Array.from({ length: contractCount }, (_, index) => (
+              <option key={index} value={index}>สัญญา {index + 1}</option>
+            ))}
+          </select>
+        </label>
         <label className="label">
           {t("fields.pmCycle")}
           <select
@@ -789,7 +891,11 @@ function ContractTab({
         </label>
         <label className="label">
           {t("fields.contractNumber")}
-          <input className="field" value={contractNumber} placeholder={t("fields.contractNumber")} onChange={(event) => onContractNumberChange(event.target.value)} />
+          <input className="field" value={contract.contractNumber ?? ""} placeholder={t("fields.contractNumber")} onChange={(event) => updateContractDetails("contractNumber", event.target.value)} />
+        </label>
+        <label className="label">
+          ชื่อโครงการ
+          <input className="field" value={contract.projectName ?? ""} placeholder="ชื่อโครงการ" onChange={(event) => updateContractDetails("projectName", event.target.value)} />
         </label>
         {/* <label className="label">
           {t("fields.visitCount")}
@@ -841,7 +947,7 @@ function ContractTab({
 
       <label className="label">
         {t("fields.contractNote")}
-        <textarea className="textarea" value={contractDetails.contractNote ?? ""} onChange={(event) => updateContractDetails("contractNote", event.target.value)} />
+        <textarea className="textarea" value={contract.contractNote ?? ""} onChange={(event) => updateContractDetails("contractNote", event.target.value)} />
       </label>
 
       <section className="sectionCard">

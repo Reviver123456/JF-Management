@@ -7,6 +7,7 @@ type CurrentUserState = {
   email: string;
   error: string | null;
   isLoading: boolean;
+  signature: string;
   userName: string;
 };
 
@@ -15,6 +16,7 @@ export function useCurrentUser(): CurrentUserState {
     email: "",
     error: null,
     isLoading: true,
+    signature: "",
     userName: ""
   });
 
@@ -37,12 +39,14 @@ export function useCurrentUser(): CurrentUserState {
         const userName = typeof metadata.full_name === "string" && metadata.full_name.trim()
           ? metadata.full_name.trim()
           : user?.email ?? "";
+        const signature = typeof metadata.signature === "string" ? metadata.signature : "";
 
         if (isCurrent) {
           setState({
             email: user?.email ?? "",
             error: null,
             isLoading: false,
+            signature,
             userName
           });
         }
@@ -52,6 +56,7 @@ export function useCurrentUser(): CurrentUserState {
             email: "",
             error: error instanceof Error ? error.message : "Cannot load current user.",
             isLoading: false,
+            signature: "",
             userName: ""
           });
         }
