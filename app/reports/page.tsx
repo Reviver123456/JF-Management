@@ -326,9 +326,6 @@ function CoverTemplatePage({
   return (
     <section className="templateSheet coverSheet">
       <TemplateHeader heading="Preventive Maintenance" row={row} />
-      <h2>Preventive Maintenance</h2>
-      <p className="coverRound">ครั้งที่ {visitRoundText}</p>
-
       <table className="templateTable coverInfoTable">
         <tbody>
           <tr>
@@ -342,6 +339,10 @@ function CoverTemplatePage({
           <tr>
             <th>สถาบัน</th>
             <td>{row.customer}</td>
+          </tr>
+          <tr>
+            <th>ครั้งที่ตรวจสอบ</th>
+            <td>{visitRoundText}</td>
           </tr>
         </tbody>
       </table>
@@ -374,12 +375,14 @@ function CoverTemplatePage({
 
       <div className="signatureGrid">
         <SignaturePersonBox
+          date={row.date}
           label="ผู้เข้าดำเนินการ"
           name={responsibleName || row.inspector}
           placeholder="ลายเซ็นผู้เข้าดำเนินการ"
           signature={responsibleSignature}
         />
         <SignaturePersonBox
+          date={row.date}
           label="ผู้ตรวจสอบ"
           name={customerSignerName}
           placeholder="ลายเซ็นลูกค้า"
@@ -390,11 +393,13 @@ function CoverTemplatePage({
 }
 
 function SignaturePersonBox({
+  date,
   label,
   name,
   placeholder,
   signature
 }: {
+  date: string;
   label: string;
   name: string;
   placeholder: string;
@@ -415,6 +420,7 @@ function SignaturePersonBox({
         ) : placeholder}
       </div>
       <span>{name}</span>
+      <span>{date}</span>
     </div>
   );
 }

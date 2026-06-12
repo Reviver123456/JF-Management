@@ -2633,6 +2633,15 @@
   width: 44%;
 }
 
+.reportsPage .coverDeviceTable th:nth-child(3),
+.reportsPage .coverDeviceTable td:nth-child(3),
+.reportsPage .coverDeviceTable th:nth-child(4),
+.reportsPage .coverDeviceTable td:nth-child(4),
+.reportsPage .coverDeviceTable th:nth-child(5),
+.reportsPage .coverDeviceTable td:nth-child(5) {
+  text-align: center;
+}
+
 .reportsPage .coverDeviceTable td {
   height: 30px;
 }
@@ -2664,7 +2673,6 @@
   align-content: end;
   min-height: 112px;
   padding: 10px 12px;
-  background: #f8fbff;
   border-radius: 4px;
   color: #111827;
   text-align: center;
@@ -2683,12 +2691,20 @@
   font-weight: 900;
 }
 
+.reportsPage .coverSignatureCard .signatureDate {
+  font-size: 11px;
+  font-weight: 400;
+  color: #111827;
+}
+
 .reportsPage .coverSignatureLine {
   min-height: 54px;
   display: grid;
   place-items: center;
   color: #64748b;
   font-weight: 700;
+  border-bottom: 1px solid #000000;
+  width: 100%;
 }
 
 .reportsPage .coverSignatureLine img {
