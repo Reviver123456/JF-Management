@@ -481,11 +481,11 @@ function TemplateHeader({ heading, row }: { heading: string; row?: ReportRow }) 
   return (
     <header className="templateHeader">
       <Image src="/report-templates/LOGO-JF.webp" alt="JF Advance Med" width={132} height={62} />
-      <strong>JF Advance Med CO., LTD</strong>
+      <strong>{heading}</strong>
       <div>
-        <span className="pmOrderNo">PM Order No. : {row ? getDisplayPmOrderNo(row) : ""}</span>
+        <span>JF Advance Med CO., LTD</span>
+        <span>PM Order No. : {row ? getDisplayPmOrderNo(row) : ""}</span>
         <span>{row?.date ?? ""}</span>
-        <b>{heading}</b>
       </div>
     </header>
   );
