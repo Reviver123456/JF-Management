@@ -46,12 +46,12 @@ type PreviewState = { title: string };
 const allOwnersValue = "__all";
 
 const checklistTemplates: ChecklistTemplate[] = [
-  { key: "synapse", title: "Synapse", heading: "Synapse Preventive Maintenance Checklist" },
-  { key: "server", title: "Server", heading: "Server Preventive Maintenance Checklist" },
-  { key: "switch", title: "Switch", heading: "Switch Preventive Maintenance Checklist" },
-  { key: "storage", title: "Storage", heading: "Storage Preventive Maintenance Checklist" },
-  { key: "environment", title: "Environment", heading: "Environment Preventive Maintenance Checklist" },
-  { key: "diag", title: "DIAG", heading: "DIAG Preventive Maintenance Checklist" }
+  { key: "synapse", title: "Synapse", heading: "Synapse Maintenance Checklist" },
+  { key: "server", title: "Server", heading: "Server Maintenance Checklist" },
+  { key: "switch", title: "Switch", heading: "Switch Maintenance Checklist" },
+  { key: "storage", title: "Storage", heading: "Storage Maintenance Checklist" },
+  { key: "environment", title: "Environment", heading: "Environment Maintenance Checklist" },
+  { key: "diag", title: "DIAG", heading: "DIAG Maintenance Checklist" }
 ];
 
 export default function ReportsPage() {
@@ -325,7 +325,6 @@ function StandardTemplatePageView({ template }: { template: StandardTemplatePage
     <section className="templateSheet">
       <TemplateHeader heading={template.heading} />
       <TemplateInfoGrid fields={template.fields} />
-      <ReferenceRows />
 
       {template.sections.map((section, index) => (
         <ChecklistTemplateTable key={`${template.key}-${section.title}-${index}`} items={section.items} title={section.title} />
@@ -343,6 +342,7 @@ function TemplateHeader({ heading }: { heading: string }) {
       <Image src="/report-templates/LOGO-JF.webp" alt="JF Advance Med" width={132} height={62} />
       <strong>JF Advance Med CO., LTD</strong>
       <div>
+        <span className="pmOrderNo">PM Order No. :</span>
         <span>Service Report</span>
         <b>{heading}</b>
       </div>
@@ -367,23 +367,6 @@ function TemplateInfoGrid({ fields }: { fields: FieldRow[] }) {
             {row.length === 1 ? <td className="fieldCell" /> : null}
           </tr>
         ))}
-      </tbody>
-    </table>
-  );
-}
-
-function ReferenceRows() {
-  return (
-    <table className="templateTable referenceTable">
-      <tbody>
-        <tr>
-          <td>เล่มที่/เลขที่</td>
-          <td />
-        </tr>
-        <tr>
-          <td>อ้างอิงใบรายงานผลการบริการ</td>
-          <td>/</td>
-        </tr>
       </tbody>
     </table>
   );
@@ -479,7 +462,7 @@ function TemplateFooter({ compact = false }: { compact?: boolean }) {
 function DiagTemplatePage() {
   return (
     <section className="templateSheet diagSheet">
-      <TemplateHeader heading="DIAG Preventive Maintenance Checklist" />
+      <TemplateHeader heading="DIAG Maintenance Checklist" />
       <TemplateInfoGrid fields={[
         ["Customer Name :", "Location :"],
         ["Brand :", "Model :"],
@@ -487,7 +470,6 @@ function DiagTemplatePage() {
         ["OS :", "Antivirus :"],
         ["Definition Date :"]
       ]} />
-      <ReferenceRows />
 
       <table className="templateTable diagCalibrateTable">
         <thead>

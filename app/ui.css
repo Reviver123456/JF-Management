@@ -1973,43 +1973,60 @@
 
 .reportsPage .templateHeader {
   display: grid;
-  grid-template-columns: 160px minmax(0, 1fr) 220px;
+  grid-template-columns: 150px minmax(0, 1fr) 260px;
   align-items: start;
   gap: 12px;
-  min-height: 82px;
-  margin-bottom: 10px;
+  min-height: 55px;
+  margin-bottom: 20px;
+  padding-bottom: 7px;
+  border-bottom: 3px solid #1f376d;
+  position: relative;
 }
 
 .reportsPage .templateHeader img {
   width: 132px;
   height: auto;
   display: block;
+  margin-top: 0;
 }
 
 .reportsPage .templateHeader>strong {
-  justify-self: start;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  justify-self: center;
   color: #111827;
   font-size: 13px;
   line-height: 1.2;
-  margin-top: 8px;
+  margin-top: 0;
+  text-align: center;
 }
 
 .reportsPage .templateHeader>div {
   display: grid;
   justify-items: end;
-  gap: 3px;
+  gap: 2px;
   color: #111827;
   text-align: right;
   font-weight: 700;
+  grid-column: 3;
+  margin-top: 0;
 }
 
 .reportsPage .templateHeader span {
   font-size: 11px;
 }
 
+.reportsPage .templateHeader .pmOrderNo {
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .reportsPage .templateHeader b {
-  max-width: 220px;
-  font-size: 13px;
+  max-width: 260px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -2037,7 +2054,7 @@
 }
 
 .reportsPage .infoTemplateTable {
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 /* Remove borders for the top info fields to match PDF layout */
@@ -2053,8 +2070,8 @@
 }
 
 .reportsPage .infoTemplateTable td {
-  padding: 6px 8px;
-  height: 32px;
+  padding: 7px 8px;
+  height: 33px;
 }
 
 .reportsPage .fieldCell {
@@ -2096,9 +2113,9 @@
 }
 
 .reportsPage .referenceTable {
-  width: 40%;
+  width: 38%;
   margin-left: auto;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 
 .reportsPage .referenceTable td:first-child {
@@ -2193,14 +2210,15 @@
 .reportsPage .templateFooter {
   margin-top: auto;
   display: grid;
-  gap: 8px;
-  padding-top: 8px;
+  gap: 7px;
+  padding-top: 10px;
 }
 
 .reportsPage .footerTopGrid {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) 285px;
+  align-items: start;
+  gap: 14px;
 }
 
 .reportsPage .statusBlock {
@@ -2210,8 +2228,9 @@
 
 .reportsPage .statusRow {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr;
+  grid-template-columns: 260px 200px minmax(0, 1fr);
   align-items: center;
+  column-gap: 14px;
 }
 
 .reportsPage .statusRow span,
@@ -2226,6 +2245,9 @@
 .reportsPage .noteLine {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
 }
 
 .reportsPage .noteLine span {
@@ -2244,12 +2266,6 @@
 
 .reportsPage .compactFooter {
   margin-top: 10px;
-}
-
-.reportsPage .footerTopGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 10px;
 }
 
 .reportsPage .workTimeGrid {
@@ -2275,75 +2291,13 @@
 
 .reportsPage .checkedByTitle {
   font-weight: 800;
-  margin-bottom: 6px;
+  margin-bottom: 0;
   padding: 4px 0;
 }
 
 .reportsPage .checkedByValue {
   min-height: 28px;
-  border-bottom: 1px solid #334155;
-}
-
-.reportsPage .summaryNoteGrid {
-  display: grid;
-  gap: 4px;
-}
-
-.reportsPage .summaryBox {
-  padding: 0;
-}
-
-.reportsPage .summaryRow {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-}
-
-.reportsPage .noteLine {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0;
-}
-
-.reportsPage .summaryRow span,
-.reportsPage .noteLine span {
-  display: flex;
-  align-items: center;
-  min-height: 26px;
-  padding: 4px 6px;
-}
-
-.reportsPage .noteLine span:last-child {
-  border-bottom: 1px solid #334155;
-}
-
-.reportsPage .noteLine span:first-child {
-  font-weight: 700;
-}
-
-.reportsPage .noteLine span:last-child {
-  border-right: 0;
-}
-
-.reportsPage .noteLine span:first-child {
-  font-weight: 700;
-}
-
-.reportsPage .summaryRow span:nth-child(2),
-.reportsPage .summaryRow span:nth-child(3) {
-  justify-content: center;
-}
-
-.reportsPage .summaryBox .noteLine {
-  grid-template-columns: 1.4fr 1fr;
-}
-
-.reportsPage .noteLine span:last-child {
-  border-right: 0;
+  border-bottom: 0;
 }
 
 .reportsPage .partsBox {
