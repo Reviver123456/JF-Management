@@ -1,4 +1,5 @@
 import { buildPmAppData, type PmJobRecord, type PmWorkDetails, type SiteCatalogRecord, type SiteContractDetails, type SiteRecord } from "@/lib/pm-data";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
@@ -90,13 +91,19 @@ function uniqueSiteRecords(sites: SiteRecord[]) {
   });
 }
 
+async function createDataClient() {
+  return process.env.NODE_ENV !== "production" && process.env.AUTH_BYPASS === "true"
+    ? createAdminClient()
+    : await createClient();
+}
+
 function formatReportDate(date: string) {
   const [year, month, day] = date.split("-");
   return `${day}/${month}/${year}`;
 }
 
 export async function listSitesFromDb() {
-  const supabase = await createClient();
+  const supabase = await createDataClient();
   const { data, error } = await supabase.from("sites").select("*").order("site");
 
   if (error) {
@@ -107,7 +114,7 @@ export async function listSitesFromDb() {
 }
 
 export async function listPmJobsFromDb() {
-  const supabase = await createClient();
+  const supabase = await createDataClient();
   const { data, error } = await supabase.from("pm_jobs").select("*").order("visit_date", { ascending: false });
 
   if (error) {
@@ -118,7 +125,7 @@ export async function listPmJobsFromDb() {
 }
 
 export async function listWorkSitesFromDb() {
-  const supabase = await createClient();
+  const supabase = await createDataClient();
   const { data, error } = await supabase
     .from("pm_jobs")
     .select("*, sites(*)")
@@ -133,7 +140,7 @@ export async function listWorkSitesFromDb() {
 }
 
 export async function getWorkSitesByDateFromDb(date: string) {
-  const supabase = await createClient();
+  const supabase = await createDataClient();
   const { data, error } = await supabase
     .from("pm_jobs")
     .select("*, sites(*)")
@@ -148,7 +155,7 @@ export async function getWorkSitesByDateFromDb(date: string) {
 }
 
 export async function getWorkSiteBySiteIdFromDb(siteId: string) {
-  const supabase = await createClient();
+  const supabase = await createDataClient();
   const { data, error } = await supabase
     .from("pm_jobs")
     .select("*, sites(*)")
@@ -165,7 +172,7 @@ export async function getWorkSiteBySiteIdFromDb(siteId: string) {
 }
 
 export async function listReportRowsFromDb() {
-  const supabase = await createClient();
+  const supabase = await createDataClient();
   const { data, error } = await supabase
     .from("pm_jobs")
     .select("*, sites(*)")

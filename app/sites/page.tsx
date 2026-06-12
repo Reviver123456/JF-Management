@@ -19,6 +19,8 @@ import type { SystemUser } from "@/lib/auth/system-users";
 import { useUi } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
 import {
+  defaultPmChecklistConfig,
+  normalizePmChecklistConfig,
   readSitePmChecklistConfig,
   type PmChecklistConfig,
   type PmChecklistKey,
@@ -191,6 +193,7 @@ function writeContractDetailsRoot(contractDetails: SiteContractDetails, contract
 
   return {
     ...contractDetails,
+    checklistConfig: primaryContract.checklistConfig ?? contractDetails.checklistConfig,
     contractCount: String(Math.min(6, Math.max(1, contracts.length))),
     contractEndDate: primaryContract.contractEndDate ?? "",
     contractNote: primaryContract.contractNote ?? "",
@@ -202,6 +205,56 @@ function writeContractDetailsRoot(contractDetails: SiteContractDetails, contract
     visitCount: primaryContract.visitCount ?? "",
     visitMonths: primaryContract.visitMonths ?? []
   };
+}
+
+function defaultContractChecklistConfig() {
+  return normalizePmChecklistConfig(defaultPmChecklistConfig);
+}
+
+function buildChecklistConfig({
+  customChecklistItemsBySection,
+  diagMonitorCounts,
+  inspectionSetCounts,
+  itemLabelsBySection,
+  selectedChecklistItems,
+  selectedInspectionTabs
+}: {
+  customChecklistItemsBySection: PmChecklistConfig["customItemsBySection"];
+  diagMonitorCounts: PmChecklistConfig["diagMonitorCounts"];
+  inspectionSetCounts: PmChecklistConfig["setCounts"];
+  itemLabelsBySection: PmChecklistConfig["itemLabelsBySection"];
+  selectedChecklistItems: PmChecklistConfig["selectedItems"];
+  selectedInspectionTabs: PmChecklistConfig["selectedTabs"];
+}) {
+  return normalizePmChecklistConfig({
+    customItems: {},
+    customItemsBySection: customChecklistItemsBySection,
+    diagMonitorCounts,
+    itemLabelsBySection,
+    selectedItems: selectedChecklistItems,
+    selectedTabs: selectedInspectionTabs,
+    setCounts: inspectionSetCounts
+  });
+}
+
+function readContractChecklistConfig(siteId: string, contractDetails: SiteContractDetails, contractNumber: string, contractIndex: number) {
+  const contracts = normalizeContractItems(contractNumber, contractDetails);
+  const boundedIndex = Math.min(Math.max(contractIndex, 0), Math.max(contracts.length - 1, 0));
+  const contractConfig = contracts[boundedIndex]?.checklistConfig;
+
+  if (contractConfig) {
+    return normalizePmChecklistConfig(contractConfig);
+  }
+
+  if (boundedIndex === 0 && contractDetails.checklistConfig) {
+    return normalizePmChecklistConfig(contractDetails.checklistConfig);
+  }
+
+  if (boundedIndex === 0) {
+    return readSitePmChecklistConfig(siteId);
+  }
+
+  return defaultContractChecklistConfig();
 }
 
 export default function SitesPage() {
@@ -366,12 +419,13 @@ function SiteModal({
   const [saveError, setSaveError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [selectedInspectionTabs, setSelectedInspectionTabs] = useState<InspectionTab[]>(() => readSitePmChecklistConfig(site.id).selectedTabs);
-  const [inspectionSetCounts, setInspectionSetCounts] = useState(() => readSitePmChecklistConfig(site.id).setCounts);
-  const [selectedChecklistItems, setSelectedChecklistItems] = useState(() => resolveSelectedChecklistItems(readSitePmChecklistConfig(site.id)));
-  const [customChecklistItemsBySection, setCustomChecklistItemsBySection] = useState(() => readCustomItemsBySection(readSitePmChecklistConfig(site.id)));
-  const [diagMonitorCounts, setDiagMonitorCounts] = useState(() => readSitePmChecklistConfig(site.id).diagMonitorCounts);
-  const [itemLabelsBySection, setItemLabelsBySection] = useState(() => readSitePmChecklistConfig(site.id).itemLabelsBySection);
+  const initialChecklistConfig = readContractChecklistConfig(site.id, site.contractDetails ?? {}, site.contract, 0);
+  const [selectedInspectionTabs, setSelectedInspectionTabs] = useState<InspectionTab[]>(() => initialChecklistConfig.selectedTabs);
+  const [inspectionSetCounts, setInspectionSetCounts] = useState(() => initialChecklistConfig.setCounts);
+  const [selectedChecklistItems, setSelectedChecklistItems] = useState(() => resolveSelectedChecklistItems(initialChecklistConfig));
+  const [customChecklistItemsBySection, setCustomChecklistItemsBySection] = useState(() => readCustomItemsBySection(initialChecklistConfig));
+  const [diagMonitorCounts, setDiagMonitorCounts] = useState(() => initialChecklistConfig.diagMonitorCounts);
+  const [itemLabelsBySection, setItemLabelsBySection] = useState(() => initialChecklistConfig.itemLabelsBySection);
   const title = mode === "add" ? t("sites.addModalTitle") : t("sites.editModalTitle");
   const contractCount = getContractCount(contractDetails);
   const contractItems = useMemo(() => normalizeContractItems(contractNumber, contractDetails), [contractDetails, contractNumber]);
@@ -380,28 +434,79 @@ function SiteModal({
     tabs.filter((tab) => tab.id === "customer" || tab.id === "contract" || selectedInspectionTabs.includes(tab.id as InspectionTab))
   ), [selectedInspectionTabs]);
 
+  const applyChecklistConfig = useCallback((config: PmChecklistConfig) => {
+    const normalizedConfig = normalizePmChecklistConfig(config);
+
+    setSelectedInspectionTabs(normalizedConfig.selectedTabs);
+    setInspectionSetCounts(normalizedConfig.setCounts);
+    setSelectedChecklistItems(resolveSelectedChecklistItems(normalizedConfig));
+    setCustomChecklistItemsBySection(readCustomItemsBySection(normalizedConfig));
+    setDiagMonitorCounts(normalizedConfig.diagMonitorCounts);
+    setItemLabelsBySection(normalizedConfig.itemLabelsBySection);
+  }, []);
+
+  const getCurrentChecklistConfig = useCallback(() => (
+    buildChecklistConfig({
+      customChecklistItemsBySection,
+      diagMonitorCounts,
+      inspectionSetCounts,
+      itemLabelsBySection,
+      selectedChecklistItems,
+      selectedInspectionTabs
+    })
+  ), [customChecklistItemsBySection, diagMonitorCounts, inspectionSetCounts, itemLabelsBySection, selectedChecklistItems, selectedInspectionTabs]);
+
   const updateContractCount = useCallback((count: number) => {
     const nextCount = Math.min(6, Math.max(1, count));
-    const currentContracts = normalizeContractItems(contractNumber, contractDetails);
-    const nextContracts = Array.from({ length: nextCount }, (_, index) => currentContracts[index] ?? emptyContractItem());
+    const currentChecklistConfig = getCurrentChecklistConfig();
+    const currentContracts = normalizeContractItems(contractNumber, contractDetails).map((contract, index) => (
+      index === selectedContractIndex ? { ...contract, checklistConfig: currentChecklistConfig } : contract
+    ));
+    const nextContracts = Array.from({ length: nextCount }, (_, index) => (
+      currentContracts[index] ?? { ...emptyContractItem(), checklistConfig: defaultContractChecklistConfig() }
+    ));
+    const nextSelectedContractIndex = Math.min(selectedContractIndex, nextCount - 1);
+    const nextContractDetails = writeContractDetailsRoot(contractDetails, nextContracts);
 
-    setContractDetails((current) => writeContractDetailsRoot(current, nextContracts));
+    setContractDetails(nextContractDetails);
     setContractNumber(nextContracts[0]?.contractNumber ?? "");
-    setSelectedContractIndex((current) => Math.min(current, nextCount - 1));
-  }, [contractDetails, contractNumber]);
+    setSelectedContractIndex(nextSelectedContractIndex);
+    applyChecklistConfig(readContractChecklistConfig(site.id, nextContractDetails, nextContracts[0]?.contractNumber ?? "", nextSelectedContractIndex));
+  }, [applyChecklistConfig, contractDetails, contractNumber, getCurrentChecklistConfig, selectedContractIndex, site.id]);
 
   const updateSelectedContract = useCallback((updates: Partial<SiteContractItem>) => {
+    const currentChecklistConfig = getCurrentChecklistConfig();
     const currentContracts = normalizeContractItems(contractNumber, contractDetails);
     const nextContracts = currentContracts.map((contract, index) => (
-      index === selectedContractIndex ? { ...contract, ...updates } : contract
+      index === selectedContractIndex ? { ...contract, ...updates, checklistConfig: currentChecklistConfig } : contract
     ));
 
-    setContractDetails((current) => writeContractDetailsRoot(current, nextContracts));
+    setContractDetails(writeContractDetailsRoot(contractDetails, nextContracts));
 
     if (selectedContractIndex === 0 && "contractNumber" in updates) {
       setContractNumber(updates.contractNumber ?? "");
     }
-  }, [contractDetails, contractNumber, selectedContractIndex]);
+  }, [contractDetails, contractNumber, getCurrentChecklistConfig, selectedContractIndex]);
+
+  const selectContractIndex = useCallback((nextIndex: number) => {
+    const boundedNextIndex = Math.min(Math.max(nextIndex, 0), contractCount - 1);
+    const currentChecklistConfig = getCurrentChecklistConfig();
+    const currentContracts = normalizeContractItems(contractNumber, contractDetails);
+    const nextContracts = currentContracts.map((contract, index) => (
+      index === selectedContractIndex ? { ...contract, checklistConfig: currentChecklistConfig } : contract
+    ));
+    const nextContractDetails = writeContractDetailsRoot(contractDetails, nextContracts);
+    const nextChecklistConfig = readContractChecklistConfig(site.id, nextContractDetails, nextContracts[0]?.contractNumber ?? contractNumber, boundedNextIndex);
+
+    setContractDetails(nextContractDetails);
+    setSelectedContractIndex(boundedNextIndex);
+    applyChecklistConfig(nextChecklistConfig);
+    setActiveTab((current) => (
+      current === "customer" || current === "contract" || nextChecklistConfig.selectedTabs.includes(current as InspectionTab)
+        ? current
+        : "contract"
+    ));
+  }, [applyChecklistConfig, contractCount, contractDetails, contractNumber, getCurrentChecklistConfig, selectedContractIndex, site.id]);
 
   const toggleInspectionTab = useCallback((tabId: InspectionTab, checked: boolean) => {
     setSelectedInspectionTabs((current) => {
@@ -546,16 +651,11 @@ function SiteModal({
   }, []);
 
   const saveChecklistConfig = async () => {
-    const checklistConfig: PmChecklistConfig = {
-      customItems: {},
-      customItemsBySection: customChecklistItemsBySection,
-      diagMonitorCounts,
-      itemLabelsBySection,
-      selectedTabs: selectedInspectionTabs,
-      setCounts: inspectionSetCounts,
-      selectedItems: selectedChecklistItems
-    };
-    const normalizedContracts = normalizeContractItems(contractNumber, contractDetails).map((contract) => {
+    const currentChecklistConfig = getCurrentChecklistConfig();
+    const contractsWithChecklistConfig = normalizeContractItems(contractNumber, contractDetails).map((contract, index) => (
+      index === selectedContractIndex ? { ...contract, checklistConfig: currentChecklistConfig } : contract
+    ));
+    const normalizedContracts = contractsWithChecklistConfig.map((contract) => {
       const pmCycle = contract.pmCycle ?? "ครึ่งปี";
       const visitCount = getVisitCountForPmCycle(pmCycle);
 
@@ -566,13 +666,20 @@ function SiteModal({
         visitMonths: (contract.visitMonths ?? []).slice(0, visitCount || undefined)
       };
     });
+    const normalizedContractsWithConfigs = normalizedContracts.map((contract, index) => ({
+      ...contract,
+      checklistConfig: normalizePmChecklistConfig(
+        contract.checklistConfig ?? (index === 0 ? contractDetails.checklistConfig ?? readSitePmChecklistConfig(site.id) : defaultContractChecklistConfig())
+      )
+    }));
+    const primaryChecklistConfig = normalizePmChecklistConfig(normalizedContractsWithConfigs[0]?.checklistConfig);
     const normalizedContractDetailsWithList: SiteContractDetails = {
-      ...writeContractDetailsRoot(contractDetails, normalizedContracts),
-      checklistConfig
+      ...writeContractDetailsRoot(contractDetails, normalizedContractsWithConfigs),
+      checklistConfig: primaryChecklistConfig
     };
-    const normalizedContractNumber = normalizedContracts[0]?.contractNumber ?? contractNumber;
+    const normalizedContractNumber = normalizedContractsWithConfigs[0]?.contractNumber ?? contractNumber;
 
-    writeSitePmChecklistConfig(site.id, checklistConfig);
+    writeSitePmChecklistConfig(site.id, primaryChecklistConfig);
 
     if (site.id) {
       const response = await fetch(`/api/sites/${encodeURIComponent(site.id)}`, {
@@ -643,7 +750,7 @@ function SiteModal({
             contractCount={contractCount}
             selectedContractIndex={selectedContractIndex}
             onContractChange={updateSelectedContract}
-            onSelectedContractIndexChange={setSelectedContractIndex}
+            onSelectedContractIndexChange={selectContractIndex}
             selectedInspectionTabs={selectedInspectionTabs}
             onToggleInspectionTab={toggleInspectionTab}
           />
@@ -663,7 +770,7 @@ function SiteModal({
       default:
         return null;
     }
-  }, [activeTab, addCustomChecklistItem, addInspectionSet, contractCount, customChecklistItemsBySection, diagMonitorCounts, inspectionSetCounts, itemLabelsBySection, regions, removeCustomChecklistItem, selectedChecklistItems, selectedContract, selectedContractIndex, selectedInspectionTabs, selectedOwner, site, systemUsers, t, toggleChecklistItem, toggleInspectionTab, updateContractCount, updateCustomChecklistItem, updateDefaultChecklistItem, updateDiagMonitorCount, updateSelectedContract]);
+  }, [activeTab, addCustomChecklistItem, addInspectionSet, contractCount, customChecklistItemsBySection, diagMonitorCounts, inspectionSetCounts, itemLabelsBySection, regions, removeCustomChecklistItem, selectContractIndex, selectedChecklistItems, selectedContract, selectedContractIndex, selectedInspectionTabs, selectedOwner, site, systemUsers, t, toggleChecklistItem, toggleInspectionTab, updateContractCount, updateCustomChecklistItem, updateDefaultChecklistItem, updateDiagMonitorCount, updateSelectedContract]);
 
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label={title}>

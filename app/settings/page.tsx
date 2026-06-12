@@ -120,49 +120,53 @@ export default function SettingsPage() {
         }
       />
       <section className="grid">
-        <article className="card">
-          <h2><UserRound size={17} /> {t("settings.profile")}</h2>
-          <div className="formGrid">
-            <label className="label">{t("fields.username")}<input className="field" value={profileName} onChange={(event) => setProfileName(event.target.value)} /></label>
-            <label className="label">{t("fields.phone")}<input className="field" value={phone} onChange={(event) => setPhone(event.target.value)} /></label>
-            <label className="label">{t("fields.email")}<input className="field" value={email} readOnly /></label>
-            <label className="label">{t("fields.contactOther")}<input className="field" defaultValue="Line: pm-admin" /></label>
-          </div>
-        </article>
+        <div className="settingsColumn">
+          <article className="card">
+            <h2><UserRound size={17} /> {t("settings.profile")}</h2>
+            <div className="formGrid">
+              <label className="label">{t("fields.username")}<input className="field" value={profileName} onChange={(event) => setProfileName(event.target.value)} /></label>
+              <label className="label">{t("fields.phone")}<input className="field" value={phone} onChange={(event) => setPhone(event.target.value)} /></label>
+              <label className="label">{t("fields.email")}<input className="field" value={email} readOnly /></label>
+              <label className="label">{t("fields.contactOther")}<input className="field" defaultValue="Line: pm-admin" /></label>
+            </div>
+          </article>
 
-        <article className="card">
-          <h2><LockKeyhole size={17} /> {t("settings.password")}</h2>
-          <div className="formGridSingle">
-            <PasswordField label={t("settings.oldPassword")} value={currentPassword} onChange={setCurrentPassword} />
-            <PasswordField label={t("settings.newPassword")} value={newPassword} onChange={setNewPassword} />
-            <PasswordField label={t("settings.confirmPassword")} value={confirmPassword} onChange={setConfirmPassword} />
-            <button className="button subtle" type="button" onClick={changePassword}>
-              <LockKeyhole size={16} />
-              {t("settings.password")}
-            </button>
-          </div>
-        </article>
+          <article className="card">
+            <h2><PenLine size={17} /> {t("settings.mySignature")}</h2>
+            <SettingsSignaturePad email={email} />
+          </article>
 
-        <article className="card">
-          <h2><PenLine size={17} /> {t("settings.mySignature")}</h2>
-          <SettingsSignaturePad email={email} />
-        </article>
+          <article className="card">
+            <h2>{theme === "dark" ? <Moon size={17} /> : <Sun size={17} />} {t("settings.theme")}</h2>
+            <div className="options">
+              <button className={theme === "dark" ? "activeOption" : "option"} type="button" onClick={() => setTheme("dark")}>{t("settings.darkTheme")}</button>
+              <button className={theme === "light" ? "activeOption" : "option"} type="button" onClick={() => setTheme("light")}>{t("settings.lightTheme")}</button>
+            </div>
+          </article>
+        </div>
 
-        <article className="card">
-          <h2><Languages size={17} /> {t("settings.language")}</h2>
-          <div className="options">
-            <button className={lang === "th" ? "activeOption" : "option"} type="button" onClick={() => setLang("th")}>{t("settings.thai")}</button>
-            <button className={lang === "en" ? "activeOption" : "option"} type="button" onClick={() => setLang("en")}>{t("settings.english")}</button>
-          </div>
-        </article>
+        <div className="settingsColumn">
+          <article className="card">
+            <h2><LockKeyhole size={17} /> {t("settings.password")}</h2>
+            <div className="formGridSingle">
+              <PasswordField label={t("settings.oldPassword")} value={currentPassword} onChange={setCurrentPassword} />
+              <PasswordField label={t("settings.newPassword")} value={newPassword} onChange={setNewPassword} />
+              <PasswordField label={t("settings.confirmPassword")} value={confirmPassword} onChange={setConfirmPassword} />
+              <button className="button subtle" type="button" onClick={changePassword}>
+                <LockKeyhole size={16} />
+                {t("settings.password")}
+              </button>
+            </div>
+          </article>
 
-        <article className="card">
-          <h2>{theme === "dark" ? <Moon size={17} /> : <Sun size={17} />} {t("settings.theme")}</h2>
-          <div className="options">
-            <button className={theme === "dark" ? "activeOption" : "option"} type="button" onClick={() => setTheme("dark")}>{t("settings.darkTheme")}</button>
-            <button className={theme === "light" ? "activeOption" : "option"} type="button" onClick={() => setTheme("light")}>{t("settings.lightTheme")}</button>
-          </div>
-        </article>
+          <article className="card">
+            <h2><Languages size={17} /> {t("settings.language")}</h2>
+            <div className="options">
+              <button className={lang === "th" ? "activeOption" : "option"} type="button" onClick={() => setLang("th")}>{t("settings.thai")}</button>
+              <button className={lang === "en" ? "activeOption" : "option"} type="button" onClick={() => setLang("en")}>{t("settings.english")}</button>
+            </div>
+          </article>
+        </div>
       </section>
       </div>
     </AppShell>

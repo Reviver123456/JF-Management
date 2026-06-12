@@ -9,10 +9,29 @@ const publicPaths = [
   "/api/db/seed"
 ];
 
+function isLocalAuthBypass(request: NextRequest) {
+  const hostname = request.nextUrl.hostname;
+  const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+
+  return process.env.NODE_ENV !== "production"
+    && process.env.AUTH_BYPASS === "true"
+    && isLocalhost;
+}
+
 export async function proxy(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const pathname = request.nextUrl.pathname;
+
+  if (isLocalAuthBypass(request)) {
+    if (pathname === "/" || pathname === "/login") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
+
+    return NextResponse.next({ request });
+  }
 
   if (!supabaseUrl || !supabaseKey || publicPaths.some((path) => pathname.startsWith(path))) {
     return NextResponse.next({ request });

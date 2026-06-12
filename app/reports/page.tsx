@@ -190,10 +190,10 @@ function ChecklistReportPanel({
               <span>{t("common.inspectorPrefix")}: {row.inspector}</span>
               <MapPin size={13} /> {row.province}
             </small>
-            <span className="reportPreviewCue">
+            {/* <span className="reportPreviewCue">
               <Eye size={14} />
               {t("reports.preview")}
-            </span>
+            </span> */}
           </button>
         )) : <EmptyState message={t("reports.empty")} />}
       </div>
@@ -1257,22 +1257,27 @@ function PreviewModal({
   const { t } = useUi();
   const documentRef = useRef<HTMLDivElement | null>(null);
   const [downloadType, setDownloadType] = useState<"pdf" | "word" | "excel">("pdf");
-  const [showPreview, setShowPreview] = useState(true);
+  const [showPreview, setShowPreview] = useState(false);
   const contracts = getSiteContractItems(preview.site);
   const selectedContract = getSiteContractAt(preview.site, preview.contractIndex);
   const selectedContractLabel = getSiteContractLabel(selectedContract, preview.contractIndex);
-  const downloadReport = () => {
+  const printReport = () => {
+    printReportPdf(documentRef.current?.innerHTML ?? "", `${preview.title} - ${selectedContractLabel}`);
+  };
+  const downloadReport = async () => {
     if (downloadType === "pdf") {
-      setShowPreview(true);
-      window.setTimeout(() => window.print(), 0);
+      printReport();
       return;
     }
 
-    const html = documentRef.current?.innerHTML ?? "";
+    const html = await prepareOfficeExportContent(documentRef.current?.innerHTML ?? "");
     const isExcel = downloadType === "excel";
     const extension = isExcel ? "xls" : "doc";
     const mimeType = isExcel ? "application/vnd.ms-excel;charset=utf-8" : "application/msword;charset=utf-8";
-    const blob = new Blob([buildExportHtml(html)], { type: mimeType });
+    const blob = new Blob([
+      "\ufeff",
+      buildExportHtml(html, `${preview.title} - ${selectedContractLabel}`, isExcel ? "excel" : "word")
+    ], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -1282,61 +1287,337 @@ function PreviewModal({
   };
 
   return (
-    <div className="overlay" role="dialog" aria-modal="true" aria-label={preview.title}>
+    <div
+      className="overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label={preview.title}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <article className="modal previewModal">
         <div className="modalHeader">
           <h2>{preview.title}</h2>
           <button type="button" onClick={onClose} aria-label={t("common.close")}><X size={18} /></button>
         </div>
-        <div className="reportModalControls">
-          <label className="label">
-            เลือกสัญญา
-            <select className="select" value={preview.contractIndex} onChange={(event) => onContractIndexChange(Number(event.target.value))}>
-              {contracts.map((contract, index) => (
-                <option key={index} value={index}>{getSiteContractLabel(contract, index)}</option>
-              ))}
-            </select>
-          </label>
-          <label className="label">
-            ประเภทไฟล์
-            <select className="select" value={downloadType} onChange={(event) => setDownloadType(event.target.value as "pdf" | "word" | "excel")}>
-              <option value="pdf">PDF</option>
-              <option value="word">Word</option>
-              <option value="excel">Excel</option>
-            </select>
-          </label>
-          <button className="button subtle" type="button" onClick={() => window.print()}>
-            <Printer size={16} />
-            {t("common.print")}
-          </button>
-          <button className="button subtle" type="button" onClick={downloadReport}>
-            <Download size={16} />
-            {t("common.download")}
-          </button>
-          <button className="button primary" type="button" onClick={() => setShowPreview((current) => !current)}>
-            <Eye size={16} />
-            {t("reports.preview")}
-          </button>
-        </div>
-        {showPreview ? (
-          <div ref={documentRef}>
-            <ReportDocumentPacket
-              contractIndex={preview.contractIndex}
-              pmJobs={pmJobs}
-              responsibleName={responsibleName}
-              responsibleSignature={responsibleSignature}
-              row={preview.row}
-              site={preview.site}
-            />
+        {!showPreview ? (
+          <div className="reportModalControls">
+            <label className="label">
+              เลือกสัญญา
+              <select className="select" value={preview.contractIndex} onChange={(event) => onContractIndexChange(Number(event.target.value))}>
+                {contracts.map((contract, index) => (
+                  <option key={index} value={index}>{getSiteContractLabel(contract, index)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="label">
+              ประเภทไฟล์
+              <select className="select" value={downloadType} onChange={(event) => setDownloadType(event.target.value as "pdf" | "word" | "excel")}>
+                <option value="pdf">PDF</option>
+                <option value="word">Word</option>
+                <option value="excel">Excel</option>
+              </select>
+            </label>
+            <button className="button subtle" type="button" onClick={printReport}>
+              <Printer size={16} />
+              {t("common.print")}
+            </button>
+            <button className="button subtle" type="button" onClick={downloadReport}>
+              <Download size={16} />
+              {t("common.download")}
+            </button>
+            <button className="button primary" type="button" onClick={() => setShowPreview(true)}>
+              <Eye size={16} />
+              {t("reports.preview")}
+            </button>
           </div>
         ) : null}
+        <div ref={documentRef} className={showPreview ? undefined : "reportDocumentHidden"} aria-hidden={!showPreview}>
+          <ReportDocumentPacket
+            contractIndex={preview.contractIndex}
+            pmJobs={pmJobs}
+            responsibleName={responsibleName}
+            responsibleSignature={responsibleSignature}
+            row={preview.row}
+            site={preview.site}
+          />
+        </div>
       </article>
     </div>
   );
 }
 
-function buildExportHtml(content: string) {
-  return `<!doctype html><html><head><meta charset="utf-8"><title>PM Report</title></head><body>${content}</body></html>`;
+async function prepareOfficeExportContent(content: string) {
+  if (!content.trim()) {
+    return "";
+  }
+
+  const container = document.createElement("div");
+  container.innerHTML = content;
+  const images = Array.from(container.querySelectorAll("img"));
+
+  await Promise.all(images.map(async (image) => {
+    const source = image.getAttribute("src");
+
+    image.removeAttribute("srcset");
+    image.removeAttribute("sizes");
+
+    if (!source) {
+      return;
+    }
+
+    if (source.startsWith("data:image/png")) {
+      return;
+    }
+
+    const absoluteSource = new URL(source, window.location.origin).href;
+
+    try {
+      image.setAttribute("src", await imageUrlToPngDataUrl(absoluteSource));
+    } catch {
+      image.setAttribute("src", absoluteSource);
+    }
+  }));
+
+  return container.innerHTML;
+}
+
+function imageUrlToPngDataUrl(source: string) {
+  return new Promise<string>((resolve, reject) => {
+    const image = new window.Image();
+
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      const width = image.naturalWidth || image.width;
+      const height = image.naturalHeight || image.height;
+      const context = canvas.getContext("2d");
+
+      if (!context || width <= 0 || height <= 0) {
+        reject(new Error("Cannot prepare export image."));
+        return;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      context.drawImage(image, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/png"));
+    };
+
+    image.onerror = () => reject(new Error("Cannot load export image."));
+    image.crossOrigin = "anonymous";
+    image.src = source;
+  });
+}
+
+function buildExportHtml(content: string, title: string, exportType: "word" | "excel") {
+  return `<!doctype html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns:x="urn:schemas-microsoft-com:office:excel">
+  <head>
+    <meta charset="utf-8">
+    <base href="${window.location.origin}">
+    <title>${escapeHtml(title)}</title>
+    ${exportType === "word" ? getWordOfficeXml() : getExcelOfficeXml()}
+    <style>${getPrintableStyles()}${getOfficeExportStyles(exportType)}</style>
+  </head>
+  <body>
+    <main class="reportsPage printReportRoot officeExportRoot ${exportType === "excel" ? "excelExportRoot" : "wordExportRoot"}">${content}</main>
+  </body>
+</html>`;
+}
+
+function printReportPdf(content: string, title: string) {
+  if (!content.trim()) {
+    return;
+  }
+
+  const printWindow = window.open("", "_blank", "width=960,height=900");
+
+  if (!printWindow) {
+    return;
+  }
+
+  printWindow.document.open();
+  printWindow.document.write(buildPdfPrintHtml(content, title));
+  printWindow.document.close();
+
+  const triggerPrint = () => {
+    printWindow.focus();
+    printWindow.print();
+  };
+
+  const waitForImages = Array.from(printWindow.document.images).map((image) => (
+    image.complete
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => {
+        image.onload = () => resolve();
+        image.onerror = () => resolve();
+      })
+  ));
+
+  Promise.all(waitForImages).then(() => {
+    window.setTimeout(triggerPrint, 250);
+  });
+}
+
+function buildPdfPrintHtml(content: string, title: string) {
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <base href="${window.location.origin}">
+    <title>${escapeHtml(title)}</title>
+    <style>${getPrintableStyles()}</style>
+  </head>
+  <body>
+    <main class="reportsPage printReportRoot">${content}</main>
+  </body>
+</html>`;
+}
+
+function getPrintableStyles() {
+  const appStyles = Array.from(document.styleSheets).flatMap((sheet) => {
+    try {
+      return Array.from(sheet.cssRules).map((rule) => rule.cssText);
+    } catch {
+      return [];
+    }
+  }).join("\n");
+
+  return `${appStyles}
+@page {
+  size: A4;
+  margin: 0;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #ffffff !important;
+}
+
+.printReportRoot {
+  width: 210mm;
+  margin: 0 auto;
+  background: #ffffff !important;
+}
+
+.printReportRoot .reportDocumentStack {
+  display: block !important;
+  padding: 0 !important;
+}
+
+.printReportRoot .templateSheet {
+  width: 210mm !important;
+  min-height: 297mm !important;
+  margin: 0 auto !important;
+  padding: 10mm 13mm !important;
+  box-shadow: none !important;
+  page-break-after: always;
+  break-after: page;
+  box-sizing: border-box;
+}
+
+.printReportRoot .templateSheet:last-child {
+  page-break-after: auto;
+  break-after: auto;
+}
+
+.printReportRoot * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}`;
+}
+
+function getOfficeExportStyles(exportType: "word" | "excel") {
+  const officeRootClass = exportType === "excel" ? "excelExportRoot" : "wordExportRoot";
+
+  return `
+.officeExportRoot {
+  width: 210mm;
+  margin: 0 auto;
+  background: #ffffff !important;
+}
+
+.officeExportRoot .reportDocumentStack {
+  display: block !important;
+  padding: 0 !important;
+}
+
+.officeExportRoot .templateSheet {
+  width: 210mm !important;
+  min-height: 297mm !important;
+  margin: 0 auto 0 auto !important;
+  padding: 10mm 13mm !important;
+  box-shadow: none !important;
+  box-sizing: border-box;
+  page-break-after: always;
+  break-after: page;
+  mso-page-orientation: portrait;
+}
+
+.officeExportRoot .templateSheet:last-child {
+  page-break-after: auto;
+  break-after: auto;
+}
+
+.officeExportRoot .templateTable,
+.officeExportRoot table {
+  border-collapse: collapse;
+}
+
+.officeExportRoot img {
+  max-width: 100%;
+}
+
+.${officeRootClass} * {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}`;
+}
+
+function getWordOfficeXml() {
+  return `<!--[if gte mso 9]>
+<xml>
+  <w:WordDocument>
+    <w:View>Print</w:View>
+    <w:Zoom>100</w:Zoom>
+    <w:DoNotOptimizeForBrowser/>
+  </w:WordDocument>
+</xml>
+<![endif]-->`;
+}
+
+function getExcelOfficeXml() {
+  return `<!--[if gte mso 9]>
+<xml>
+  <x:ExcelWorkbook>
+    <x:ExcelWorksheets>
+      <x:ExcelWorksheet>
+        <x:Name>PM Report</x:Name>
+        <x:WorksheetOptions>
+          <x:Print>
+            <x:ValidPrinterInfo/>
+            <x:PaperSizeIndex>9</x:PaperSizeIndex>
+          </x:Print>
+        </x:WorksheetOptions>
+      </x:ExcelWorksheet>
+    </x:ExcelWorksheets>
+  </x:ExcelWorkbook>
+</xml>
+<![endif]-->`;
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function sanitizeFileName(value: string) {

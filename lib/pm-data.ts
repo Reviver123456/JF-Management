@@ -21,6 +21,7 @@ export type SiteContractDetails = {
 };
 
 export type SiteContractItem = {
+  checklistConfig?: unknown;
   contractEndDate?: string;
   contractNote?: string;
   contractNumber?: string;
@@ -273,6 +274,7 @@ export function getSiteContractItems(site: Pick<SiteCatalogRecord, "contract" | 
   const count = getContractCount(details);
   const savedContracts = Array.isArray(details?.contracts) ? details.contracts : [];
   const legacyContract: SiteContractItem = {
+    checklistConfig: details?.checklistConfig,
     contractEndDate: details?.contractEndDate,
     contractNote: details?.contractNote,
     contractNumber: details?.contractNumber ?? site?.contract,
