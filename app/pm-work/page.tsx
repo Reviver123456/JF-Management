@@ -26,7 +26,7 @@ import {
   X
 } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
-import { FeedbackPopups, LoadingPopup } from "@/components/AppPopup";
+import { FeedbackPopups } from "@/components/AppPopup";
 import type { SystemUser } from "@/lib/auth/system-users";
 import { useUi, type Lang } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
@@ -67,6 +67,7 @@ import {
   type PmWorkDetails,
   type SiteRecord
 } from "@/lib/pm-data";
+import { beginAppDataLoad, endAppDataLoad } from "@/lib/app-data-loading";
 import { usePmData } from "@/lib/use-pm-data";
 
 const allOwnersValue = "__all";
@@ -291,7 +292,6 @@ function PmWorkFallback() {
 
   return (
     <AppShell>
-      <LoadingPopup open message={t("pm.loadingSubtitle")} />
       <div className="pmWorkPage">
         <PageTitle title={t("pm.title")} subtitle={t("pm.loadingSubtitle")} />
       </div>
@@ -301,8 +301,8 @@ function PmWorkFallback() {
 
 function PmWorkContent() {
   const { t } = useUi();
-  const { data, error, isLoading, reload } = usePmData();
-  const { error: userError, isLoading: isUserLoading, userName, signature: userSignature } = useCurrentUser();
+  const { data, error, reload } = usePmData();
+  const { error: userError, userName, signature: userSignature } = useCurrentUser();
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [usersError, setUsersError] = useState("");
   const router = useRouter();
@@ -330,6 +330,8 @@ function PmWorkContent() {
     let isCurrent = true;
 
     async function loadSystemUsers() {
+      beginAppDataLoad();
+
       try {
         const response = await fetch("/api/auth/users", { cache: "no-store" });
         const payload = await response.json() as { users?: SystemUser[]; message?: string };
@@ -346,6 +348,8 @@ function PmWorkContent() {
         if (isCurrent) {
           setUsersError(loadError instanceof Error ? loadError.message : "Cannot load users.");
         }
+      } finally {
+        endAppDataLoad();
       }
     }
 
@@ -401,7 +405,6 @@ function PmWorkContent() {
 
     return sourceSites;
   }, [showAllJobs, statusParam, todayDate, visibleSites]);
-  const pageIsLoading = isLoading || isUserLoading;
   const listSubtitle = showAllJobs
     ? `${statusParam === "backlog" ? t("dashboard.backlog") : t("pm.title")} · ${filteredSites.length} ${t("common.jobs")}`
     : `${t("pm.todayOnlySubtitle")} · ${todayDate}`;
@@ -410,8 +413,6 @@ function PmWorkContent() {
     <AppShell>
       <div className="pmWorkPage">
         <FeedbackPopups
-          loading={pageIsLoading}
-          loadingMessage={t("pm.loadingSubtitle")}
           alertMessage={error ?? userError ?? usersError}
         />
         {selectedSite ? (
@@ -510,7 +511,7 @@ function DetailView({
   });
   const [summaryNote, setSummaryNote] = useState(savedDetails?.summaryNote ?? "");
   const [signerName, setSignerName] = useState(savedDetails?.signerName ?? "");
-  const [inspectorSignature, setInspectorSignature] = useState(savedDetails?.inspectorSignature ?? "");
+  const inspectorSignature = savedDetails?.inspectorSignature ?? "";
   const [customerSignature, setCustomerSignature] = useState(savedDetails?.customerSignature ?? "");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -538,12 +539,6 @@ function DetailView({
     ? `\u0e22\u0e31\u0e07\u0e02\u0e32\u0e14\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25 ${missingRequiredCount} \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23`
     : `${missingRequiredCount} required items remaining`;
   const saveSuccessMessage = lang === "th" ? "บันทึกข้อมูลงาน PM แล้ว" : "PM job saved.";
-
-  useEffect(() => {
-    if (!savedDetails?.inspectorSignature && userSignature) {
-      setInspectorSignature((current) => current || userSignature);
-    }
-  }, [savedDetails?.inspectorSignature, userSignature]);
 
   useEffect(() => {
     const refreshConfig = () => setChecklistConfig(readChecklistConfigForSite(site));
@@ -850,10 +845,11 @@ function DetailView({
   return (
     <div className="detailPage">
       <FeedbackPopups
-        loading={isSaving}
-        loadingMessage={t("pm.loadingSubtitle")}
         alertMessage={saveError || saveSuccess}
         alertTone={saveSuccess ? "success" : "error"}
+        alertVariant="status"
+        loading={isSaving}
+        loadingMessage={t("pm.loadingSubtitle")}
       />
       <div className="detailTitle">
         <button className="backButton" type="button" onClick={handleBack} aria-label={t("common.back")}>

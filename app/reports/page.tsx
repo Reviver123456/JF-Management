@@ -81,7 +81,7 @@ const checklistTemplates: ChecklistTemplate[] = [
 export default function ReportsPage() {
   const { lang, t } = useUi();
   const { email, signature, userName } = useCurrentUser();
-  const { data, error, isLoading } = usePmData();
+  const { data, error } = usePmData();
   const [query, setQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -113,7 +113,7 @@ export default function ReportsPage() {
   return (
     <AppShell>
       <div className="reportsPage">
-        <FeedbackPopups loading={isLoading} loadingMessage={t("pm.loadingSubtitle")} alertMessage={error} />
+        <FeedbackPopups alertMessage={error} />
         <PageTitle title={t("reports.title")} subtitle={t("reports.subtitle")} />
 
         <section className="toolbar reportToolbar">

@@ -303,7 +303,6 @@
     height: 26px;
     border-radius: 999px;
     font-size: 11px;
-    font-weight: 900;
   }
 
   .shell .mobileBrand strong {
@@ -580,7 +579,7 @@
 }
 
 .dashboardPage .resultBars span {
-  font-weight: 900;
+
   font-size: 12px;
 }
 
@@ -601,21 +600,53 @@
   content: "";
   display: block;
   height: 100%;
+  width: 0%;
   border-radius: inherit;
+  transition: width 720ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dashboardPage .resultBars[data-ready="true"]>div:nth-child(1) i::before {
+  width: var(--bar-width, 0%);
+  transition-delay: 120ms;
+}
+
+.dashboardPage .resultBars[data-ready="true"]>div:nth-child(2) i::before {
+  width: var(--bar-width, 0%);
+  transition-delay: 240ms;
+}
+
+.dashboardPage .resultBars[data-ready="true"]>div:nth-child(3) i::before {
+  width: var(--bar-width, 0%);
+  transition-delay: 360ms;
+}
+
+.dashboardPage .resultBars[data-ready="true"]>div:nth-child(4) i::before {
+  width: var(--bar-width, 0%);
+  transition-delay: 480ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .dashboardPage .resultBars i::before,
+  .dashboardPage .resultBars[data-ready="true"]>div i::before {
+    transition: none;
+    width: var(--bar-width, 0%);
+  }
 }
 
 .dashboardPage .greenBar::before {
-  width: 20%;
   background: var(--success);
 }
 
+.dashboardPage .blueBar::before {
+  background: var(--primary);
+}
+
 .dashboardPage .yellowBar::before {
-  width: 90%;
   background: var(--warning);
 }
 
 .dashboardPage .redBar::before {
-  width: 20%;
   background: var(--danger);
 }
 
@@ -926,6 +957,24 @@
 
 .loginPage .forgotPasswordButton:hover {
   color: var(--text);
+}
+
+.loginPage .loginRememberToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.loginPage .loginRememberToggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary-strong);
+  cursor: pointer;
 }
 
 .loginPage .showPasswordToggle {
@@ -3725,7 +3774,6 @@
   margin: 0;
   text-align: center;
   font-size: 16px;
-  font-weight: 900;
 }
 
 .schedulePage .calendarHead button {
@@ -3751,7 +3799,7 @@
 
 .schedulePage .weekHeader {
   height: 30px;
-  background: #17233d;
+  background: var(--calendar-header-bg);
   border: 1px solid var(--border);
   border-bottom: 0;
   border-radius: 8px 8px 0 0;
@@ -3761,7 +3809,7 @@
 .schedulePage .weekHeader span {
   display: grid;
   place-items: center;
-  color: var(--text-muted);
+  color: var(--calendar-header-text);
   font-size: 11px;
   font-weight: 900;
 }
@@ -3778,12 +3826,12 @@
   min-height: 74px;
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
-  background: var(--panel-3);
+  background: var(--calendar-day-bg);
 }
 
 .schedulePage .blankCell,
 .schedulePage .trailingBlock {
-  background: #16243d;
+  background: var(--calendar-empty-bg);
 }
 
 .schedulePage .trailingBlock {
@@ -3809,12 +3857,12 @@
 
 .schedulePage .dayCell:hover,
 .schedulePage .selectedDay {
-  background: #12203a;
-  box-shadow: inset 0 0 0 1px rgba(47, 125, 246, 0.5);
+  background: var(--calendar-day-hover);
+  box-shadow: inset 0 0 0 1px var(--calendar-day-selected-ring);
 }
 
 .schedulePage .pastDay {
-  background: rgba(234, 179, 8, 0.08);
+  background: var(--warning-soft);
   color: var(--text-muted);
 }
 
@@ -3823,7 +3871,7 @@
 }
 
 .schedulePage .pastDay:hover {
-  background: rgba(234, 179, 8, 0.13);
+  background: color-mix(in srgb, var(--warning-soft) 88%, var(--calendar-day-hover));
 }
 
 .schedulePage .dayEvents {
@@ -4429,6 +4477,163 @@
   background: var(--primary);
   border-color: var(--primary);
   color: #ffffff;
+}
+
+.settingsPage .pwaInstallCard {
+  display: grid;
+  gap: 14px;
+}
+
+.settingsPage .pwaInstallDesc,
+.settingsPage .pwaInstallHint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.settingsPage .pwaInstallButton {
+  width: fit-content;
+}
+
+.settingsPage .pwaInstallStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(34, 197, 94, 0.14);
+  color: #86efac;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.pwaGuideOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(3, 7, 18, 0.72);
+  backdrop-filter: blur(6px);
+}
+
+.pwaGuideModal {
+  width: min(100%, 560px);
+  max-height: calc(100vh - 32px);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+}
+
+.pwaGuideHeader,
+.pwaGuideFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+}
+
+.pwaGuideHeader {
+  border-bottom: 1px solid var(--border);
+}
+
+.pwaGuideHeader h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.pwaGuideHeader button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.pwaGuideHeader button:hover {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text);
+}
+
+.pwaGuideBody {
+  overflow: auto;
+  padding: 12px 14px 0;
+}
+
+.pwaGuideImage {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+}
+
+.pwaGuideSteps {
+  display: grid;
+  gap: 16px;
+  padding: 4px 4px 12px;
+}
+
+.pwaGuideStepsIcon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: rgba(59, 130, 246, 0.14);
+  color: #93c5fd;
+}
+
+.pwaGuideSteps ol {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 12px;
+  color: var(--text-soft);
+  line-height: 1.6;
+}
+
+.pwaGuideSteps li {
+  font-size: 14px;
+}
+
+.pwaGuideNote {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.pwaGuideFooter {
+  border-top: 1px solid var(--border);
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .pwaGuideOverlay {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .pwaGuideModal {
+    width: 100%;
+    max-height: none;
+    height: 100%;
+    border-radius: 0;
+  }
 }
 
 @media (max-width: 900px) {
@@ -5071,4 +5276,9 @@
     grid-template-columns: 1fr repeat(4, 72px);
     overflow-x: auto;
   }
+}
+
+/* Page enter animation — inline styles on .pageEnterSurface drive the motion */
+.pageEnterSurface {
+  width: 100%;
 }

@@ -39,14 +39,14 @@ while (true) {
       continue;
     }
 
-    const { signature: removed, ...rest } = metadata;
+    const metadataWithoutSignature = { ...metadata };
+    delete metadataWithoutSignature.signature;
     const { error: updateError } = await admin.auth.admin.updateUserById(user.id, {
       user_metadata: {
-        ...rest,
+        ...metadataWithoutSignature,
         signature: null
       }
     });
-
     if (updateError) {
       console.log("UPDATE_ERROR:", user.email ?? user.id, updateError.message);
       continue;

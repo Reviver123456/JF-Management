@@ -48,10 +48,11 @@ if (typeof metadata.signature !== "string") {
   process.exit(0);
 }
 
-const { signature: removed, ...rest } = metadata;
+const metadataWithoutSignature = { ...metadata };
+delete metadataWithoutSignature.signature;
 const { error: updateError } = await admin.auth.admin.updateUserById(userId, {
   user_metadata: {
-    ...rest,
+    ...metadataWithoutSignature,
     signature: null
   }
 });

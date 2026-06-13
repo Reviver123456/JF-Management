@@ -147,12 +147,22 @@ const dictionaries: Record<Lang, Dictionary> = {
       subtitle: "แดชบอร์ดสำหรับทีม Preventive Maintenance หน้างานและผู้จัดการไซต์",
       email: "อีเมลหรือชื่อผู้ใช้",
       password: "รหัสผ่าน",
-      remember: "จดจำอุปกรณ์นี้",
+      remember: "จำรหัสผ่าน",
       signIn: "เข้าสู่ระบบ",
       username: "ชื่อผู้ใช้งาน",
       fieldReady: "พร้อมใช้งานภาคสนาม",
       secure: "ยืนยันตัวตนแบบปลอดภัย",
       device: "ออกแบบสำหรับ Web, iPad และโทรศัพท์"
+    },
+    bootstrap: {
+      loading: "กำลังเตรียมข้อมูลระบบ",
+      error: "ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่",
+      retry: "ลองใหม่"
+    },
+    feedback: {
+      saveSuccess: "บันทึกสำเร็จ",
+      saveFailed: "บันทึกไม่สำเร็จ",
+      notice: "แจ้งเตือน"
     },
     dashboard: {
       title: "แดชบอร์ด",
@@ -161,6 +171,7 @@ const dictionaries: Record<Lang, Dictionary> = {
       todayWork: "งานวันนี้",
       fieldMap: "แผนที่ไซต์วันนี้",
       workload: "สถานะงาน",
+      teamWorkload: "สถานะงานทั้งทีม",
       totalSites: "ไซต์ทั้งหมด",
       monthlyJobs: "งานเดือนนี้",
       doneJobs: "เสร็จแล้ว",
@@ -364,7 +375,18 @@ const dictionaries: Record<Lang, Dictionary> = {
       thai: "ภาษาไทย",
       english: "English",
       darkTheme: "ธีมมืด",
-      lightTheme: "ธีมสว่าง"
+      lightTheme: "ธีมสว่าง",
+      installApp: "ติดตั้งแอป",
+      installAppDesc: "เพิ่ม PM Site ไปที่หน้าจอหลัก เพื่อเปิดใช้งานได้เร็วขึ้นเหมือนแอปมือถือ",
+      installButton: "ติดตั้งแอป",
+      installInstalled: "ติดตั้งแอปแล้ว",
+      installIosTitle: "วิธีเพิ่มแอปไปที่หน้าจอหลัก (iOS)",
+      installIosClose: "เข้าใจแล้ว",
+      installDesktopTitle: "วิธีติดตั้งแอปบนคอมพิวเตอร์",
+      installDesktopStep1: "เปิดเว็บนี้ด้วย Chrome หรือ Edge",
+      installDesktopStep2: "มองหาไอคอนติดตั้ง (∞ หรือคอมพิวเตอร์) ที่แถบที่อยู่ด้านบน แล้วกด",
+      installDesktopStep3: "เลือก \"ติดตั้ง\" หรือ \"Install\" เพื่อเพิ่มแอปลงเครื่อง",
+      installDesktopNote: "ถ้าไม่เห็นไอคอน ให้เปิดเมนู ⋮ มุมขวาบน แล้วเลือก \"ติดตั้ง PM Site\" หรือ \"Install app\""
     }
   },
   en: {
@@ -495,12 +517,22 @@ const dictionaries: Record<Lang, Dictionary> = {
       subtitle: "A field-ready Preventive Maintenance dashboard for site teams and managers",
       email: "Email or username",
       password: "Password",
-      remember: "Remember this device",
+      remember: "Remember password",
       signIn: "Sign in",
       username: "Username",
       fieldReady: "Field-ready workflow",
       secure: "Secure authentication",
       device: "Designed for web, iPad, and phones"
+    },
+    bootstrap: {
+      loading: "Preparing your workspace",
+      error: "Unable to load data. Please try again.",
+      retry: "Retry"
+    },
+    feedback: {
+      saveSuccess: "Saved successfully",
+      saveFailed: "Save failed",
+      notice: "Notice"
     },
     dashboard: {
       title: "Dashboard",
@@ -509,6 +541,7 @@ const dictionaries: Record<Lang, Dictionary> = {
       todayWork: "Today’s Work",
       fieldMap: "Today’s Site Map",
       workload: "Work Status",
+      teamWorkload: "Team Work Status",
       totalSites: "Total sites",
       monthlyJobs: "This month",
       doneJobs: "Completed",
@@ -712,7 +745,18 @@ const dictionaries: Record<Lang, Dictionary> = {
       thai: "Thai",
       english: "English",
       darkTheme: "Dark theme",
-      lightTheme: "Light theme"
+      lightTheme: "Light theme",
+      installApp: "Install App",
+      installAppDesc: "Add PM Site to your home screen for quick access like a mobile app.",
+      installButton: "Install App",
+      installInstalled: "App installed",
+      installIosTitle: "How to add the app to your home screen (iOS)",
+      installIosClose: "Got it",
+      installDesktopTitle: "How to install the app on desktop",
+      installDesktopStep1: "Open this site in Chrome or Edge",
+      installDesktopStep2: "Look for the install icon (∞ or monitor) in the address bar and click it",
+      installDesktopStep3: "Choose \"Install\" to add the app to your device",
+      installDesktopNote: "If you do not see the icon, open the ⋮ menu and choose \"Install PM Site\" or \"Install app\""
     }
   }
 };

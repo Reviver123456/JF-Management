@@ -49,6 +49,7 @@ import {
   type SiteContractDetails,
   type SiteContractItem
 } from "@/lib/pm-data";
+import { beginAppDataLoad, endAppDataLoad } from "@/lib/app-data-loading";
 import { usePmData } from "@/lib/use-pm-data";
 
 type SiteTab = "customer" | "contract" | "synapse" | "server" | "switch" | "storage" | "environment" | "diag";
@@ -259,7 +260,7 @@ function readContractChecklistConfig(siteId: string, contractDetails: SiteContra
 
 export default function SitesPage() {
   const { t } = useUi();
-  const { data, error, isLoading, reload } = usePmData();
+  const { data, error, reload } = usePmData();
   const sites = data.siteCatalog;
   const regions = data.regions;
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
@@ -274,6 +275,8 @@ export default function SitesPage() {
     let isCurrent = true;
 
     async function loadSystemUsers() {
+      beginAppDataLoad();
+
       try {
         const response = await fetch("/api/auth/users", { cache: "no-store" });
         const payload = await response.json() as { users?: SystemUser[]; message?: string };
@@ -290,6 +293,8 @@ export default function SitesPage() {
         if (isCurrent) {
           setUsersError(loadError instanceof Error ? loadError.message : "Cannot load users.");
         }
+      } finally {
+        endAppDataLoad();
       }
     }
 
@@ -329,7 +334,7 @@ export default function SitesPage() {
   return (
     <AppShell>
       <div className="sitesPage">
-        <FeedbackPopups loading={isLoading} loadingMessage={t("pm.loadingSubtitle")} alertMessage={error ?? usersError} />
+        <FeedbackPopups alertMessage={error ?? usersError} />
         <PageTitle
           title={t("sites.title")}
           subtitle={`${sites.length} ${t("sites.countSubtitle")}`}
@@ -799,7 +804,14 @@ function SiteModal({
         </nav>
 
         <div className="modalBody">{content}</div>
-        <AlertPopup open={Boolean(saveError)} tone="error" message={saveError} onClose={() => setSaveError("")} />
+        <AlertPopup
+          message={saveError}
+          open={Boolean(saveError)}
+          title={t("feedback.saveFailed")}
+          tone="error"
+          variant="status"
+          onClose={() => setSaveError("")}
+        />
 
         <footer className="modalFooter">
           <div className="modalFooterActions">

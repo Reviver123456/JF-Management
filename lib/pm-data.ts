@@ -207,6 +207,22 @@ export function getDateString(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
+export function formatVisitTime(time: string | null | undefined) {
+  const value = (time ?? "").trim();
+
+  if (!value) {
+    return "";
+  }
+
+  const match = value.match(/^(\d{1,2}):(\d{2})(?::\d{2})?/);
+
+  if (match) {
+    return `${match[1].padStart(2, "0")}:${match[2]}`;
+  }
+
+  return value;
+}
+
 export function getWorkSitesByDate(sites: SiteRecord[], date: string) {
   return sites.filter((site) => site.visitDate === date);
 }

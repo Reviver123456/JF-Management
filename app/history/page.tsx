@@ -35,8 +35,8 @@ const allOwnersValue = "__all";
 
 export default function HistoryPage() {
   const { lang, t } = useUi();
-  const { data, error, isLoading } = usePmData();
-  const { error: userError, isLoading: isUserLoading, userName } = useCurrentUser();
+  const { data, error } = usePmData();
+  const { error: userError, userName } = useCurrentUser();
   const reportRows = data.reportRows;
   const [query, setQuery] = useState("");
   const [resultFilter, setResultFilter] = useState("");
@@ -94,7 +94,7 @@ export default function HistoryPage() {
         </div>
       ) : (
         <div className="historyPage">
-          <FeedbackPopups loading={isLoading || isUserLoading} loadingMessage={t("pm.loadingSubtitle")} alertMessage={error ?? userError} />
+          <FeedbackPopups alertMessage={error ?? userError} />
           <PageTitle title={t("history.title")} subtitle={t("history.subtitle")} />
           <section className="toolbar">
             <div className="historyFilterField">

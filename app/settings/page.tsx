@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { Eye, EyeOff, Languages, LockKeyhole, Moon, PenLine, RotateCcw, Save, Sun, UserRound, X } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { FeedbackPopups } from "@/components/AppPopup";
+import { PwaInstallSection } from "@/components/PwaInstallSection";
 import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
@@ -108,6 +109,7 @@ export default function SettingsPage() {
       <FeedbackPopups
         alertMessage={message || (saved ? t("settings.saved") : "")}
         alertTone={message ? "error" : "success"}
+        alertVariant="status"
       />
       <PageTitle
         title={t("settings.title")}
@@ -166,6 +168,8 @@ export default function SettingsPage() {
               <button className={lang === "en" ? "activeOption" : "option"} type="button" onClick={() => setLang("en")}>{t("settings.english")}</button>
             </div>
           </article>
+
+          <PwaInstallSection />
         </div>
       </section>
       </div>

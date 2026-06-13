@@ -17,6 +17,7 @@ import {
   type ScheduleDay,
   type SiteCatalogRecord
 } from "@/lib/pm-data";
+import { beginAppDataLoad, endAppDataLoad } from "@/lib/app-data-loading";
 import { usePmData } from "@/lib/use-pm-data";
 
 const weekDaysByLang: Record<Lang, string[]> = {
@@ -91,8 +92,8 @@ function getMonthPlan(lang: Lang, pmJobs: PmJobRecord[], siteCatalog: SiteCatalo
 
 export default function SchedulePage() {
   const { lang, t } = useUi();
-  const { data, error, isLoading, reload } = usePmData();
-  const { error: userError, isLoading: isUserLoading, userName } = useCurrentUser();
+  const { data, error, reload } = usePmData();
+  const { error: userError, userName } = useCurrentUser();
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [usersError, setUsersError] = useState("");
   const [yearMonth, setYearMonth] = useState(() => getDateString().slice(0, 7));
@@ -156,13 +157,14 @@ export default function SchedulePage() {
     [data.siteCatalog, selectedDate, visiblePmJobs]
   );
   const trailingBlankDays = (7 - ((month.leadingBlankDays + month.dayCount) % 7)) % 7;
-  const pageIsLoading = isLoading || isUserLoading;
   const followersLabel = lang === "th" ? "ผู้ติดตาม" : "Followers";
 
   useEffect(() => {
     let isCurrent = true;
 
     async function loadSystemUsers() {
+      beginAppDataLoad();
+
       try {
         const response = await fetch("/api/auth/users", { cache: "no-store" });
         const payload = await response.json() as { users?: SystemUser[]; message?: string };
@@ -179,6 +181,8 @@ export default function SchedulePage() {
         if (isCurrent) {
           setUsersError(loadError instanceof Error ? loadError.message : "Cannot load users.");
         }
+      } finally {
+        endAppDataLoad();
       }
     }
 
@@ -296,11 +300,16 @@ export default function SchedulePage() {
     <AppShell>
       <div className="schedulePage">
         <FeedbackPopups
-          loading={pageIsLoading}
-          loadingMessage={t("pm.loadingSubtitle")}
           alertMessage={error ?? userError ?? usersError}
         />
-        <AlertPopup open={Boolean(actionMessage)} tone={actionTone} message={actionMessage} onClose={() => setActionMessage("")} />
+        <AlertPopup
+          message={actionMessage}
+          open={Boolean(actionMessage)}
+          title={actionTone === "success" ? t("feedback.saveSuccess") : t("feedback.saveFailed")}
+          tone={actionTone}
+          variant="status"
+          onClose={() => setActionMessage("")}
+        />
         <PageTitle
           title={t("schedule.title")}
           subtitle={t("schedule.subtitle")}
@@ -710,7 +719,14 @@ function AddPlanModal({
             ))}
           </div>
         ) : null}
-        <AlertPopup open={Boolean(saveError)} tone="error" message={saveError} onClose={() => setSaveError("")} />
+        <AlertPopup
+          message={saveError}
+          open={Boolean(saveError)}
+          title={t("feedback.saveFailed")}
+          tone="error"
+          variant="status"
+          onClose={() => setSaveError("")}
+        />
         <footer className="modalActions">
           {mode === "edit" && onDelete ? (
             <button className="button danger" type="button" disabled={deleting || isSaving} onClick={onDelete}>

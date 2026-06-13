@@ -6,7 +6,9 @@ import Image from "next/image";
 import { LockKeyhole, UserRound } from "lucide-react";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { clearAppBrowserCache } from "@/lib/auth/clear-app-cache";
+import { readRememberedLogin, writeRememberedLogin } from "@/lib/auth/remember-login";
 import { useUi } from "@/lib/i18n";
+import { usePageEnterProps } from "@/components/PageEnterTransition";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -18,6 +20,8 @@ export default function LoginPage() {
   const [messageTone, setMessageTone] = useState<"error" | "success">("error");
   const [resetMode, setResetMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rememberPassword, setRememberPassword] = useState(false);
+  const pageEnterProps = usePageEnterProps("loginPage", "login");
 
   useEffect(() => {
     let isCurrent = true;
@@ -30,6 +34,11 @@ export default function LoginPage() {
       if (!isCurrent) {
         return;
       }
+
+      const remembered = readRememberedLogin();
+      setRememberPassword(remembered.remember);
+      setEmail(remembered.email);
+      setPassword(remembered.password);
     }
 
     void prepareLoginPage();
@@ -85,8 +94,9 @@ export default function LoginPage() {
 
     await fetch("/api/auth/cleanup-metadata", { method: "POST" });
     await supabase.auth.refreshSession();
+    writeRememberedLogin(rememberPassword, normalizedEmail, password);
 
-    router.replace("/dashboard");
+    router.replace("/loading");
     router.refresh();
   };
   const sendPasswordReset = async () => {
@@ -121,8 +131,14 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="loginPage">
-      <FeedbackPopups loading={isSubmitting} loadingMessage={t("pm.loadingSubtitle")} alertMessage={message} alertTone={messageTone} />
+    <main {...pageEnterProps}>
+      <FeedbackPopups
+        alertMessage={message}
+        alertTone={messageTone}
+        alertVariant={messageTone === "success" && message ? "status" : "default"}
+        loading={isSubmitting}
+        loadingMessage={t("pm.loadingSubtitle")}
+      />
       <section className="card">
         <div className="brand brandLogo">
           <Image src="/report-templates/LOGO-JF.webp" alt="JF Advance Med" width={360} height={112} priority />
@@ -159,24 +175,34 @@ export default function LoginPage() {
             </span>
           </label>
           {resetMode ? null : (
-            <label className="label">
-              {t("login.password")}
-              <span className="inputWrap">
-                <LockKeyhole size={16} />
+            <>
+              <label className="label">
+                {t("login.password")}
+                <span className="inputWrap">
+                  <LockKeyhole size={16} />
+                  <input
+                    className="field"
+                    type="password"
+                    autoComplete="current-password"
+                    minLength={8}
+                    required
+                    value={password}
+                    onChange={(event) => {
+                      setPassword(event.target.value);
+                      setMessage("");
+                    }}
+                  />
+                </span>
+              </label>
+              <label className="loginRememberToggle">
                 <input
-                  className="field"
-                  type="password"
-                  autoComplete="current-password"
-                  minLength={8}
-                  required
-                  value={password}
-                  onChange={(event) => {
-                    setPassword(event.target.value);
-                    setMessage("");
-                  }}
+                  checked={rememberPassword}
+                  type="checkbox"
+                  onChange={(event) => setRememberPassword(event.target.checked)}
                 />
-              </span>
-            </label>
+                <span>{t("login.remember")}</span>
+              </label>
+            </>
           )}
           <button className="button primary" type="submit" disabled={isSubmitting}>
             {resetMode ? "ส่งลิงก์รหัสผ่าน" : t("login.signIn")}

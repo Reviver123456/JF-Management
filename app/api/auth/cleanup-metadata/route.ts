@@ -19,7 +19,8 @@ export async function POST() {
       return NextResponse.json({ ok: true, changed: false });
     }
 
-    const { signature: _removedSignature, ...metadataWithoutSignature } = metadata;
+    const metadataWithoutSignature = { ...metadata };
+    delete metadataWithoutSignature.signature;
     const adminClient = createAdminClient();
     const { error: updateError } = await adminClient.auth.admin.updateUserById(user.id, {
       user_metadata: {

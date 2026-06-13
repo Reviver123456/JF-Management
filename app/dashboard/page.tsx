@@ -2,14 +2,17 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { Building2, CalendarCheck2, CheckCircle2, Clock3, ClipboardCheck, MapPin, Timer } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { FeedbackPopups } from "@/components/AppPopup";
+import { usePageEnterVisible } from "@/components/PageEnterTransition";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { useUi } from "@/lib/i18n";
 import {
   filterPmJobsByParticipant,
   filterSitesByOwner,
+  formatVisitTime,
   getDateString,
   getSiteRecordJobKey,
   getUniquePmJobs,
@@ -43,8 +46,8 @@ const statusLabelKeys = {
 
 export default function DashboardPage() {
   const { t } = useUi();
-  const { data, error, isLoading } = usePmData();
-  const { error: userError, isLoading: isUserLoading, userName } = useCurrentUser();
+  const { data, error } = usePmData();
+  const { error: userError, userName } = useCurrentUser();
   const [selectedOwner, setSelectedOwner] = useState("");
   const activeOwner = selectedOwner || userName || allOwnersValue;
   const showAllOwners = activeOwner === allOwnersValue;
@@ -70,9 +73,9 @@ export default function DashboardPage() {
   const visiblePmJobs = getUniquePmJobs(showAllOwners ? data.pmJobs : filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, activeOwner));
   const visiblePmJobKeys = new Set(visiblePmJobs.map((job) => `${job.siteId}:${job.visitDate}:${job.visitTime}`));
   const sites = data.sites.filter((site) => visiblePmJobKeys.has(getSiteRecordJobKey(site)));
-  const ownerWorkloadJobs = getUniquePmJobs(filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, userName));
-  const ownerWorkloadKeys = new Set(ownerWorkloadJobs.map((job) => `${job.siteId}:${job.visitDate}:${job.visitTime}`));
-  const workloadSites = data.sites.filter((site) => ownerWorkloadKeys.has(getSiteRecordJobKey(site)));
+  const teamPmJobs = getUniquePmJobs(data.pmJobs);
+  const teamPmJobKeys = new Set(teamPmJobs.map((job) => `${job.siteId}:${job.visitDate}:${job.visitTime}`));
+  const teamSites = data.sites.filter((site) => teamPmJobKeys.has(getSiteRecordJobKey(site)));
   const currentMonth = todayDate.slice(0, 7);
   const metrics: Metric[] = [
     { id: "sites", value: String(assignedSites.length), trend: "+0", color: "blue" },
@@ -81,16 +84,21 @@ export default function DashboardPage() {
     { id: "backlog", value: String(visiblePmJobs.filter((job) => job.status === "pending" || job.status === "inProgress").length), trend: "", color: "orange" }
   ];
   const today = getWorkSitesByDate(sites, todayDate);
-  const completedCount = workloadSites.filter((site) => site.status === "completed").length;
-  const inProgressCount = workloadSites.filter((site) => site.status === "inProgress").length;
-  const backlogCount = workloadSites.filter((site) => site.status === "pending").length;
-  const abnormalCount = workloadSites.filter((site) => site.status === "abnormal").length;
+  const teamCompletedCount = teamSites.filter((site) => site.status === "completed").length;
+  const teamInProgressCount = teamSites.filter((site) => site.status === "inProgress").length;
+  const teamBacklogCount = teamSites.filter((site) => site.status === "pending").length;
+  const teamAbnormalCount = teamSites.filter((site) => site.status === "abnormal").length;
+  const teamBarMax = Math.max(1, teamCompletedCount, teamInProgressCount, teamBacklogCount, teamAbnormalCount);
+  const getTeamBarWidth = (count: number) => `${count === 0 ? 0 : Math.max(10, Math.round((count / teamBarMax) * 100))}%`;
+  const teamBarsReady = usePageEnterVisible("dashboard-team-bars");
   const nextSite = sites.find((site) => site.visitDate >= todayDate);
 
   return (
     <AppShell>
       <div className="dashboardPage">
-        <FeedbackPopups loading={isLoading || isUserLoading} loadingMessage={t("pm.loadingSubtitle")} alertMessage={error ?? userError} />
+        <FeedbackPopups
+          alertMessage={error ?? userError}
+        />
         <PageTitle
           title={t("dashboard.title")}
           subtitle={t("dashboard.subtitle")}
@@ -143,7 +151,7 @@ export default function DashboardPage() {
                 const status = statusMeta[site.status];
                 return (
                   <div className="jobRow" key={site.id}>
-                    <span className="timeBadge">{site.visitTime}</span>
+                    <span className="timeBadge">{formatVisitTime(site.visitTime)}</span>
                     <div>
                       <strong>{site.site}</strong>
                       <small>
@@ -160,32 +168,38 @@ export default function DashboardPage() {
             </div>
           </article>
 
-          <aside className="panel">
+          <aside className="panel dashboardTeamPanel">
             <div className="panelHeader">
-              <h2>{t("dashboard.workload")}</h2>
+              <h2>{t("dashboard.teamWorkload")}</h2>
+              <span>{teamSites.length} {t("common.jobs")}</span>
             </div>
-            <div className="resultBars">
+            <div className="resultBars" data-ready={teamBarsReady ? "true" : "false"}>
               <div>
                 <span>{t("workStatus.completed")}</span>
-                <strong>{completedCount}</strong>
-                <i className="greenBar" />
+                <strong>{teamCompletedCount}</strong>
+                <i className="greenBar" style={{ "--bar-width": getTeamBarWidth(teamCompletedCount) } as CSSProperties} />
+              </div>
+              <div>
+                <span>{t("workStatus.inProgress")}</span>
+                <strong>{teamInProgressCount}</strong>
+                <i className="blueBar" style={{ "--bar-width": getTeamBarWidth(teamInProgressCount) } as CSSProperties} />
               </div>
               <div>
                 <span>{t("dashboard.backlog")}</span>
-                <strong>{backlogCount}</strong>
-                <i className="yellowBar" />
+                <strong>{teamBacklogCount}</strong>
+                <i className="yellowBar" style={{ "--bar-width": getTeamBarWidth(teamBacklogCount) } as CSSProperties} />
               </div>
               <div>
                 <span>{t("workStatus.abnormal")}</span>
-                <strong>{abnormalCount}</strong>
-                <i className="redBar" />
+                <strong>{teamAbnormalCount}</strong>
+                <i className="redBar" style={{ "--bar-width": getTeamBarWidth(teamAbnormalCount) } as CSSProperties} />
               </div>
             </div>
             <div className="legend">
-              <span><b className="dotGreen" />{t("workStatus.completed")} <strong>{completedCount}</strong></span>
-              <span><b className="dotBlue" />{t("workStatus.inProgress")} <strong>{inProgressCount}</strong></span>
-              <span><b className="dotYellow" />{t("dashboard.backlog")} <strong>{backlogCount}</strong></span>
-              <span><b className="dotRed" />{t("workStatus.abnormal")} <strong>{abnormalCount}</strong></span>
+              <span><b className="dotGreen" />{t("workStatus.completed")} <strong>{teamCompletedCount}</strong></span>
+              <span><b className="dotBlue" />{t("workStatus.inProgress")} <strong>{teamInProgressCount}</strong></span>
+              <span><b className="dotYellow" />{t("dashboard.backlog")} <strong>{teamBacklogCount}</strong></span>
+              <span><b className="dotRed" />{t("workStatus.abnormal")} <strong>{teamAbnormalCount}</strong></span>
             </div>
           </aside>
         </section>
@@ -193,7 +207,7 @@ export default function DashboardPage() {
         <section className="compactPanel">
           <CalendarCheck2 size={18} />
           <span>
-            {t("dashboard.nextSite")}: {nextSite ? `${nextSite.site} · ${nextSite.visitDate} · ${nextSite.visitTime}` : "-"}
+            {t("dashboard.nextSite")}: {nextSite ? `${nextSite.site} · ${nextSite.visitDate} · ${formatVisitTime(nextSite.visitTime)}` : "-"}
           </span>
         </section>
       </div>

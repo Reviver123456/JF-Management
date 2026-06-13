@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { beginAppDataLoad, endAppDataLoad } from "@/lib/app-data-loading";
+import { cacheUserProfile, readCachedUserProfile } from "@/lib/app-bootstrap-cache";
 import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { createClient } from "@/lib/supabase/client";
 
@@ -40,19 +42,47 @@ async function loadSignatureFromDb(localFallback: string) {
 }
 
 export function useCurrentUser(): CurrentUserState {
-  const [state, setState] = useState<CurrentUserState>({
+  const [state, setState] = useState<CurrentUserState>(() => ({
     email: "",
     error: null,
     isLoading: true,
     signature: "",
     userName: ""
-  });
+  }));
 
   useEffect(() => {
     let isCurrent = true;
     const supabase = createClient();
+    const cachedProfile = readCachedUserProfile();
+    let frame = 0;
+
+    if (cachedProfile) {
+      frame = window.requestAnimationFrame(() => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setState({
+          email: cachedProfile.email,
+          error: null,
+          isLoading: false,
+          signature: cachedProfile.signature,
+          userName: cachedProfile.userName
+        });
+      });
+    }
 
     async function loadCurrentUser() {
+      beginAppDataLoad();
+
+      if (isCurrent) {
+        setState((current) => ({
+          ...current,
+          error: null,
+          isLoading: true
+        }));
+      }
+
       try {
         const {
           data: { user },
@@ -78,12 +108,17 @@ export function useCurrentUser(): CurrentUserState {
         }
 
         if (isCurrent) {
-          setState({
+          const profile = {
             email: userEmail,
-            error: null,
-            isLoading: false,
             signature,
             userName
+          };
+
+          cacheUserProfile(profile);
+          setState({
+            ...profile,
+            error: null,
+            isLoading: false
           });
         }
       } catch (error) {
@@ -96,6 +131,8 @@ export function useCurrentUser(): CurrentUserState {
             userName: ""
           });
         }
+      } finally {
+        endAppDataLoad();
       }
     }
 
@@ -103,6 +140,7 @@ export function useCurrentUser(): CurrentUserState {
 
     return () => {
       isCurrent = false;
+      window.cancelAnimationFrame(frame);
     };
   }, []);
 
