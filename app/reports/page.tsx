@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
+  ArrowLeft,
   CalendarDays,
   Download,
   Eye,
   MapPin,
   Printer,
-  UserRound,
-  X
+  UserRound
 } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
 import { FeedbackPopups } from "@/components/AppPopup";
@@ -50,6 +50,7 @@ import {
   type SiteCatalogRecord
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
+import { usePageShellLoading } from "@/lib/use-page-shell-loading";
 
 type ChecklistTemplateKey = "synapse" | "server" | "switch" | "storage" | "environment" | "diag";
 
@@ -80,8 +81,9 @@ const checklistTemplates: ChecklistTemplate[] = [
 
 export default function ReportsPage() {
   const { lang, t } = useUi();
-  const { email, signature, userName } = useCurrentUser();
-  const { data, error } = usePmData();
+  const { email, isLoading: userLoading, signature, userName } = useCurrentUser();
+  const { data, error, isLoading } = usePmData();
+  const pageLoading = usePageShellLoading(isLoading, userLoading);
   const [query, setQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -111,43 +113,12 @@ export default function ReportsPage() {
   };
 
   return (
-    <AppShell>
+    <AppShell loading={pageLoading}>
       <div className="reportsPage">
         <FeedbackPopups alertMessage={error} />
-        <PageTitle title={t("reports.title")} subtitle={t("reports.subtitle")} />
-
-        <section className="toolbar reportToolbar">
-          <div className="reportFilterField">
-            <span>{t("common.search")}</span>
-            <SearchControl placeholder={t("reports.searchInput")} value={query} onChange={setQuery} />
-          </div>
-          <label className="reportFilterField">
-            <span>{t("reports.startDate")}</span>
-            <input className="field" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-          </label>
-          <label className="reportFilterField">
-            <span>{t("reports.endDate")}</span>
-            <input className="field" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
-          </label>
-          <label className="reportFilterField">
-            <span>{t("common.inspector")}</span>
-            <select className="select" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
-              <option value={allOwnersValue}>{t("common.all")}</option>
-              {ownerOptions.map((owner) => (
-                <option key={owner} value={owner}>{owner}</option>
-              ))}
-            </select>
-          </label>
-        </section>
-
-        <ChecklistReportPanel
-          filteredReports={filteredReports}
-          lang={lang}
-          onPreviewReport={openReportPreview}
-        />
 
         {preview ? (
-          <PreviewModal
+          <ReportPreviewPage
             pmJobs={data.pmJobs}
             preview={preview}
             responsibleName={responsibleName}
@@ -155,7 +126,41 @@ export default function ReportsPage() {
             onClose={() => setPreview(null)}
             onContractIndexChange={(contractIndex) => setPreview((current) => current ? { ...current, contractIndex } : current)}
           />
-        ) : null}
+        ) : (
+          <>
+            <PageTitle title={t("reports.title")} subtitle={t("reports.subtitle")} />
+
+            <section className="toolbar reportToolbar">
+              <div className="reportFilterField">
+                <span>{t("common.search")}</span>
+                <SearchControl placeholder={t("reports.searchInput")} value={query} onChange={setQuery} />
+              </div>
+              <label className="reportFilterField">
+                <span>{t("reports.startDate")}</span>
+                <input className="field" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+              </label>
+              <label className="reportFilterField">
+                <span>{t("reports.endDate")}</span>
+                <input className="field" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+              </label>
+              <label className="reportFilterField">
+                <span>{t("common.inspector")}</span>
+                <select className="select" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
+                  <option value={allOwnersValue}>{t("common.all")}</option>
+                  {ownerOptions.map((owner) => (
+                    <option key={owner} value={owner}>{owner}</option>
+                  ))}
+                </select>
+              </label>
+            </section>
+
+            <ChecklistReportPanel
+              filteredReports={filteredReports}
+              lang={lang}
+              onPreviewReport={openReportPreview}
+            />
+          </>
+        )}
       </div>
     </AppShell>
   );
@@ -1263,7 +1268,7 @@ function getStoredUserSignature(email: string) {
   return window.localStorage.getItem(getUserSignatureStorageKey(email)) ?? "";
 }
 
-function PreviewModal({
+function ReportPreviewPage({
   onClose,
   onContractIndexChange,
   pmJobs,
@@ -1401,85 +1406,76 @@ function PreviewModal({
   };
 
   return (
-    <div
-      className={`overlay${showPreview ? " overlayReportPreview" : ""}`}
-      role="dialog"
-      aria-modal="true"
-      aria-label={preview.title}
-      onMouseDown={(event) => {
-        if (!showPreview && event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      <article className={`modal previewModal${showPreview ? " previewModalExpanded previewModalReportOnly" : ""}`}>
-        {showPreview ? (
-          <button
-            className="reportPreviewFloatBack"
-            type="button"
-            aria-label={t("common.back")}
-            onClick={() => setShowPreview(false)}
-          >
-            <X size={18} />
-          </button>
-        ) : (
-          <>
-            <div className="modalHeader">
-              <h2>{preview.title}</h2>
-              <button type="button" onClick={onClose} aria-label={t("common.close")}><X size={18} /></button>
-            </div>
-            <div className="reportModalControls">
-              <label className="label">
-                เลือกสัญญา
-                <select className="select" value={preview.contractIndex} onChange={(event) => onContractIndexChange(Number(event.target.value))}>
-                  {contracts.map((contract, index) => (
-                    <option key={index} value={index}>{getSiteContractLabel(contract, index)}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="label">
-                ประเภทไฟล์
-                <select className="select" value={downloadType} onChange={(event) => setDownloadType(event.target.value as "pdf" | "word" | "excel")}>
-                  <option value="pdf">PDF</option>
-                  <option value="word">Word</option>
-                  <option value="excel">Excel</option>
-                </select>
-              </label>
-              <button className="button subtle" type="button" onClick={printReport}>
-                <Printer size={16} />
-                {t("common.print")}
-              </button>
-              <button className="button subtle" type="button" onClick={() => void downloadReport()}>
-                <Download size={16} />
-                {t("common.download")}
-              </button>
-              <button className="button primary" type="button" onClick={() => setShowPreview(true)}>
-                <Eye size={16} />
-                {t("reports.preview")}
-              </button>
-            </div>
-            {exportMessage ? <p className="reportExportMessage">{exportMessage}</p> : null}
-          </>
-        )}
-        <div
-          ref={viewportRef}
-          className={showPreview ? "reportPreviewViewport" : "reportDocumentHidden"}
-          aria-hidden={!showPreview}
+    <div className={`reportEditorPage${showPreview ? " reportEditorPagePreview" : ""}`}>
+      <header className="reportEditorHeader">
+        <button
+          aria-label={t("common.back")}
+          className="reportEditorBackButton"
+          type="button"
+          onClick={showPreview ? () => setShowPreview(false) : onClose}
         >
-          <div ref={scaleShellRef} className="reportPreviewScaleShell">
-            <div ref={documentRef} className="reportDocumentStack">
-              <ReportDocumentPacket
-                contractIndex={preview.contractIndex}
-                pmJobs={pmJobs}
-                responsibleName={responsibleName}
-                responsibleSignature={responsibleSignature}
-                row={preview.row}
-                site={preview.site}
-              />
-            </div>
+          <ArrowLeft size={18} />
+        </button>
+        <div>
+          <h1>{preview.title}</h1>
+          {!showPreview ? <p>{selectedContractLabel}</p> : null}
+        </div>
+      </header>
+
+      {!showPreview ? (
+        <div className="reportEditorBody">
+          <div className="reportModalControls">
+            <label className="label">
+              เลือกสัญญา
+              <select className="select" value={preview.contractIndex} onChange={(event) => onContractIndexChange(Number(event.target.value))}>
+                {contracts.map((contract, index) => (
+                  <option key={index} value={index}>{getSiteContractLabel(contract, index)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="label">
+              ประเภทไฟล์
+              <select className="select" value={downloadType} onChange={(event) => setDownloadType(event.target.value as "pdf" | "word" | "excel")}>
+                <option value="pdf">PDF</option>
+                <option value="word">Word</option>
+                <option value="excel">Excel</option>
+              </select>
+            </label>
+            <button className="button subtle" type="button" onClick={printReport}>
+              <Printer size={16} />
+              {t("common.print")}
+            </button>
+            <button className="button subtle" type="button" onClick={() => void downloadReport()}>
+              <Download size={16} />
+              {t("common.download")}
+            </button>
+            <button className="button primary" type="button" onClick={() => setShowPreview(true)}>
+              <Eye size={16} />
+              {t("reports.preview")}
+            </button>
+          </div>
+          {exportMessage ? <p className="reportExportMessage">{exportMessage}</p> : null}
+        </div>
+      ) : null}
+
+      <div
+        ref={viewportRef}
+        className={showPreview ? "reportPreviewViewport" : "reportDocumentHidden"}
+        aria-hidden={!showPreview}
+      >
+        <div ref={scaleShellRef} className="reportPreviewScaleShell">
+          <div ref={documentRef} className="reportDocumentStack">
+            <ReportDocumentPacket
+              contractIndex={preview.contractIndex}
+              pmJobs={pmJobs}
+              responsibleName={responsibleName}
+              responsibleSignature={responsibleSignature}
+              row={preview.row}
+              site={preview.site}
+            />
           </div>
         </div>
-      </article>
+      </div>
     </div>
   );
 }

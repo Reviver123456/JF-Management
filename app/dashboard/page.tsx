@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { Building2, CalendarCheck2, CheckCircle2, Clock3, ClipboardCheck, MapPin, Timer } from "lucide-react";
@@ -22,6 +23,7 @@ import {
   type Metric
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
+import { usePageShellLoading } from "@/lib/use-page-shell-loading";
 
 const allOwnersValue = "__all";
 
@@ -46,8 +48,9 @@ const statusLabelKeys = {
 
 export default function DashboardPage() {
   const { t } = useUi();
-  const { data, error } = usePmData();
-  const { error: userError, userName } = useCurrentUser();
+  const { data, error, isLoading } = usePmData();
+  const { error: userError, isLoading: userLoading, userName } = useCurrentUser();
+  const pageLoading = usePageShellLoading(isLoading, userLoading);
   const [selectedOwner, setSelectedOwner] = useState("");
   const activeOwner = selectedOwner || userName || allOwnersValue;
   const showAllOwners = activeOwner === allOwnersValue;
@@ -90,11 +93,12 @@ export default function DashboardPage() {
   const teamAbnormalCount = teamSites.filter((site) => site.status === "abnormal").length;
   const teamBarMax = Math.max(1, teamCompletedCount, teamInProgressCount, teamBacklogCount, teamAbnormalCount);
   const getTeamBarWidth = (count: number) => `${count === 0 ? 0 : Math.max(10, Math.round((count / teamBarMax) * 100))}%`;
-  const teamBarsReady = usePageEnterVisible("dashboard-team-bars");
+  const pathname = usePathname();
+  const teamBarsReady = usePageEnterVisible(pathname, !pageLoading);
   const nextSite = sites.find((site) => site.visitDate >= todayDate);
 
   return (
-    <AppShell>
+    <AppShell loading={pageLoading}>
       <div className="dashboardPage">
         <FeedbackPopups
           alertMessage={error ?? userError}

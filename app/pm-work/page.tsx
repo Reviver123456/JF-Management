@@ -67,8 +67,8 @@ import {
   type PmWorkDetails,
   type SiteRecord
 } from "@/lib/pm-data";
-import { beginAppDataLoad, endAppDataLoad } from "@/lib/app-data-loading";
 import { usePmData } from "@/lib/use-pm-data";
+import { usePageShellLoading } from "@/lib/use-page-shell-loading";
 
 const allOwnersValue = "__all";
 type CheckResult = "ok" | "bad";
@@ -291,7 +291,7 @@ function PmWorkFallback() {
   const { t } = useUi();
 
   return (
-    <AppShell>
+    <AppShell loading>
       <div className="pmWorkPage">
         <PageTitle title={t("pm.title")} subtitle={t("pm.loadingSubtitle")} />
       </div>
@@ -301,10 +301,12 @@ function PmWorkFallback() {
 
 function PmWorkContent() {
   const { t } = useUi();
-  const { data, error, reload } = usePmData();
-  const { error: userError, userName, signature: userSignature } = useCurrentUser();
+  const { data, error, isLoading, reload } = usePmData();
+  const { error: userError, isLoading: userLoading, userName, signature: userSignature } = useCurrentUser();
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [usersError, setUsersError] = useState("");
+  const [usersLoading, setUsersLoading] = useState(true);
+  const pageLoading = usePageShellLoading(isLoading, userLoading, usersLoading);
   const router = useRouter();
   const searchParams = useSearchParams();
   const siteIdParam = searchParams.get("siteId");
@@ -330,7 +332,7 @@ function PmWorkContent() {
     let isCurrent = true;
 
     async function loadSystemUsers() {
-      beginAppDataLoad();
+      setUsersLoading(true);
 
       try {
         const response = await fetch("/api/auth/users", { cache: "no-store" });
@@ -349,7 +351,9 @@ function PmWorkContent() {
           setUsersError(loadError instanceof Error ? loadError.message : "Cannot load users.");
         }
       } finally {
-        endAppDataLoad();
+        if (isCurrent) {
+          setUsersLoading(false);
+        }
       }
     }
 
@@ -410,7 +414,7 @@ function PmWorkContent() {
     : `${t("pm.todayOnlySubtitle")} · ${todayDate}`;
 
   return (
-    <AppShell>
+    <AppShell loading={pageLoading}>
       <div className="pmWorkPage">
         <FeedbackPopups
           alertMessage={error ?? userError ?? usersError}
@@ -842,6 +846,18 @@ function DetailView({
         ? (lang === "th" ? "บันทึกร่างอัตโนมัติไม่สำเร็จ" : "Draft autosave failed")
         : (lang === "th" ? "บันทึกร่างอัตโนมัติ" : "Draft autosave enabled");
 
+  if (photoPopupOpen) {
+    return (
+      <PhotoEditorPage
+        photoNotes={photoNotes}
+        photos={photos}
+        onAddPhotoFiles={addPhotoFiles}
+        onClose={() => setPhotoPopupOpen(false)}
+        onNoteChange={setPhotoNote}
+      />
+    );
+  }
+
   return (
     <div className="detailPage">
       <FeedbackPopups
@@ -982,15 +998,6 @@ function DetailView({
             ))}
           </div>
         </div>
-        {photoPopupOpen ? (
-          <PhotoPopup
-            photoNotes={photoNotes}
-            photos={photos}
-            onAddPhotoFiles={addPhotoFiles}
-            onClose={() => setPhotoPopupOpen(false)}
-            onNoteChange={setPhotoNote}
-          />
-        ) : null}
       </section>
 
       <section className="card">
@@ -1105,7 +1112,7 @@ function RequiredLabel({ label, required = true }: { label: string; required?: b
   );
 }
 
-function PhotoPopup({
+function PhotoEditorPage({
   photoNotes,
   photos,
   onAddPhotoFiles,
@@ -1121,14 +1128,17 @@ function PhotoPopup({
   const { t } = useUi();
 
   return (
-    <div className="photoPopupOverlay" role="dialog" aria-modal="true" aria-label={t("pm.photos")}>
-      <article className="photoPopup">
-        <header className="photoPopupHeader">
-          <h3><Camera size={16} /> {t("pm.photos")}</h3>
-          <button type="button" onClick={onClose} aria-label={t("common.close")}>
-            <X size={18} />
-          </button>
-        </header>
+    <div className="photoEditorPage">
+      <header className="photoEditorHeader">
+        <button aria-label={t("common.back")} className="photoEditorBackButton" type="button" onClick={onClose}>
+          <ArrowLeft size={18} />
+        </button>
+        <div>
+          <h1><Camera size={20} /> {t("pm.photos")}</h1>
+        </div>
+      </header>
+
+      <div className="photoEditorBody">
         <div className="photoPopupList">
           {photoUploadItems.map((item) => (
             <section className="photoPopupItem" key={item.key}>
@@ -1175,10 +1185,11 @@ function PhotoPopup({
             </section>
           ))}
         </div>
-        <footer className="photoPopupActions">
-          <button className="button primary" type="button" onClick={onClose}>{t("common.done")}</button>
-        </footer>
-      </article>
+      </div>
+
+      <footer className="photoEditorFooter">
+        <button className="button primary" type="button" onClick={onClose}>{t("common.done")}</button>
+      </footer>
     </div>
   );
 }

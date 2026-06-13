@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  ArrowLeft,
   Building2,
   Check,
   ChevronRight,
@@ -15,9 +16,11 @@ import {
 } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
 import { AlertPopup, FeedbackPopups } from "@/components/AppPopup";
+import { Pagination } from "@/components/Pagination";
 import type { SystemUser } from "@/lib/auth/system-users";
 import { useUi } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
+import { paginate } from "@/lib/pagination";
 import {
   defaultPmChecklistConfig,
   normalizePmChecklistConfig,
@@ -49,8 +52,8 @@ import {
   type SiteContractDetails,
   type SiteContractItem
 } from "@/lib/pm-data";
-import { beginAppDataLoad, endAppDataLoad } from "@/lib/app-data-loading";
 import { usePmData } from "@/lib/use-pm-data";
+import { usePageShellLoading } from "@/lib/use-page-shell-loading";
 
 type SiteTab = "customer" | "contract" | "synapse" | "server" | "switch" | "storage" | "environment" | "diag";
 type InspectionTab = PmChecklistKey;
@@ -258,24 +261,31 @@ function readContractChecklistConfig(siteId: string, contractDetails: SiteContra
   return defaultContractChecklistConfig();
 }
 
+const SITES_PAGE_SIZE = 10;
+
 export default function SitesPage() {
   const { t } = useUi();
-  const { data, error, reload } = usePmData();
+  const { data, error, isLoading, reload } = usePmData();
   const sites = data.siteCatalog;
   const regions = data.regions;
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [usersError, setUsersError] = useState("");
+  const [usersLoading, setUsersLoading] = useState(true);
   const [modalSite, setModalSite] = useState<SiteCatalogRecord | null>(null);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
   const [query, setQuery] = useState("");
   const [regionFilter, setRegionFilter] = useState("");
   const [siteStatusFilter, setSiteStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const listTopRef = useRef<HTMLDivElement>(null);
+
+  const pageLoading = usePageShellLoading(isLoading, usersLoading);
 
   useEffect(() => {
     let isCurrent = true;
 
     async function loadSystemUsers() {
-      beginAppDataLoad();
+      setUsersLoading(true);
 
       try {
         const response = await fetch("/api/auth/users", { cache: "no-store" });
@@ -294,7 +304,9 @@ export default function SitesPage() {
           setUsersError(loadError instanceof Error ? loadError.message : "Cannot load users.");
         }
       } finally {
-        endAppDataLoad();
+        if (isCurrent) {
+          setUsersLoading(false);
+        }
       }
     }
 
@@ -321,6 +333,28 @@ export default function SitesPage() {
     });
   }, [query, regionFilter, siteStatusFilter, sites]);
 
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setPage(1);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [query, regionFilter, siteStatusFilter]);
+
+  const pagination = useMemo(
+    () => paginate(filteredSites, page, SITES_PAGE_SIZE),
+    [filteredSites, page]
+  );
+
+  const goToPage = useCallback((nextPage: number) => {
+    setPage(nextPage);
+    window.requestAnimationFrame(() => {
+      listTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
+
   const openAdd = () => {
     setModalMode("add");
     setModalSite(sites[0] ?? emptySite);
@@ -332,58 +366,9 @@ export default function SitesPage() {
   };
 
   return (
-    <AppShell>
+    <AppShell loading={pageLoading}>
       <div className="sitesPage">
         <FeedbackPopups alertMessage={error ?? usersError} />
-        <PageTitle
-          title={t("sites.title")}
-          subtitle={`${sites.length} ${t("sites.countSubtitle")}`}
-          actions={
-            <button className="button primary" type="button" onClick={openAdd}>
-              <Plus size={16} />
-              {t("sites.addSite")}
-            </button>
-          }
-        />
-
-        <section className="toolbar">
-          <SearchControl placeholder={t("sites.searchPlaceholder")} value={query} onChange={setQuery} />
-          <select className="select" value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)}>
-            <option value="">{t("sites.allRegions")}</option>
-            {regions.map((region) => (
-              <option key={region} value={region}>{region}</option>
-            ))}
-          </select>
-          <select className="select" value={siteStatusFilter} onChange={(event) => setSiteStatusFilter(event.target.value)}>
-            <option value="">{t("sites.allStatuses")}</option>
-            <option value="active">{t("common.active")}</option>
-            <option value="inactive">{t("common.inactive")}</option>
-          </select>
-        </section>
-
-        <section className="rows">
-          {filteredSites.length > 0 ? filteredSites.map((site) => {
-            const isActiveSite = site.owner.trim().length > 0;
-
-            return (
-              <button className="siteRow" key={site.id} type="button" onClick={() => openEdit(site)}>
-                <div>
-                  <strong>{site.site}</strong>
-                  <span className={`statusPill ${isActiveSite ? "success" : "warning"}`}>
-                    {isActiveSite ? t("common.active") : t("common.inactive")}
-                  </span>
-                </div>
-                <small>
-                  <UserRound size={13} /> {site.customer}
-                  <span>{t("common.phonePrefix")} {site.phone}</span>
-                  <span>{t("common.provincePrefix")} {site.province}</span>
-                  <span>{t("common.ownerPrefix")}: {site.owner || "-"}</span>
-                </small>
-                <ChevronRight size={18} />
-              </button>
-            );
-          }) : <EmptyState message={t("sites.noSites")} />}
-        </section>
 
         {modalSite ? (
           <SiteModal
@@ -394,7 +379,71 @@ export default function SitesPage() {
             onClose={() => setModalSite(null)}
             onSaved={reload}
           />
-        ) : null}
+        ) : (
+          <>
+            <PageTitle
+              title={t("sites.title")}
+              subtitle={`${filteredSites.length} ${t("sites.countSubtitle")}`}
+              actions={
+                <button className="button primary" type="button" onClick={openAdd}>
+                  <Plus size={16} />
+                  {t("sites.addSite")}
+                </button>
+              }
+            />
+
+            <section className="toolbar">
+              <SearchControl placeholder={t("sites.searchPlaceholder")} value={query} onChange={setQuery} />
+              <select className="select" value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)}>
+                <option value="">{t("sites.allRegions")}</option>
+                {regions.map((region) => (
+                  <option key={region} value={region}>{region}</option>
+                ))}
+              </select>
+              <select className="select" value={siteStatusFilter} onChange={(event) => setSiteStatusFilter(event.target.value)}>
+                <option value="">{t("sites.allStatuses")}</option>
+                <option value="active">{t("common.active")}</option>
+                <option value="inactive">{t("common.inactive")}</option>
+              </select>
+            </section>
+
+            <div ref={listTopRef} />
+
+            <section className="rows">
+              {pagination.items.length > 0 ? pagination.items.map((site) => {
+                const isActiveSite = site.owner.trim().length > 0;
+
+                return (
+                  <button className="siteRow" key={site.id} type="button" onClick={() => openEdit(site)}>
+                    <div>
+                      <strong>{site.site}</strong>
+                      <span className={`statusPill ${isActiveSite ? "success" : "warning"}`}>
+                        {isActiveSite ? t("common.active") : t("common.inactive")}
+                      </span>
+                    </div>
+                    <small>
+                      <UserRound size={13} /> {site.customer}
+                      <span>{t("common.phonePrefix")} {site.phone}</span>
+                      <span>{t("common.provincePrefix")} {site.province}</span>
+                      <span>{t("common.ownerPrefix")}: {site.owner || "-"}</span>
+                    </small>
+                    <ChevronRight size={18} />
+                  </button>
+                );
+              }) : <EmptyState message={t("sites.noSites")} />}
+            </section>
+
+            <Pagination
+              className="paginationBarBottom"
+              endIndex={pagination.endIndex}
+              page={pagination.page}
+              startIndex={pagination.startIndex}
+              totalItems={pagination.totalItems}
+              totalPages={pagination.totalPages}
+              onPageChange={goToPage}
+            />
+          </>
+        )}
       </div>
     </AppShell>
   );
@@ -777,91 +826,97 @@ function SiteModal({
     }
   }, [activeTab, addCustomChecklistItem, addInspectionSet, contractCount, customChecklistItemsBySection, diagMonitorCounts, inspectionSetCounts, itemLabelsBySection, regions, removeCustomChecklistItem, selectContractIndex, selectedChecklistItems, selectedContract, selectedContractIndex, selectedInspectionTabs, selectedOwner, site, systemUsers, t, toggleChecklistItem, toggleInspectionTab, updateContractCount, updateCustomChecklistItem, updateDefaultChecklistItem, updateDiagMonitorCount, updateSelectedContract]);
 
-  return (
-    <div className="overlay" role="dialog" aria-modal="true" aria-label={title}>
-      <article className="modal">
-        <header className="modalHeader">
-          <h2>
-            <Building2 size={17} />
-            {title}
-          </h2>
-          <button type="button" onClick={onClose} aria-label={t("common.close")}>
-            <X size={18} />
+  if (showDeleteConfirm) {
+    return (
+      <div className="siteEditorPage">
+        <header className="siteEditorHeader">
+          <button aria-label={t("common.back")} className="siteEditorBackButton" type="button" onClick={() => setShowDeleteConfirm(false)}>
+            <ArrowLeft size={18} />
           </button>
+          <div>
+            <h1>{t("sites.deleteModalTitle")}</h1>
+            <p>{site.site}</p>
+          </div>
         </header>
 
-        <nav className="tabs" aria-label="Site form tabs">
-          {visibleTabs.map((tab) => (
-            <button
-              className={activeTab === tab.id ? "activeTab" : "tab"}
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.labelKey ? t(tab.labelKey) : tab.label}
+        <div className="siteEditorBody">
+          <p className="siteDeleteConfirmMessage">{t("sites.deleteConfirmMessage").replace("{site}", site.site)}</p>
+        </div>
+
+        <footer className="siteEditorFooter">
+          <div className="siteEditorFooterActions">
+            <button className="button ghost" type="button" onClick={() => setShowDeleteConfirm(false)} disabled={isDeleting}>
+              {t("common.cancel")}
             </button>
-          ))}
-        </nav>
-
-        <div className="modalBody">{content}</div>
-        <AlertPopup
-          message={saveError}
-          open={Boolean(saveError)}
-          title={t("feedback.saveFailed")}
-          tone="error"
-          variant="status"
-          onClose={() => setSaveError("")}
-        />
-
-        <footer className="modalFooter">
-          <div className="modalFooterActions">
-            <button className="button ghost" type="button" onClick={onClose}>{t("common.cancel")}</button>
-            {mode === "edit" && (
-              <button
-                className="button danger"
-                type="button"
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={isDeleting}
-              >
-                <Trash2 size={16} />
-                {t("sites.deleteSite")}
-              </button>
-            )}
           </div>
-          <button className="button primary" type="button" onClick={saveChecklistConfig} disabled={isDeleting}>
-            <Save size={16} />
-            {t("sites.saveSite")}
+          <button className="button danger" type="button" onClick={deleteSite} disabled={isDeleting}>
+            <Trash2 size={16} />
+            {isDeleting ? t("sites.deletingSite") : t("sites.deleteSite")}
           </button>
         </footer>
+      </div>
+    );
+  }
 
-        {showDeleteConfirm && (
-          <div className="confirmOverlay" role="alertdialog" aria-modal="true" aria-label={t("sites.deleteModalTitle")}>
-            <button className="confirmBackdrop" type="button" aria-label={t("common.cancel")} onClick={() => setShowDeleteConfirm(false)} />
-            <article className="confirmDialog">
-              <h3>{t("sites.deleteModalTitle")}</h3>
-              <p>{t("sites.deleteConfirmMessage").replace("{site}", site.site)}</p>
-              <div className="confirmActions">
-                <button
-                  className="button ghost"
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(false)}
-                  disabled={isDeleting}
-                >
-                  {t("common.cancel")}
-                </button>
-                <button
-                  className="button danger"
-                  type="button"
-                  onClick={deleteSite}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? t("sites.deletingSite") : t("sites.deleteSite")}
-                </button>
-              </div>
-            </article>
-          </div>
-        )}
-      </article>
+  return (
+    <div className="siteEditorPage">
+      <header className="siteEditorHeader">
+        <button aria-label={t("common.back")} className="siteEditorBackButton" type="button" onClick={onClose}>
+          <ArrowLeft size={18} />
+        </button>
+        <div>
+          <h1>
+            <Building2 size={20} />
+            {title}
+          </h1>
+          {site.site ? <p>{site.site}</p> : null}
+        </div>
+      </header>
+
+      <nav aria-label="Site form tabs" className="tabs">
+        {visibleTabs.map((tab) => (
+          <button
+            className={activeTab === tab.id ? "activeTab" : "tab"}
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.labelKey ? t(tab.labelKey) : tab.label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="siteEditorBody">{content}</div>
+
+      <AlertPopup
+        message={saveError}
+        open={Boolean(saveError)}
+        title={t("feedback.saveFailed")}
+        tone="error"
+        variant="status"
+        onClose={() => setSaveError("")}
+      />
+
+      <footer className="siteEditorFooter">
+        <div className="siteEditorFooterActions">
+          <button className="button ghost" type="button" onClick={onClose}>{t("common.cancel")}</button>
+          {mode === "edit" && (
+            <button
+              className="button danger"
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting}
+            >
+              <Trash2 size={16} />
+              {t("sites.deleteSite")}
+            </button>
+          )}
+        </div>
+        <button className="button primary" type="button" onClick={saveChecklistConfig} disabled={isDeleting}>
+          <Save size={16} />
+          {t("sites.saveSite")}
+        </button>
+      </footer>
     </div>
   );
 }

@@ -159,6 +159,13 @@ const dictionaries: Record<Lang, Dictionary> = {
       error: "ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่",
       retry: "ลองใหม่"
     },
+    pagination: {
+      label: "การแบ่งหน้า",
+      summary: "แสดง {start}-{end} จาก {total}",
+      previous: "หน้าก่อน",
+      next: "หน้าถัดไป",
+      page: "หน้า"
+    },
     feedback: {
       saveSuccess: "บันทึกสำเร็จ",
       saveFailed: "บันทึกไม่สำเร็จ",
@@ -528,6 +535,13 @@ const dictionaries: Record<Lang, Dictionary> = {
       loading: "Preparing your workspace",
       error: "Unable to load data. Please try again.",
       retry: "Retry"
+    },
+    pagination: {
+      label: "Pagination",
+      summary: "Showing {start}-{end} of {total}",
+      previous: "Previous page",
+      next: "Next page",
+      page: "Page"
     },
     feedback: {
       saveSuccess: "Saved successfully",

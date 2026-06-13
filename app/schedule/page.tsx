@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, MapPin, Plus, Trash2, UserRound, X } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, Plus, Trash2, UserRound, X } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { AlertPopup, FeedbackPopups } from "@/components/AppPopup";
 import type { SystemUser } from "@/lib/auth/system-users";
@@ -17,8 +17,8 @@ import {
   type ScheduleDay,
   type SiteCatalogRecord
 } from "@/lib/pm-data";
-import { beginAppDataLoad, endAppDataLoad } from "@/lib/app-data-loading";
 import { usePmData } from "@/lib/use-pm-data";
+import { usePageShellLoading } from "@/lib/use-page-shell-loading";
 
 const weekDaysByLang: Record<Lang, string[]> = {
   th: ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"],
@@ -92,10 +92,11 @@ function getMonthPlan(lang: Lang, pmJobs: PmJobRecord[], siteCatalog: SiteCatalo
 
 export default function SchedulePage() {
   const { lang, t } = useUi();
-  const { data, error, reload } = usePmData();
-  const { error: userError, userName } = useCurrentUser();
+  const { data, error, isLoading, reload } = usePmData();
+  const { error: userError, isLoading: userLoading, userName } = useCurrentUser();
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [usersError, setUsersError] = useState("");
+  const [usersLoading, setUsersLoading] = useState(true);
   const [yearMonth, setYearMonth] = useState(() => getDateString().slice(0, 7));
   const [selectedDay, setSelectedDay] = useState<number | null>(() => Number(getDateString().slice(-2)));
   const [addingDate, setAddingDate] = useState<{ yearMonth: string; day: number; siteId?: string } | null>(null);
@@ -159,11 +160,13 @@ export default function SchedulePage() {
   const trailingBlankDays = (7 - ((month.leadingBlankDays + month.dayCount) % 7)) % 7;
   const followersLabel = lang === "th" ? "ผู้ติดตาม" : "Followers";
 
+  const pageLoading = usePageShellLoading(isLoading, userLoading, usersLoading);
+
   useEffect(() => {
     let isCurrent = true;
 
     async function loadSystemUsers() {
-      beginAppDataLoad();
+      setUsersLoading(true);
 
       try {
         const response = await fetch("/api/auth/users", { cache: "no-store" });
@@ -182,7 +185,9 @@ export default function SchedulePage() {
           setUsersError(loadError instanceof Error ? loadError.message : "Cannot load users.");
         }
       } finally {
-        endAppDataLoad();
+        if (isCurrent) {
+          setUsersLoading(false);
+        }
       }
     }
 
@@ -297,7 +302,7 @@ export default function SchedulePage() {
   };
 
   return (
-    <AppShell>
+    <AppShell loading={pageLoading}>
       <div className="schedulePage">
         <FeedbackPopups
           alertMessage={error ?? userError ?? usersError}
@@ -310,27 +315,72 @@ export default function SchedulePage() {
           variant="status"
           onClose={() => setActionMessage("")}
         />
-        <PageTitle
-          title={t("schedule.title")}
-          subtitle={t("schedule.subtitle")}
-          actions={
-            <div className="scheduleActions">
-              <label className="ownerFilter">
-                <span>{t("fields.siteOwner")}</span>
-                <select
-                  className="select"
-                  value={activeOwner}
-                  onChange={(event) => setSelectedOwner(event.target.value)}
-                >
-                  {ownerOptions.map((owner) => (
-                    <option key={owner} value={owner}>{owner}</option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          }
-        />
-        <section className="layout">
+
+        {addingDate ? (
+          <AddPlanModal
+            allSites={allUnplannedSites}
+            day={addingDate.day}
+            initialSiteId={addingDate.siteId}
+            yearMonth={addingDate.yearMonth}
+            sites={unplannedSites}
+            systemUsers={systemUsers}
+            onClose={() => setAddingDate(null)}
+            onSubmit={(siteId, time, followers, startDate, endDate) => addPlan({
+              endDate,
+              followers,
+              siteId,
+              startDate,
+              time
+            })}
+          />
+        ) : editingJob ? (
+          <AddPlanModal
+            allSites={includeSiteInOptions(allUnplannedSites, data.siteCatalog, editingJob.siteId)}
+            day={Number(editingJob.date.slice(8, 10))}
+            initialEndDate={editingJob.date}
+            initialFollowers={editingJob.followers}
+            initialSiteId={editingJob.siteId}
+            initialTime={editingJob.time}
+            mode="edit"
+            yearMonth={editingJob.date.slice(0, 7)}
+            sites={includeSiteInOptions(unplannedSites, data.siteCatalog, editingJob.siteId)}
+            systemUsers={systemUsers}
+            deleting={deletingJobId === editingJob.id}
+            onClose={() => setEditingJob(null)}
+            onDelete={() => deletePlan(editingJob.id)}
+            onSubmit={(siteId, time, followers, startDate, endDate) => updatePlan(editingJob.id, {
+              endDate,
+              followers,
+              siteId,
+              startDate,
+              time
+            })}
+          />
+        ) : viewingJob ? (
+          <PlanDetailModal job={viewingJob} onClose={() => setViewingJob(null)} />
+        ) : (
+          <>
+            <PageTitle
+              title={t("schedule.title")}
+              subtitle={t("schedule.subtitle")}
+              actions={
+                <div className="scheduleActions">
+                  <label className="ownerFilter">
+                    <span>{t("fields.siteOwner")}</span>
+                    <select
+                      className="select"
+                      value={activeOwner}
+                      onChange={(event) => setSelectedOwner(event.target.value)}
+                    >
+                      {ownerOptions.map((owner) => (
+                        <option key={owner} value={owner}>{owner}</option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              }
+            />
+            <section className="layout">
           <article className="calendarPanel">
             <div className="calendarHead">
               <button type="button" onClick={() => moveMonth(-1)} aria-label={t("schedule.previousMonth")}>
@@ -453,51 +503,8 @@ export default function SchedulePage() {
             </div>
           </aside>
         </section>
-        {addingDate ? (
-          <AddPlanModal
-            allSites={allUnplannedSites}
-            day={addingDate.day}
-            initialSiteId={addingDate.siteId}
-            yearMonth={addingDate.yearMonth}
-            sites={unplannedSites}
-            systemUsers={systemUsers}
-            onClose={() => setAddingDate(null)}
-            onSubmit={(siteId, time, followers, startDate, endDate) => addPlan({
-              endDate,
-              followers,
-              siteId,
-              startDate,
-              time
-            })}
-          />
-        ) : null}
-        {editingJob ? (
-          <AddPlanModal
-            allSites={includeSiteInOptions(allUnplannedSites, data.siteCatalog, editingJob.siteId)}
-            day={Number(editingJob.date.slice(8, 10))}
-            initialEndDate={editingJob.date}
-            initialFollowers={editingJob.followers}
-            initialSiteId={editingJob.siteId}
-            initialTime={editingJob.time}
-            mode="edit"
-            yearMonth={editingJob.date.slice(0, 7)}
-            sites={includeSiteInOptions(unplannedSites, data.siteCatalog, editingJob.siteId)}
-            systemUsers={systemUsers}
-            deleting={deletingJobId === editingJob.id}
-            onClose={() => setEditingJob(null)}
-            onDelete={() => deletePlan(editingJob.id)}
-            onSubmit={(siteId, time, followers, startDate, endDate) => updatePlan(editingJob.id, {
-              endDate,
-              followers,
-              siteId,
-              startDate,
-              time
-            })}
-          />
-        ) : null}
-        {viewingJob ? (
-          <PlanDetailModal job={viewingJob} onClose={() => setViewingJob(null)} />
-        ) : null}
+          </>
+        )}
       </div>
     </AppShell>
   );
@@ -507,11 +514,18 @@ function PlanDetailModal({ job, onClose }: { job: DisplayPlanJob; onClose: () =>
   const { t } = useUi();
 
   return (
-    <div className="overlay" role="dialog" aria-modal="true" aria-label={t("schedule.jobDetailTitle")}>
-      <article className="scheduleModal">
-        <header className="modalHeader">
-          <h2>{t("schedule.jobDetailTitle")}</h2>
-        </header>
+    <div className="scheduleEditorPage">
+      <header className="scheduleEditorHeader">
+        <button aria-label={t("common.back")} className="scheduleEditorBackButton" type="button" onClick={onClose}>
+          <ArrowLeft size={18} />
+        </button>
+        <div>
+          <h1>{t("schedule.jobDetailTitle")}</h1>
+          <p>{job.site}</p>
+        </div>
+      </header>
+
+      <div className="scheduleEditorBody">
         <div className="planDetailGrid">
           <InfoLine label={t("common.site")} value={job.site} />
           <InfoLine label={t("common.customer")} value={job.customer} />
@@ -519,10 +533,11 @@ function PlanDetailModal({ job, onClose }: { job: DisplayPlanJob; onClose: () =>
           <InfoLine label={t("fields.operationTime")} value={job.time} />
           <InfoLine label={t("schedule.followers")} value={job.followers.length > 0 ? job.followers.join(", ") : "-"} />
         </div>
-        <footer className="modalActions">
-          <button className="button primary" type="button" onClick={onClose}>{t("common.close")}</button>
-        </footer>
-      </article>
+      </div>
+
+      <footer className="scheduleEditorFooter">
+        <button className="button primary" type="button" onClick={onClose}>{t("common.close")}</button>
+      </footer>
     </div>
   );
 }
@@ -623,9 +638,19 @@ function AddPlanModal({
   };
 
   return (
-    <div className="overlay" role="dialog" aria-modal="true" aria-label={modalTitle}>
+    <div className="scheduleEditorPage">
+      <header className="scheduleEditorHeader">
+        <button aria-label={t("common.back")} className="scheduleEditorBackButton" type="button" onClick={onClose}>
+          <ArrowLeft size={18} />
+        </button>
+        <div>
+          <h1>{modalTitle}</h1>
+          <p>{formatModalDate(day, yearMonth)}</p>
+        </div>
+      </header>
+
       <form
-        className="scheduleModal"
+        className="scheduleEditorForm"
         onSubmit={async (event) => {
           event.preventDefault();
           setIsSaving(true);
@@ -640,85 +665,85 @@ function AddPlanModal({
           }
         }}
       >
-        <header className="modalHeader">
-          <h2>{modalTitle} - {formatModalDate(day, yearMonth)}</h2>
-        </header>
-        <label className="allSitesToggle">
-          <input
-            type="checkbox"
-            checked={showAllSitesInModal}
-            onChange={(event) => setShowAllSitesInModal(event.target.checked)}
-          />
-          <span aria-hidden="true" />
-          {t("schedule.viewAllSites")}
-        </label>
-        <label className="label">
-          {t("fields.siteSelect")}
-          <select className="select" value={selectedSiteId} onChange={(event) => setSiteId(event.target.value)}>
-            {availableSites.map((site) => (
-              <option key={site.id} value={site.id}>
-                {site.site} - {site.customer}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="scheduleDateRange">
-          <label className="label">
-            {t("schedule.startDate")}
+        <div className="scheduleEditorBody">
+          <label className="allSitesToggle">
             <input
-              className="field"
-              type="date"
-              value={startDate}
-              min={firstDate}
-              max={lastDate}
-              onChange={(event) => updateStartDate(event.target.value)}
+              type="checkbox"
+              checked={showAllSitesInModal}
+              onChange={(event) => setShowAllSitesInModal(event.target.checked)}
             />
+            <span aria-hidden="true" />
+            {t("schedule.viewAllSites")}
           </label>
           <label className="label">
-            {t("schedule.endDate")}
-            <input
-              className="field"
-              type="date"
-              value={endDate}
-              min={startDate}
-              max={lastDate}
-              onChange={(event) => setEndDate(event.target.value)}
-            />
+            {t("fields.siteSelect")}
+            <select className="select" value={selectedSiteId} onChange={(event) => setSiteId(event.target.value)}>
+              {availableSites.map((site) => (
+                <option key={site.id} value={site.id}>
+                  {site.site} - {site.customer}
+                </option>
+              ))}
+            </select>
           </label>
-        </div>
-        <label className="label">
-          {t("fields.operationTime")}
-          <input className="field" type="time" value={time} onChange={(event) => setTime(event.target.value)} />
-        </label>
-        <label className="label">
-          {followersLabel}
-          <select
-            className="select"
-            value={followerSelect}
-            disabled={availableFollowerUsers.length === 0}
-            onChange={(event) => {
-              setFollowerSelect(event.target.value);
-              addFollower(event.target.value);
-            }}
-          >
-            <option value="">{availableFollowerUsers.length > 0 ? t("schedule.selectFollower") : t("schedule.noFollowers")}</option>
-            {availableFollowerUsers.map((user) => (
-              <option key={user.id} value={user.name}>{user.name}</option>
-            ))}
-          </select>
-        </label>
-        {followers.length > 0 ? (
-          <div className="selectedFollowers">
-            {followers.map((name) => (
-              <span key={name}>
-                {name}
-                <button type="button" aria-label={`${t("schedule.removeFollower")} ${name}`} onClick={() => removeFollower(name)}>
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
+          <div className="scheduleDateRange">
+            <label className="label">
+              {t("schedule.startDate")}
+              <input
+                className="field"
+                type="date"
+                value={startDate}
+                min={firstDate}
+                max={lastDate}
+                onChange={(event) => updateStartDate(event.target.value)}
+              />
+            </label>
+            <label className="label">
+              {t("schedule.endDate")}
+              <input
+                className="field"
+                type="date"
+                value={endDate}
+                min={startDate}
+                max={lastDate}
+                onChange={(event) => setEndDate(event.target.value)}
+              />
+            </label>
           </div>
-        ) : null}
+          <label className="label">
+            {t("fields.operationTime")}
+            <input className="field" type="time" value={time} onChange={(event) => setTime(event.target.value)} />
+          </label>
+          <label className="label">
+            {followersLabel}
+            <select
+              className="select"
+              value={followerSelect}
+              disabled={availableFollowerUsers.length === 0}
+              onChange={(event) => {
+                setFollowerSelect(event.target.value);
+                addFollower(event.target.value);
+              }}
+            >
+              <option value="">{availableFollowerUsers.length > 0 ? t("schedule.selectFollower") : t("schedule.noFollowers")}</option>
+              {availableFollowerUsers.map((user) => (
+                <option key={user.id} value={user.name}>{user.name}</option>
+              ))}
+            </select>
+          </label>
+          {followers.length > 0 ? (
+            <div className="selectedFollowers">
+              {followers.map((name) => (
+                <span key={name}>
+                  {name}
+                  <button type="button" aria-label={`${t("schedule.removeFollower")} ${name}`} onClick={() => removeFollower(name)}>
+                    <X size={12} />
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
         <AlertPopup
           message={saveError}
           open={Boolean(saveError)}
@@ -727,14 +752,17 @@ function AddPlanModal({
           variant="status"
           onClose={() => setSaveError("")}
         />
-        <footer className="modalActions">
-          {mode === "edit" && onDelete ? (
-            <button className="button danger" type="button" disabled={deleting || isSaving} onClick={onDelete}>
-              <Trash2 size={15} />
-              {t("schedule.deleteJob")}
-            </button>
-          ) : null}
-          <button className="button ghost" type="button" onClick={onClose}>{t("common.cancel")}</button>
+
+        <footer className="scheduleEditorFooter">
+          <div className="scheduleEditorFooterActions">
+            {mode === "edit" && onDelete ? (
+              <button className="button danger" type="button" disabled={deleting || isSaving} onClick={onDelete}>
+                <Trash2 size={15} />
+                {t("schedule.deleteJob")}
+              </button>
+            ) : null}
+            <button className="button ghost" type="button" onClick={onClose}>{t("common.cancel")}</button>
+          </div>
           <button className="button primary" type="submit" disabled={!selectedSiteId || isSaving}>
             {mode === "edit" ? t("common.save") : t("schedule.addJob")}
           </button>

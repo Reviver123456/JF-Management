@@ -7,7 +7,7 @@ import "./ui.css";
 
 const prompt = Prompt({
   subsets: ["latin", "thai"],
-  weight: ["400", "500", "600", "700", "800", "900"],
+  weight: ["400", "500"],
   display: "swap",
   preload: true,
   fallback: ["Noto Sans Thai", "sans-serif"]

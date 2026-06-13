@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { beginAppDataLoad, endAppDataLoad } from "@/lib/app-data-loading";
 import { cacheUserProfile, readCachedUserProfile } from "@/lib/app-bootstrap-cache";
 import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { createClient } from "@/lib/supabase/client";
@@ -42,12 +41,13 @@ async function loadSignatureFromDb(localFallback: string) {
 }
 
 export function useCurrentUser(): CurrentUserState {
+  const cachedProfile = readCachedUserProfile();
   const [state, setState] = useState<CurrentUserState>(() => ({
-    email: "",
+    email: cachedProfile?.email ?? "",
     error: null,
-    isLoading: true,
-    signature: "",
-    userName: ""
+    isLoading: !cachedProfile,
+    signature: cachedProfile?.signature ?? "",
+    userName: cachedProfile?.userName ?? ""
   }));
 
   useEffect(() => {
@@ -73,9 +73,7 @@ export function useCurrentUser(): CurrentUserState {
     }
 
     async function loadCurrentUser() {
-      beginAppDataLoad();
-
-      if (isCurrent) {
+      if (isCurrent && !cachedProfile) {
         setState((current) => ({
           ...current,
           error: null,
@@ -131,8 +129,6 @@ export function useCurrentUser(): CurrentUserState {
             userName: ""
           });
         }
-      } finally {
-        endAppDataLoad();
       }
     }
 

@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Eye, EyeOff, Languages, LockKeyhole, Moon, PenLine, RotateCcw, Save, Sun, UserRound, X } from "lucide-react";
+import { Eye, EyeOff, Languages, LockKeyhole, Moon, PenLine, RotateCcw, Save, Sun, UserRound, ArrowLeft } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { FeedbackPopups } from "@/components/AppPopup";
+import { PwaInstallGuidePage } from "@/components/PwaInstallGuideModal";
 import { PwaInstallSection } from "@/components/PwaInstallSection";
 import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { useUi } from "@/lib/i18n";
@@ -19,6 +20,8 @@ export default function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [signatureEditorOpen, setSignatureEditorOpen] = useState(false);
+  const [pwaGuide, setPwaGuide] = useState<{ open: boolean; mode: "ios" | "desktop" }>({ open: false, mode: "ios" });
 
   useEffect(() => {
     const supabase = createClient();
@@ -111,6 +114,13 @@ export default function SettingsPage() {
         alertTone={message ? "error" : "success"}
         alertVariant="status"
       />
+
+      {signatureEditorOpen ? (
+        <SignatureEditorPage email={email} onClose={() => setSignatureEditorOpen(false)} />
+      ) : pwaGuide.open ? (
+        <PwaInstallGuidePage mode={pwaGuide.mode} onClose={() => setPwaGuide((current) => ({ ...current, open: false }))} />
+      ) : (
+        <>
       <PageTitle
         title={t("settings.title")}
         subtitle={t("settings.subtitle")}
@@ -135,7 +145,7 @@ export default function SettingsPage() {
 
           <article className="card">
             <h2><PenLine size={17} /> {t("settings.mySignature")}</h2>
-            <SettingsSignaturePad email={email} />
+            <SettingsSignaturePad email={email} onOpen={() => setSignatureEditorOpen(true)} />
           </article>
 
           <article className="card">
@@ -169,9 +179,11 @@ export default function SettingsPage() {
             </div>
           </article>
 
-          <PwaInstallSection />
+          <PwaInstallSection onShowGuide={(mode) => setPwaGuide({ open: true, mode })} />
         </div>
       </section>
+        </>
+      )}
       </div>
     </AppShell>
   );
@@ -202,19 +214,27 @@ function PasswordField({
   );
 }
 
-function SettingsSignaturePad({ email }: { email: string }) {
+function SettingsSignaturePad({ email, onOpen }: { email: string; onOpen: () => void }) {
+  const hasSignature = typeof window !== "undefined" && Boolean(window.localStorage.getItem(getUserSignatureStorageKey(email)));
+
+  return (
+    <div className="settingsSignaturePad">
+      <button className="button subtle" type="button" onClick={onOpen}>
+        <PenLine size={16} />
+        {hasSignature ? "แก้ไขลายเซ็นของฉัน" : "เซ็นลายเซ็นของฉัน"}
+      </button>
+      {hasSignature ? <span className="signatureSavedText">บันทึกลายเซ็นแล้ว</span> : null}
+    </div>
+  );
+}
+
+function SignatureEditorPage({ email, onClose }: { email: string; onClose: () => void }) {
   const { t } = useUi();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
   const [, setSignatureRevision] = useState(0);
-  const hasSignature = typeof window !== "undefined" && Boolean(window.localStorage.getItem(getUserSignatureStorageKey(email)));
 
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
     const canvas = canvasRef.current;
     if (!canvas) {
       return;
@@ -267,7 +287,7 @@ function SettingsSignaturePad({ email }: { email: string }) {
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [email, isOpen]);
+  }, [email]);
 
   const saveSignature = async () => {
     const canvas = canvasRef.current;
@@ -356,48 +376,45 @@ function SettingsSignaturePad({ email }: { email: string }) {
   };
 
   return (
-    <div className="settingsSignaturePad">
-      <button className="button subtle" type="button" onClick={() => setIsOpen(true)}>
-        <PenLine size={16} />
-        {hasSignature ? "แก้ไขลายเซ็นของฉัน" : "เซ็นลายเซ็นของฉัน"}
-      </button>
-      {hasSignature ? <span className="signatureSavedText">บันทึกลายเซ็นแล้ว</span> : null}
-      {isOpen ? (
-        <div className="settingsSignatureOverlay" role="dialog" aria-modal="true" aria-label={t("settings.mySignature")}>
-          <article className="settingsSignatureModal">
-            <div className="modalHeader">
-              <h2>{t("settings.mySignature")}</h2>
-              <button type="button" onClick={() => setIsOpen(false)} aria-label={t("common.close")}>
-                <X size={18} />
-              </button>
-            </div>
-            <canvas
-              ref={canvasRef}
-              onPointerDown={startDrawing}
-              onPointerMove={draw}
-              onPointerUp={stopDrawing}
-              onPointerLeave={stopDrawing}
-            />
-            <div className="modalActions">
-              <button className="button ghost" type="button" onClick={clearSignature}>
-                <RotateCcw size={15} />
-                {t("pm.clearSignature")}
-              </button>
-              <button
-                className="button primary"
-                type="button"
-                onClick={() => {
-                  void saveSignature();
-                  setIsOpen(false);
-                }}
-              >
-                <Save size={15} />
-                {t("common.save")}
-              </button>
-            </div>
-          </article>
+    <div className="signatureEditorPage">
+      <header className="signatureEditorHeader">
+        <button aria-label={t("common.back")} className="signatureEditorBackButton" type="button" onClick={onClose}>
+          <ArrowLeft size={18} />
+        </button>
+        <div>
+          <h1>{t("settings.mySignature")}</h1>
         </div>
-      ) : null}
+      </header>
+
+      <div className="signatureEditorBody">
+        <canvas
+          ref={canvasRef}
+          onPointerDown={startDrawing}
+          onPointerMove={draw}
+          onPointerUp={stopDrawing}
+          onPointerLeave={stopDrawing}
+        />
+      </div>
+
+      <footer className="signatureEditorFooter">
+        <div className="signatureEditorFooterActions">
+          <button className="button ghost" type="button" onClick={clearSignature}>
+            <RotateCcw size={15} />
+            {t("pm.clearSignature")}
+          </button>
+        </div>
+        <button
+          className="button primary"
+          type="button"
+          onClick={() => {
+            void saveSignature();
+            onClose();
+          }}
+        >
+          <Save size={15} />
+          {t("common.save")}
+        </button>
+      </footer>
     </div>
   );
 }

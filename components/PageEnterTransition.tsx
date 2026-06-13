@@ -4,10 +4,15 @@ import { useLayoutEffect, useState } from "react";
 
 const enterTransition = "opacity 800ms cubic-bezier(0.16, 1, 0.3, 1), transform 800ms cubic-bezier(0.16, 1, 0.3, 1)";
 
-export function usePageEnterVisible(resetKey = "") {
+export function usePageEnterVisible(resetKey = "", enabled = true) {
   const [visible, setVisible] = useState(false);
 
   useLayoutEffect(() => {
+    if (!enabled) {
+      setVisible(false);
+      return;
+    }
+
     let cancelled = false;
     let innerFrame = 0;
 
@@ -34,7 +39,7 @@ export function usePageEnterVisible(resetKey = "") {
       window.cancelAnimationFrame(frame);
       window.cancelAnimationFrame(innerFrame);
     };
-  }, [resetKey]);
+  }, [resetKey, enabled]);
 
   return visible;
 }

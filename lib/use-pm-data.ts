@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { beginAppDataLoad, endAppDataLoad } from "@/lib/app-data-loading";
 import { cachePmData, readCachedPmData } from "@/lib/app-bootstrap-cache";
 import { emptyPmAppData, type PmAppData } from "@/lib/pm-data";
 
@@ -13,10 +12,12 @@ type PmDataState = {
 };
 
 function getInitialPmDataState(): Omit<PmDataState, "reload"> {
+  const cached = readCachedPmData();
+
   return {
-    data: emptyPmAppData,
+    data: cached ?? emptyPmAppData,
     error: null,
-    isLoading: true
+    isLoading: !cached
   };
 }
 
@@ -27,8 +28,6 @@ export function usePmData(): PmDataState {
     canSetState: () => boolean = () => true,
     options: { background?: boolean } = {}
   ) => {
-    beginAppDataLoad();
-
     if (canSetState() && !options.background) {
       setState((current) => ({
         ...current,
@@ -61,8 +60,6 @@ export function usePmData(): PmDataState {
           isLoading: false
         }));
       }
-    } finally {
-      endAppDataLoad();
     }
   }, []);
 

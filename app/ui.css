@@ -74,11 +74,11 @@
   border-radius: 9px;
   color: var(--text-soft);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .shell .navItem:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--nav-hover-bg);
   color: var(--text);
 }
 
@@ -106,13 +106,13 @@
   gap: 11px;
   padding: 0 10px;
   border-radius: 8px;
-  font-weight: 800;
+  font-weight: 500;
   font-size: 12px;
 }
 
 .shell .footerButton:hover {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--nav-hover-bg);
 }
 
 .shell.shellCollapsed .brand {
@@ -365,7 +365,7 @@
     gap: 2px;
     color: var(--text-muted);
     font-size: 10px;
-    font-weight: 800;
+    font-weight: 500;
   }
 
   .shell .activeBottomItem {
@@ -385,7 +385,7 @@
   gap: 6px;
   color: var(--text);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .dashboardPage .ownerFilter span {
@@ -442,7 +442,7 @@
 .dashboardPage .metricCard span {
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .dashboardPage .metricCard strong {
@@ -455,7 +455,7 @@
   margin-top: 15px;
   color: #27d17f;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .dashboardPage .metricCard i {
@@ -545,7 +545,7 @@
   place-items: center;
   background: rgba(47, 125, 246, 0.18);
   color: var(--primary-strong);
-  font-weight: 900;
+  font-weight: 500;
   font-size: 12px;
 }
 
@@ -596,40 +596,46 @@
   overflow: hidden;
 }
 
+@keyframes dashboardTeamBarFill {
+  from {
+    width: 0%;
+  }
+
+  to {
+    width: var(--bar-width, 0%);
+  }
+}
+
 .dashboardPage .resultBars i::before {
   content: "";
   display: block;
   height: 100%;
   width: 0%;
   border-radius: inherit;
-  transition: width 720ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: width;
 }
 
 .dashboardPage .resultBars[data-ready="true"]>div:nth-child(1) i::before {
-  width: var(--bar-width, 0%);
-  transition-delay: 120ms;
+  animation: dashboardTeamBarFill 900ms cubic-bezier(0.22, 1, 0.36, 1) 80ms both;
 }
 
 .dashboardPage .resultBars[data-ready="true"]>div:nth-child(2) i::before {
-  width: var(--bar-width, 0%);
-  transition-delay: 240ms;
+  animation: dashboardTeamBarFill 900ms cubic-bezier(0.22, 1, 0.36, 1) 200ms both;
 }
 
 .dashboardPage .resultBars[data-ready="true"]>div:nth-child(3) i::before {
-  width: var(--bar-width, 0%);
-  transition-delay: 360ms;
+  animation: dashboardTeamBarFill 900ms cubic-bezier(0.22, 1, 0.36, 1) 320ms both;
 }
 
 .dashboardPage .resultBars[data-ready="true"]>div:nth-child(4) i::before {
-  width: var(--bar-width, 0%);
-  transition-delay: 480ms;
+  animation: dashboardTeamBarFill 900ms cubic-bezier(0.22, 1, 0.36, 1) 440ms both;
 }
 
 @media (prefers-reduced-motion: reduce) {
 
   .dashboardPage .resultBars i::before,
   .dashboardPage .resultBars[data-ready="true"]>div i::before {
-    transition: none;
+    animation: none;
     width: var(--bar-width, 0%);
   }
 }
@@ -663,7 +669,7 @@
   align-items: center;
   color: var(--text-soft);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .dashboardPage .legend b {
@@ -696,7 +702,7 @@
   gap: 10px;
   padding: 0 14px;
   color: var(--text-soft);
-  font-weight: 800;
+  font-weight: 500;
 }
 
 @media (max-width: 1120px) {
@@ -742,7 +748,7 @@
   display: grid;
   gap: 6px;
   padding: 0;
-  font-weight: 800;
+  font-weight: 500;
   font-size: 12px;
   line-height: 1.1;
 }
@@ -801,7 +807,7 @@
   flex-wrap: wrap;
   gap: 9px;
   color: var(--text-muted);
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .historyPage .row>svg {
@@ -920,7 +926,7 @@
   color: #fca5a5;
   padding: 9px 11px;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
   line-height: 1.5;
 }
 
@@ -952,7 +958,7 @@
   gap: 7px;
   padding: 0;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .loginPage .forgotPasswordButton:hover {
@@ -965,7 +971,7 @@
   gap: 10px;
   color: var(--text-soft);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   cursor: pointer;
   user-select: none;
 }
@@ -1035,7 +1041,7 @@
   flex-wrap: wrap;
   gap: 8px;
   color: var(--text-muted);
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .pmWorkPage .listRow>svg {
@@ -1140,7 +1146,7 @@
   background: transparent;
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .pmWorkPage .activeTab {
@@ -1178,7 +1184,7 @@
   color: var(--text-soft);
   padding: 0 12px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
   text-transform: uppercase;
 }
 
@@ -1196,7 +1202,7 @@
   margin: 0 0 12px;
   color: var(--text-soft);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
   text-transform: uppercase;
 }
 
@@ -1227,7 +1233,7 @@
 .pmWorkPage .calibrateStatusPicker>strong {
   color: var(--text-soft);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .pmWorkPage .calibrateStatusPicker .vx {
@@ -1346,7 +1352,7 @@
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
   color: var(--text-muted);
-  font-weight: 900;
+  font-weight: 500;
   margin: 0;
 }
 
@@ -1358,7 +1364,7 @@
 .pmWorkPage .radioGroup>strong {
   color: var(--text-soft);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .pmWorkPage .radioGroup div {
@@ -1373,7 +1379,7 @@
   gap: 6px;
   color: var(--text);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .pmWorkPage .radioGroup input {
@@ -1405,7 +1411,7 @@
 .pmWorkPage .pmDeviceTable .deviceName {
   color: var(--text-soft);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .pmWorkPage .pmDeviceTable .deviceName {
@@ -1523,7 +1529,7 @@
   align-items: center;
   padding: 0 9px;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .pmWorkPage .expenseGrid {
@@ -1543,8 +1549,74 @@
   gap: 8px;
   padding: 0 12px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
   cursor: pointer;
+}
+
+.pmWorkPage .photoEditorPage {
+  width: 100%;
+  min-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 88px;
+}
+
+.pmWorkPage .photoEditorHeader {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.pmWorkPage .photoEditorBackButton {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+}
+
+.pmWorkPage .photoEditorBackButton:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-2);
+}
+
+.pmWorkPage .photoEditorHeader h1 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.pmWorkPage .photoEditorBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 18px;
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.pmWorkPage .photoEditorFooter {
+  position: sticky;
+  z-index: 20;
+  bottom: 0;
+  margin-top: auto;
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  background: linear-gradient(180deg, transparent, var(--bg) 28%);
 }
 
 .pmWorkPage .photoPopupOverlay {
@@ -1631,7 +1703,7 @@
 .pmWorkPage .photoPopupItem span {
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .pmWorkPage .photoPopupButtons {
@@ -1709,7 +1781,7 @@
   justify-content: center;
   gap: 8px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
   margin-top: 12px;
 }
 
@@ -1746,7 +1818,7 @@
   place-items: center;
   gap: 4px;
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .pmWorkPage .summaryChoice svg {
@@ -1781,7 +1853,7 @@
   margin-top: 14px;
   color: var(--text-soft);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .pmWorkPage .signaturePad canvas {
@@ -1815,7 +1887,7 @@
 .pmWorkPage .requiredHint {
   color: #facc15;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .pmWorkPage .saveStatusGroup {
@@ -1828,7 +1900,7 @@
 .pmWorkPage .autosaveStatus {
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .pmWorkPage .autosaveStatus.saving {
@@ -1870,14 +1942,6 @@
 
   .pmWorkPage .inspectorField {
     grid-column: 1 / -1;
-  }
-
-  .pmWorkPage .stickyActions {
-    flex-wrap: wrap;
-  }
-
-  .pmWorkPage .saveStatusGroup {
-    width: 100%;
   }
 
   .pmWorkPage .tabs {
@@ -1935,7 +1999,7 @@
   display: grid;
   gap: 6px;
   padding: 0;
-  font-weight: 800;
+  font-weight: 500;
   font-size: 12px;
   line-height: 1.1;
 }
@@ -1981,7 +2045,7 @@
   flex-wrap: wrap;
   gap: 9px;
   color: var(--text-muted);
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .reportsPage .viewButton {
@@ -1996,7 +2060,66 @@
   align-items: center;
   gap: 5px;
   padding: 0 10px;
-  font-weight: 900;
+  font-weight: 500;
+}
+
+.reportsPage .reportEditorPage {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.reportsPage .reportEditorHeader {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.reportsPage .reportEditorBackButton {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+}
+
+.reportsPage .reportEditorBackButton:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-2);
+}
+
+.reportsPage .reportEditorHeader h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.reportsPage .reportEditorHeader p {
+  margin: 6px 0 0;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.reportsPage .reportEditorBody {
+  display: grid;
+  gap: 12px;
+}
+
+.reportsPage .reportEditorPage.reportEditorPagePreview {
+  min-height: calc(100vh - 80px);
+  padding-bottom: 0;
+}
+
+.reportsPage .reportEditorPagePreview .reportPreviewViewport {
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius);
 }
 
 .reportsPage .overlay {
@@ -2087,7 +2210,7 @@
   grid-template-columns: minmax(170px, 1fr) 150px auto auto auto;
   gap: 10px;
   align-items: end;
-  margin-bottom: 14px;
+  margin-bottom: 0;
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
@@ -2115,7 +2238,7 @@
   background: rgba(254, 226, 226, 0.45);
   color: #991b1b;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .reportsPage .reportDocumentHidden {
@@ -2168,13 +2291,13 @@
   margin: 0;
   color: var(--text);
   font-size: 15px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .reportsPage .panelTitleRow span {
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .reportsPage .reportRows .row {
@@ -2219,7 +2342,7 @@
   gap: 6px;
   padding: 0 11px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -2274,7 +2397,7 @@
   color: #111827;
   font-size: 15px;
   line-height: 1.2;
-  font-weight: 800;
+  font-weight: 500;
   text-align: center;
   white-space: nowrap;
 }
@@ -2287,7 +2410,7 @@
   gap: 2px;
   color: #111827;
   text-align: right;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .reportsPage .templateHeaderMeta span {
@@ -2297,7 +2420,7 @@
 
 .reportsPage .templateHeaderMeta .pmOrderNo {
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .reportsPage .templateTable {
@@ -2321,7 +2444,7 @@
 .reportsPage .templateTable th {
   background: #e7f0fb;
   color: #102a4c;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .reportsPage .infoTemplateTable {
@@ -2383,7 +2506,7 @@
   align-items: center;
   padding: 0;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .reportsPage .reportCustomerRow span {
@@ -2391,7 +2514,7 @@
   display: flex;
   align-items: center;
   padding: 0;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .reportsPage .reportInfoGrid {
@@ -2423,7 +2546,7 @@
 .reportsPage .reportInfoGrid .fieldLabel i {
   min-height: 16px;
   padding: 0 6px;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .reportsPage .fieldCell {
@@ -2436,7 +2559,7 @@
 .reportsPage .dualMonitorRow span,
 .reportsPage .backupChoiceRow span {
   color: #111827;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .reportsPage .fieldLabel {
@@ -2474,7 +2597,7 @@
 
 .reportsPage .referenceTable td:first-child {
   background: transparent;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .reportsPage .checklistTemplateTable {
@@ -2496,7 +2619,7 @@
   justify-content: center;
   padding: 3px 7px;
   color: #102a4c;
-  font-weight: 800;
+  font-weight: 500;
   font-size: 12px;
   border-radius: 4px;
 }
@@ -2542,7 +2665,7 @@
 
 .reportsPage .checklistTemplateTable tbody td:first-child {
   color: #16263f;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .reportsPage .checklistTemplateTable tbody td:nth-child(3) {
@@ -2586,7 +2709,7 @@
 
 .reportsPage .backupChoiceRow b,
 .reportsPage .dualMonitorRow b {
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .reportsPage .choiceItem,
@@ -2594,7 +2717,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-weight: 700;
+  font-weight: 500;
   color: #111827;
 }
 
@@ -2728,7 +2851,7 @@
 }
 
 .reportsPage .statusRow span {
-  font-weight: 700;
+  font-weight: 500;
   color: #102a4c;
 }
 
@@ -2748,7 +2871,7 @@
 }
 
 .reportsPage .noteLine span:first-child {
-  font-weight: 700;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -2793,7 +2916,7 @@
 }
 
 .reportsPage .partsBox span:first-child {
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .reportsPage .workTimeGrid {
@@ -2818,7 +2941,7 @@
 
 .reportsPage .workTimeGrid strong {
   background: #eaf2fb;
-  font-weight: 800;
+  font-weight: 500;
   display: block;
   padding: 4px 6px;
   color: #102a4c;
@@ -2842,7 +2965,7 @@
   color: #111827;
   text-align: center;
   font-size: 24px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .reportsPage .coverRound {
@@ -2850,7 +2973,7 @@
   color: #111827;
   text-align: center;
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .reportsPage .coverInfoTable th {
@@ -2931,14 +3054,14 @@
 .reportsPage .coverSignatureCard strong {
   color: #102a4c;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .reportsPage .coverSignatureCard span {
   min-height: 18px;
   color: #111827;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .reportsPage .coverSignatureCard .signatureDate {
@@ -2969,7 +3092,7 @@
   align-items: center;
   justify-content: center;
   color: #64748b;
-  font-weight: 700;
+  font-weight: 500;
 }
 
 .reportsPage .coverSignatureRule {
@@ -3008,7 +3131,7 @@
 
 .reportsPage .diagCalibrateTitle {
   text-align: left !important;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .reportsPage .diagCalibrateSpacer {
@@ -3116,14 +3239,14 @@
 .reportsPage .paperHeader span {
   color: #0f172a;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .reportsPage .paperHeader h3 {
   margin: 0;
   color: #0f172a;
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .reportsPage .paperSection {
@@ -3138,7 +3261,7 @@
   color: #111827;
   padding: 5px 8px;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
   text-transform: uppercase;
 }
 
@@ -3187,7 +3310,7 @@
   align-items: center;
   padding: 4px 7px;
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .reportsPage .paperInfoGrid strong,
@@ -3227,7 +3350,7 @@
   align-items: center;
   padding: 4px 8px;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .reportsPage .paperCheckRows {
@@ -3252,7 +3375,7 @@
   color: #0f172a;
   font-size: 11px;
   font-style: normal;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .reportsPage .paperCheckRow em,
@@ -3275,7 +3398,7 @@
   color: #0f172a;
   padding: 5px 7px;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .reportsPage .paperCheckTable .deviceName {
@@ -3316,7 +3439,7 @@
 .label .required-star {
   color: #ef4444;
   margin-left: 6px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .label.has-value .required-star {
@@ -3347,7 +3470,7 @@
   align-items: center;
   padding: 0 10px;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .reportsPage .editableReportTable .reportInput {
@@ -3420,7 +3543,7 @@
   overflow: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  background: #dbeafe;
+  background: var(--report-preview-bg);
   border-radius: var(--radius-sm);
   padding: 8px;
 }
@@ -3641,7 +3764,7 @@
   gap: 6px;
   color: var(--text);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .schedulePage .ownerFilter span {
@@ -3663,7 +3786,7 @@
   color: var(--text);
   cursor: pointer;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .schedulePage .allSitesToggle input {
@@ -3746,7 +3869,7 @@
   margin: -6px 0 12px;
   color: var(--text-soft);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .schedulePage .calendarLegend span {
@@ -3811,7 +3934,7 @@
   place-items: center;
   color: var(--calendar-header-text);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .schedulePage .calendarGrid {
@@ -3852,7 +3975,7 @@
 
 .schedulePage .dayCell strong {
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .schedulePage .dayCell:hover,
@@ -3892,7 +4015,7 @@
   color: var(--primary-strong);
   padding: 2px 5px;
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .schedulePage .dayDetailCard {
@@ -3912,14 +4035,14 @@
   margin: 0;
   color: var(--text);
   font-size: 14px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .schedulePage .dayDetailCard p {
   margin: 7px 0 0;
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .schedulePage .addPlanButton:disabled {
@@ -3986,7 +4109,7 @@
 .schedulePage .plannedItem span {
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .schedulePage .deletePlanButton {
@@ -4073,7 +4196,7 @@
   gap: 5px;
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4088,12 +4211,98 @@
   color: #facc15;
   padding: 0 8px;
   font-size: 10px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .schedulePage .sitePlanStatus.scheduled {
   background: var(--success-soft);
   color: #34d399;
+}
+
+.schedulePage .scheduleEditorPage {
+  width: 100%;
+  min-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 88px;
+}
+
+.schedulePage .scheduleEditorForm {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.schedulePage .scheduleEditorHeader {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.schedulePage .scheduleEditorBackButton {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+}
+
+.schedulePage .scheduleEditorBackButton:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-2);
+}
+
+.schedulePage .scheduleEditorHeader h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.schedulePage .scheduleEditorHeader p {
+  margin: 6px 0 0;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.schedulePage .scheduleEditorBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 16px;
+  padding-bottom: 18px;
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.schedulePage .scheduleEditorFooter {
+  position: sticky;
+  z-index: 20;
+  bottom: 0;
+  margin-top: auto;
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  background: linear-gradient(180deg, transparent, var(--bg) 28%);
+}
+
+.schedulePage .scheduleEditorFooterActions {
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .schedulePage .overlay {
@@ -4130,7 +4339,7 @@
   margin: 0;
   color: var(--text);
   font-size: 16px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .schedulePage .modalHeader button {
@@ -4174,7 +4383,7 @@
   align-items: center;
   gap: 7px;
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .schedulePage .selectedFollowers button {
@@ -4214,7 +4423,7 @@
   gap: 8px;
   color: var(--text);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .schedulePage .followerOption:hover {
@@ -4246,7 +4455,7 @@
 .schedulePage .planDetailGrid span {
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .schedulePage .planDetailGrid strong {
@@ -4307,6 +4516,16 @@
     grid-template-columns: 1fr;
   }
 
+  .schedulePage .scheduleEditorPage {
+    min-height: calc(100vh - 80px);
+    padding-bottom: 96px;
+  }
+
+  .schedulePage .scheduleEditorFooterActions {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
   .schedulePage .trailingBlock {
     grid-column: span 6;
   }
@@ -4323,7 +4542,7 @@
   color: #34d399;
   padding: 8px 12px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .settingsPage .grid {
@@ -4388,7 +4607,97 @@
 .settingsPage .signatureSavedText {
   color: #34d399;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
+}
+
+.settingsPage .signatureEditorPage,
+.settingsPage .pwaGuidePage {
+  width: 100%;
+  min-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 88px;
+}
+
+.settingsPage .signatureEditorHeader,
+.settingsPage .pwaGuidePageHeader {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.settingsPage .signatureEditorBackButton,
+.settingsPage .pwaGuidePageBackButton {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+}
+
+.settingsPage .signatureEditorBackButton:hover,
+.settingsPage .pwaGuidePageBackButton:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-2);
+}
+
+.settingsPage .signatureEditorHeader h1,
+.settingsPage .pwaGuidePageHeader h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.settingsPage .signatureEditorBody,
+.settingsPage .pwaGuidePageBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 18px;
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.settingsPage .signatureEditorBody canvas {
+  width: 100%;
+  min-height: 280px;
+  height: min(52vh, 420px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #ffffff;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.settingsPage .signatureEditorFooter,
+.settingsPage .pwaGuidePageFooter {
+  position: sticky;
+  z-index: 20;
+  bottom: 0;
+  margin-top: auto;
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  background: linear-gradient(180deg, transparent, var(--bg) 28%);
+}
+
+.settingsPage .signatureEditorFooterActions {
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .settingsPage .settingsSignatureOverlay {
@@ -4470,7 +4779,7 @@
   color: var(--text-soft);
   text-align: left;
   padding: 0 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .settingsPage .activeOption {
@@ -4505,7 +4814,7 @@
   background: rgba(34, 197, 94, 0.14);
   color: #86efac;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .pwaGuideOverlay {
@@ -4645,6 +4954,10 @@
 }
 
 /* Sites */
+.sitesPage {
+  padding-bottom: 12px;
+}
+
 .sitesPage .toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 180px 140px;
@@ -4655,6 +4968,128 @@
 .sitesPage .rows {
   display: grid;
   gap: 10px;
+}
+
+.paginationBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.sitesPage .paginationBarBottom {
+  position: sticky;
+  bottom: 12px;
+  z-index: 6;
+  margin-top: 16px;
+}
+
+.paginationSummary {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.paginationControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.paginationPages {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.paginationButton {
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  color: var(--text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.paginationButton span {
+  display: none;
+}
+
+.paginationButton:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--panel-3);
+  color: var(--text);
+}
+
+.paginationButton.active {
+  border-color: rgba(47, 125, 246, 0.45);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+.paginationButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.paginationEllipsis {
+  min-width: 24px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+@media (min-width: 760px) {
+  .paginationButton span {
+    display: inline;
+  }
+}
+
+@media (max-width: 900px) {
+  .sitesPage {
+    padding-bottom: 72px;
+  }
+
+  .sitesPage .paginationBarBottom {
+    bottom: 70px;
+  }
+
+  .sitesPage .toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .paginationBar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .paginationSummary {
+    width: 100%;
+    text-align: center;
+  }
+
+  .paginationControls {
+    width: 100%;
+    margin-left: 0;
+    justify-content: center;
+  }
 }
 
 .sitesPage .siteRow {
@@ -4693,7 +5128,7 @@
   flex-wrap: wrap;
   gap: 9px;
   color: var(--text-muted);
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .sitesPage .siteRow>svg {
@@ -4702,10 +5137,98 @@
   color: var(--text-muted);
 }
 
+.sitesPage .siteEditorPage {
+  width: 100%;
+  min-height: calc(100vh - 120px);
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 88px;
+}
+
+.sitesPage .siteEditorHeader {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 18px;
+}
+
+.sitesPage .siteEditorBackButton {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+}
+
+.sitesPage .siteEditorBackButton:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-2);
+}
+
+.sitesPage .siteEditorHeader h1 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.sitesPage .siteEditorHeader h1 svg {
+  color: var(--primary);
+}
+
+.sitesPage .siteEditorHeader p {
+  margin: 6px 0 0;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.sitesPage .siteEditorPage .tabs {
+  margin: 0 0 16px;
+}
+
+.sitesPage .siteEditorBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 18px;
+  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-width: thin;
+}
+
+.sitesPage .siteEditorFooter {
+  position: sticky;
+  z-index: 20;
+  bottom: 0;
+  margin-top: auto;
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+  background: linear-gradient(180deg, transparent, var(--bg) 28%);
+}
+
+.sitesPage .siteEditorFooterActions {
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .sitesPage .overlay {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: 120;
   display: grid;
   place-items: center;
   padding: 28px;
@@ -4718,8 +5241,8 @@
   height: min(86vh, 620px);
   border: 1px solid var(--border);
   border-radius: 10px;
-  background: #0b1222;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.56);
+  background: var(--panel);
+  box-shadow: var(--shadow);
   display: grid;
   grid-template-rows: 54px auto 1fr 62px;
   overflow: hidden;
@@ -4739,7 +5262,7 @@
   border-top: 1px solid var(--border);
   border-bottom: 0;
   justify-content: flex-end;
-  background: #0d1527;
+  background: var(--panel-2);
 }
 
 .sitesPage .modalFooterActions {
@@ -4781,28 +5304,33 @@
 .sitesPage .tabs {
   margin: 22px 18px 12px;
   min-height: 34px;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
-  gap: 0;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
   border-radius: 10px;
-  background: #101a2e;
+  background: var(--panel-2);
   padding: 3px;
+  scrollbar-width: thin;
 }
 
 .sitesPage .tab,
 .sitesPage .activeTab {
+  flex: 0 0 auto;
   height: 28px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--text-soft);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
+  padding: 0 12px;
+  white-space: nowrap;
 }
 
 .sitesPage .activeTab {
-  background: #090f1d;
+  background: var(--panel);
   color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 .sitesPage .modalBody {
@@ -4838,7 +5366,7 @@
 .sitesPage .sectionCard {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: #101728;
+  background: var(--panel-2);
   padding: 18px;
 }
 
@@ -4846,7 +5374,7 @@
   margin: 0 0 13px;
   color: var(--text-soft);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
   text-transform: uppercase;
 }
 
@@ -4867,7 +5395,7 @@
 .sitesPage .sectionTitleRow span {
   color: var(--text-muted);
   font-size: 11px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .sitesPage .visitMonthChips {
@@ -4888,7 +5416,7 @@
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .sitesPage .visitMonthChips button {
@@ -4935,7 +5463,7 @@
   gap: 8px;
   color: var(--text-soft);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .sitesPage .uploadBox strong {
@@ -5089,7 +5617,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .sitesPage .radioGroup {
@@ -5115,7 +5643,7 @@
   gap: 6px;
   color: var(--text);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .sitesPage .radioGroup input {
@@ -5155,7 +5683,7 @@
 .sitesPage .deviceName {
   color: var(--text-soft);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 500;
 }
 
 .sitesPage .deviceName {
@@ -5184,6 +5712,14 @@
 .sitesPage .dotCell .emptyDot:focus-visible {
   outline: 2px solid var(--primary-strong);
   outline-offset: 2px;
+}
+
+.sitesPage .siteDeleteConfirmMessage {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.6;
 }
 
 .sitesPage .confirmOverlay {
@@ -5222,7 +5758,7 @@
   margin: 0 0 20px;
   color: var(--text-soft);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .sitesPage .confirmActions {
@@ -5232,6 +5768,17 @@
 }
 
 @media (max-width: 900px) {
+
+  .sitesPage .siteEditorPage {
+    min-height: calc(100vh - 80px);
+    padding-bottom: 96px;
+  }
+
+
+  .sitesPage .siteEditorFooterActions {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
 
   .sitesPage .overlay {
     padding: 10px;
@@ -5281,4 +5828,52 @@
 /* Page enter animation — inline styles on .pageEnterSurface drive the motion */
 .pageEnterSurface {
   width: 100%;
+}
+
+[data-theme="light"] .pmWorkPage .photoPopup,
+[data-theme="light"] .schedulePage .scheduleModal,
+[data-theme="light"] .settingsPage .settingsSignatureModal,
+[data-theme="light"] .sitesPage .confirmDialog {
+  background: var(--elevated-surface);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+
+[data-theme="light"] .pmWorkPage .photoPopupOverlay,
+[data-theme="light"] .reportsPage .overlay,
+[data-theme="light"] .schedulePage .overlay,
+[data-theme="light"] .sitesPage .overlay,
+[data-theme="light"] .sitesPage .confirmOverlay,
+[data-theme="light"] .settingsPage .settingsSignatureOverlay,
+[data-theme="light"] .pwaGuideOverlay {
+  background: var(--overlay-backdrop);
+}
+
+[data-theme="light"] .reportsPage .reportListPanel,
+[data-theme="light"] .reportsPage .summaryReportPanel,
+[data-theme="light"] .reportsPage .reportToolbar {
+  background: var(--panel);
+}
+
+[data-theme="light"] .settingsPage .signatureSavedText {
+  color: var(--success-text);
+}
+
+[data-theme="light"] .settingsPage .pwaInstallStatus {
+  background: var(--success-soft);
+  color: var(--success-text);
+}
+
+[data-theme="light"] .schedulePage .sitePlanStatus {
+  color: var(--warning-text);
+}
+
+[data-theme="light"] .schedulePage .sitePlanStatus.scheduled {
+  color: var(--success-text);
+}
+
+[data-theme="light"] .shell .mobileTopbar,
+[data-theme="light"] .shell .bottomNav {
+  background: var(--sidebar);
+  border-color: var(--border);
 }

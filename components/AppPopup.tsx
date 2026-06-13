@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 import { useUi } from "@/lib/i18n";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 export type AlertTone = "error" | "info" | "success";
 export type AlertVariant = "default" | "status";
@@ -16,6 +17,7 @@ function LoadingPopupContent({
   progress?: number;
 }) {
   const [animatedProgress, setAnimatedProgress] = useState(8);
+  useBodyScrollLock(true);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -89,6 +91,7 @@ function AlertPopupContent({
   variant?: AlertVariant;
 }) {
   const [dismissProgress, setDismissProgress] = useState(100);
+  useBodyScrollLock(true);
 
   useEffect(() => {
     const startedAt = Date.now();

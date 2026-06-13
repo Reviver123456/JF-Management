@@ -29,14 +29,16 @@ import {
   type SiteRecord
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
+import { usePageShellLoading } from "@/lib/use-page-shell-loading";
 
 const checklistTabs = ["SYNAPSE", "Server", "Switch", "Storage", "Environment", "DIAG"] as const;
 const allOwnersValue = "__all";
 
 export default function HistoryPage() {
   const { lang, t } = useUi();
-  const { data, error } = usePmData();
-  const { error: userError, userName } = useCurrentUser();
+  const { data, error, isLoading } = usePmData();
+  const { error: userError, isLoading: userLoading, userName } = useCurrentUser();
+  const pageLoading = usePageShellLoading(isLoading, userLoading);
   const reportRows = data.reportRows;
   const [query, setQuery] = useState("");
   const [resultFilter, setResultFilter] = useState("");
@@ -82,7 +84,7 @@ export default function HistoryPage() {
   });
 
   return (
-    <AppShell>
+    <AppShell loading={pageLoading}>
       {activeReport && activeSite ? (
         <div className="pmWorkPage">
           <HistoryDetailView

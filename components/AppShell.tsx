@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Building2,
   CalendarDays,
@@ -21,8 +21,6 @@ import {
   X
 } from "lucide-react";
 import { PageLoadingRing } from "@/components/PageLoadingRing";
-import { consumeBootstrapComplete } from "@/lib/app-bootstrap-cache";
-import { useAppDataLoading } from "@/lib/app-data-loading";
 import { useUi } from "@/lib/i18n";
 import { clearAppBrowserCache } from "@/lib/auth/clear-app-cache";
 import { PageEnterTransition } from "@/components/PageEnterTransition";
@@ -38,43 +36,19 @@ const navItems = [
   { href: "/settings", labelKey: "nav.settings", mobileKey: "navMobile.settings", icon: Settings }
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  loading = false
+}: {
+  children: React.ReactNode;
+  loading?: boolean;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { lang, theme, toggleLang, toggleTheme, t } = useUi();
-  const appDataLoading = useAppDataLoading();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [pageLoading, setPageLoading] = useState(false);
-  const skipBootstrapLoadingRef = useRef<boolean | null>(null);
   const closeMobileMenu = () => setMobileMenuOpen(false);
-
-  if (skipBootstrapLoadingRef.current === null) {
-    skipBootstrapLoadingRef.current = consumeBootstrapComplete();
-  }
-
-  useEffect(() => {
-    if (skipBootstrapLoadingRef.current) {
-      skipBootstrapLoadingRef.current = false;
-      return;
-    }
-
-    setPageLoading(true);
-  }, []);
-
-  useEffect(() => {
-    if (appDataLoading) {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setPageLoading(false);
-    }, 120);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
-  }, [appDataLoading]);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -101,7 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className={`${collapsed ? "shell shellCollapsed" : "shell"}${mobileMenuOpen ? " mobileMenuOpen" : ""}`}>
-      <PageLoadingRing active={pageLoading || appDataLoading} message={t("pm.loadingSubtitle")} />
+      <PageLoadingRing active={loading} message={t("pm.loadingSubtitle")} />
       <button
         className="mobileMenuBackdrop"
         type="button"
