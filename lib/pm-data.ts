@@ -75,6 +75,7 @@ export type PmWorkDetails = {
   checkNotes?: Record<string, string>;
   checkResults?: Record<string, CheckResult>;
   checklistSnapshot?: SavedChecklistGroup[];
+  contractIndex?: number;
   draftStatus?: "draft" | "submitted";
   expenses?: PmExpenseDetails;
   fieldValues?: Record<string, string>;
@@ -321,6 +322,21 @@ export function getSiteContractLabel(contract: SiteContractItem | undefined, ind
 
 export function getSiteProjectName(site: Pick<SiteCatalogRecord, "contract" | "contractDetails" | "site"> | null | undefined, index: number) {
   return getSiteContractAt(site, index).projectName?.trim() || site?.site || "";
+}
+
+export function getSiteContractVisitTotal(
+  site: Pick<SiteCatalogRecord, "contract" | "contractDetails"> | null | undefined,
+  contractIndex: number,
+  fallbackPmCycle?: string
+) {
+  const contract = getSiteContractAt(site, contractIndex);
+  const savedVisitCount = Number(contract.visitCount ?? "0");
+
+  if (Number.isFinite(savedVisitCount) && savedVisitCount > 0) {
+    return savedVisitCount;
+  }
+
+  return getVisitCountForPmCycle(contract.pmCycle ?? fallbackPmCycle);
 }
 
 export function normalizeOwnerName(owner: string | null | undefined) {

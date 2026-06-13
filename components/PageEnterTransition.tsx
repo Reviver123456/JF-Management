@@ -9,7 +9,6 @@ export function usePageEnterVisible(resetKey = "", enabled = true) {
 
   useLayoutEffect(() => {
     if (!enabled) {
-      setVisible(false);
       return;
     }
 
@@ -41,7 +40,7 @@ export function usePageEnterVisible(resetKey = "", enabled = true) {
     };
   }, [resetKey, enabled]);
 
-  return visible;
+  return enabled && visible;
 }
 
 function getEnterSurfaceStyle(visible: boolean) {

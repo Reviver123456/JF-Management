@@ -12,6 +12,8 @@ import {
   UserRound
 } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
+import { AppSelect } from "@/components/AppSelect";
+import { DateRangePicker } from "@/components/DateRangePicker";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
@@ -135,22 +137,23 @@ export default function ReportsPage() {
                 <span>{t("common.search")}</span>
                 <SearchControl placeholder={t("reports.searchInput")} value={query} onChange={setQuery} />
               </div>
-              <label className="reportFilterField">
-                <span>{t("reports.startDate")}</span>
-                <input className="field" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-              </label>
-              <label className="reportFilterField">
-                <span>{t("reports.endDate")}</span>
-                <input className="field" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+              <label className="reportFilterField reportDateRangeField">
+                <span>{t("common.dateRange")}</span>
+                <DateRangePicker
+                  endDate={endDate}
+                  startDate={startDate}
+                  onEndDateChange={setEndDate}
+                  onStartDateChange={setStartDate}
+                />
               </label>
               <label className="reportFilterField">
                 <span>{t("common.inspector")}</span>
-                <select className="select" value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
+                <AppSelect className="select" firstNameOnly value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
                   <option value={allOwnersValue}>{t("common.all")}</option>
                   {ownerOptions.map((owner) => (
                     <option key={owner} value={owner}>{owner}</option>
                   ))}
-                </select>
+                </AppSelect>
               </label>
             </section>
 
@@ -1427,19 +1430,19 @@ function ReportPreviewPage({
           <div className="reportModalControls">
             <label className="label">
               เลือกสัญญา
-              <select className="select" value={preview.contractIndex} onChange={(event) => onContractIndexChange(Number(event.target.value))}>
+              <AppSelect className="select" value={String(preview.contractIndex)} onChange={(event) => onContractIndexChange(Number(event.target.value))}>
                 {contracts.map((contract, index) => (
                   <option key={index} value={index}>{getSiteContractLabel(contract, index)}</option>
                 ))}
-              </select>
+              </AppSelect>
             </label>
             <label className="label">
               ประเภทไฟล์
-              <select className="select" value={downloadType} onChange={(event) => setDownloadType(event.target.value as "pdf" | "word" | "excel")}>
+              <AppSelect className="select" value={downloadType} onChange={(event) => setDownloadType(event.target.value as "pdf" | "word" | "excel")}>
                 <option value="pdf">PDF</option>
                 <option value="word">Word</option>
                 <option value="excel">Excel</option>
-              </select>
+              </AppSelect>
             </label>
             <button className="button subtle" type="button" onClick={printReport}>
               <Printer size={16} />

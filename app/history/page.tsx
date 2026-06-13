@@ -14,6 +14,8 @@ import {
   Wrench
 } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
+import { AppSelect } from "@/components/AppSelect";
+import { DateRangePicker } from "@/components/DateRangePicker";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { useUi } from "@/lib/i18n";
@@ -105,28 +107,29 @@ export default function HistoryPage() {
             </div>
             <label className="historyFilterField">
               <span>{t("common.result")}</span>
-              <select className="select" value={resultFilter} onChange={(event) => setResultFilter(event.target.value)}>
+              <AppSelect className="select" value={resultFilter} onChange={(event) => setResultFilter(event.target.value)}>
               <option value="">{t("common.all")}</option>
               <option value="ปกติ">{t("common.normal")}</option>
               <option value="ผิดปกติ">{t("common.abnormal")}</option>
-              </select>
+              </AppSelect>
             </label>
             <label className="historyFilterField">
               <span>{t("common.inspector")}</span>
-              <select className="select" value={activeOwnerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
+              <AppSelect className="select" firstNameOnly value={activeOwnerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
               <option value={allOwnersValue}>{t("common.all")}</option>
               {ownerOptions.map((owner) => (
                 <option key={owner} value={owner}>{owner}</option>
               ))}
-              </select>
+              </AppSelect>
             </label>
-            <label className="historyFilterField">
-              <span>{t("reports.startDate")}</span>
-              <input className="field" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-            </label>
-            <label className="historyFilterField">
-              <span>{t("reports.endDate")}</span>
-              <input className="field" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+            <label className="historyFilterField historyDateRangeField">
+              <span>{t("common.dateRange")}</span>
+              <DateRangePicker
+                endDate={endDate}
+                startDate={startDate}
+                onEndDateChange={setEndDate}
+                onStartDateChange={setStartDate}
+              />
             </label>
           </section>
 

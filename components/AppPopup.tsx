@@ -1,13 +1,22 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, Info, X } from "lucide-react";
 import { useUi } from "@/lib/i18n";
 import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 
 export type AlertTone = "error" | "info" | "success";
 export type AlertVariant = "default" | "status";
+
+function useIsClient() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+}
 
 function LoadingPopupContent({
   message,
@@ -17,6 +26,7 @@ function LoadingPopupContent({
   progress?: number;
 }) {
   const [animatedProgress, setAnimatedProgress] = useState(8);
+  const isClient = useIsClient();
   useBodyScrollLock(true);
 
   useEffect(() => {
@@ -29,7 +39,11 @@ function LoadingPopupContent({
 
   const displayProgress = progress ?? animatedProgress;
 
-  return (
+  if (!isClient) {
+    return null;
+  }
+
+  return createPortal(
     <div
       aria-label={message ?? "Loading"}
       aria-live="polite"
@@ -57,7 +71,8 @@ function LoadingPopupContent({
         </div>
         <p>{message ?? "Loading"}</p>
       </article>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -91,7 +106,9 @@ function AlertPopupContent({
   variant?: AlertVariant;
 }) {
   const [dismissProgress, setDismissProgress] = useState(100);
-  useBodyScrollLock(true);
+  const isClient = useIsClient();
+  const isStatus = variant === "status";
+  useBodyScrollLock(!isStatus);
 
   useEffect(() => {
     const startedAt = Date.now();
@@ -110,13 +127,16 @@ function AlertPopupContent({
   }, [onClose]);
 
   const Icon = tone === "success" ? CheckCircle2 : tone === "error" ? AlertTriangle : Info;
-  const isStatus = variant === "status";
 
-  return (
+  if (!isClient) {
+    return null;
+  }
+
+  return createPortal(
     <div
       aria-label={title ?? message}
       aria-modal="true"
-      className="appPopupOverlay appPopupOverlayAlert"
+      className={`appPopupOverlay appPopupOverlayAlert${isStatus ? " appPopupOverlayStatus" : ""}`}
       role="alertdialog"
     >
       <article className={`appPopupCard appPopupCardAlert ${tone}${isStatus ? " appPopupCardAlertStatus" : ""}`}>
@@ -150,7 +170,8 @@ function AlertPopupContent({
           style={{ transform: `scaleX(${dismissProgress / 100})` }}
         />
       </article>
-    </div>
+    </div>,
+    document.body
   );
 }
 

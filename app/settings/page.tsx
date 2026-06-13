@@ -10,11 +10,35 @@ import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 
+function splitFullName(fullName: string) {
+  const trimmed = fullName.trim();
+
+  if (!trimmed) {
+    return { firstName: "", lastName: "" };
+  }
+
+  const spaceIndex = trimmed.indexOf(" ");
+
+  if (spaceIndex === -1) {
+    return { firstName: trimmed, lastName: "" };
+  }
+
+  return {
+    firstName: trimmed.slice(0, spaceIndex),
+    lastName: trimmed.slice(spaceIndex + 1).trim()
+  };
+}
+
+function joinFullName(firstName: string, lastName: string) {
+  return [firstName.trim(), lastName.trim()].filter(Boolean).join(" ");
+}
+
 export default function SettingsPage() {
   const { lang, theme, setLang, setTheme, t } = useUi();
   const [saved, setSaved] = useState(false);
   const [message, setMessage] = useState("");
-  const [profileName, setProfileName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -33,7 +57,10 @@ export default function SettingsPage() {
       const metadata = user?.user_metadata ?? {};
 
       setEmail(user?.email ?? "");
-      setProfileName(typeof metadata.full_name === "string" ? metadata.full_name : user?.email ?? "");
+      const fullName = typeof metadata.full_name === "string" ? metadata.full_name : user?.email ?? "";
+      const nameParts = splitFullName(fullName);
+      setFirstName(nameParts.firstName);
+      setLastName(nameParts.lastName);
       setPhone(typeof metadata.phone === "string" ? metadata.phone : "");
     }
 
@@ -44,7 +71,7 @@ export default function SettingsPage() {
     const supabase = createClient();
     const { error } = await supabase.auth.updateUser({
       data: {
-        full_name: profileName,
+        full_name: joinFullName(firstName, lastName),
         phone
       }
     });
@@ -136,7 +163,8 @@ export default function SettingsPage() {
           <article className="card">
             <h2><UserRound size={17} /> {t("settings.profile")}</h2>
             <div className="formGrid">
-              <label className="label">{t("fields.username")}<input className="field" value={profileName} onChange={(event) => setProfileName(event.target.value)} /></label>
+              <label className="label">{t("fields.firstName")}<input className="field" value={firstName} onChange={(event) => setFirstName(event.target.value)} /></label>
+              <label className="label">{t("fields.lastName")}<input className="field" value={lastName} onChange={(event) => setLastName(event.target.value)} /></label>
               <label className="label">{t("fields.phone")}<input className="field" value={phone} onChange={(event) => setPhone(event.target.value)} /></label>
               <label className="label">{t("fields.email")}<input className="field" value={email} readOnly /></label>
               <label className="label">{t("fields.contactOther")}<input className="field" defaultValue="Line: pm-admin" /></label>

@@ -1,6 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
+import { useBodyScrollLock } from "@/lib/use-body-scroll-lock";
 import {
   ArrowLeft,
   Building2,
@@ -15,6 +17,7 @@ import {
   X
 } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
+import { AppSelect } from "@/components/AppSelect";
 import { AlertPopup, FeedbackPopups } from "@/components/AppPopup";
 import { Pagination } from "@/components/Pagination";
 import type { SystemUser } from "@/lib/auth/system-users";
@@ -394,17 +397,17 @@ export default function SitesPage() {
 
             <section className="toolbar">
               <SearchControl placeholder={t("sites.searchPlaceholder")} value={query} onChange={setQuery} />
-              <select className="select" value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)}>
+              <AppSelect className="select" value={regionFilter} onChange={(event) => setRegionFilter(event.target.value)}>
                 <option value="">{t("sites.allRegions")}</option>
                 {regions.map((region) => (
                   <option key={region} value={region}>{region}</option>
                 ))}
-              </select>
-              <select className="select" value={siteStatusFilter} onChange={(event) => setSiteStatusFilter(event.target.value)}>
+              </AppSelect>
+              <AppSelect className="select" value={siteStatusFilter} onChange={(event) => setSiteStatusFilter(event.target.value)}>
                 <option value="">{t("sites.allStatuses")}</option>
                 <option value="active">{t("common.active")}</option>
                 <option value="inactive">{t("common.inactive")}</option>
-              </select>
+              </AppSelect>
             </section>
 
             <div ref={listTopRef} />
@@ -826,38 +829,6 @@ function SiteModal({
     }
   }, [activeTab, addCustomChecklistItem, addInspectionSet, contractCount, customChecklistItemsBySection, diagMonitorCounts, inspectionSetCounts, itemLabelsBySection, regions, removeCustomChecklistItem, selectContractIndex, selectedChecklistItems, selectedContract, selectedContractIndex, selectedInspectionTabs, selectedOwner, site, systemUsers, t, toggleChecklistItem, toggleInspectionTab, updateContractCount, updateCustomChecklistItem, updateDefaultChecklistItem, updateDiagMonitorCount, updateSelectedContract]);
 
-  if (showDeleteConfirm) {
-    return (
-      <div className="siteEditorPage">
-        <header className="siteEditorHeader">
-          <button aria-label={t("common.back")} className="siteEditorBackButton" type="button" onClick={() => setShowDeleteConfirm(false)}>
-            <ArrowLeft size={18} />
-          </button>
-          <div>
-            <h1>{t("sites.deleteModalTitle")}</h1>
-            <p>{site.site}</p>
-          </div>
-        </header>
-
-        <div className="siteEditorBody">
-          <p className="siteDeleteConfirmMessage">{t("sites.deleteConfirmMessage").replace("{site}", site.site)}</p>
-        </div>
-
-        <footer className="siteEditorFooter">
-          <div className="siteEditorFooterActions">
-            <button className="button ghost" type="button" onClick={() => setShowDeleteConfirm(false)} disabled={isDeleting}>
-              {t("common.cancel")}
-            </button>
-          </div>
-          <button className="button danger" type="button" onClick={deleteSite} disabled={isDeleting}>
-            <Trash2 size={16} />
-            {isDeleting ? t("sites.deletingSite") : t("sites.deleteSite")}
-          </button>
-        </footer>
-      </div>
-    );
-  }
-
   return (
     <div className="siteEditorPage">
       <header className="siteEditorHeader">
@@ -897,6 +868,15 @@ function SiteModal({
         onClose={() => setSaveError("")}
       />
 
+      <SiteDeleteConfirmPopup
+        isDeleting={isDeleting}
+        open={showDeleteConfirm}
+        siteName={site.site}
+        onCancel={() => setShowDeleteConfirm(false)}
+        onConfirm={deleteSite}
+      />
+
+      {!showDeleteConfirm ? (
       <footer className="siteEditorFooter">
         <div className="siteEditorFooterActions">
           <button className="button ghost" type="button" onClick={onClose}>{t("common.cancel")}</button>
@@ -917,7 +897,82 @@ function SiteModal({
           {t("sites.saveSite")}
         </button>
       </footer>
+      ) : null}
     </div>
+  );
+}
+
+function useIsClient() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+}
+
+function SiteDeleteConfirmPopup({
+  open,
+  siteName,
+  isDeleting,
+  onCancel,
+  onConfirm
+}: {
+  open: boolean;
+  siteName: string;
+  isDeleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useUi();
+  const isClient = useIsClient();
+  useBodyScrollLock(open);
+
+  if (!open || !isClient) {
+    return null;
+  }
+
+  return createPortal(
+    <div aria-labelledby="site-delete-title" aria-modal="true" className="siteDeleteConfirmOverlay" role="dialog">
+      <button
+        aria-label={t("common.cancel")}
+        className="siteDeleteConfirmBackdrop"
+        disabled={isDeleting}
+        type="button"
+        onClick={onCancel}
+      />
+      <div className="siteDeleteConfirmDialog">
+        <header className="siteDeleteConfirmHeader">
+          <div>
+            <h3 id="site-delete-title">{t("sites.deleteModalTitle")}</h3>
+            {siteName ? <p className="siteDeleteConfirmSubtitle">{siteName}</p> : null}
+          </div>
+          <button
+            aria-label={t("common.cancel")}
+            className="siteDeleteConfirmClose"
+            disabled={isDeleting}
+            type="button"
+            onClick={onCancel}
+          >
+            <X size={16} />
+          </button>
+        </header>
+        <div className="siteDeleteConfirmBody">
+          <p className="siteDeleteConfirmMessage">{t("sites.deleteConfirmMessage").replace("{site}", siteName)}</p>
+        </div>
+        <footer className="siteDeleteConfirmFooter">
+          <div className="siteDeleteConfirmFooterActions">
+            <button className="button ghost" type="button" onClick={onCancel} disabled={isDeleting}>
+              {t("common.cancel")}
+            </button>
+          </div>
+          <button className="button danger" type="button" onClick={onConfirm} disabled={isDeleting}>
+            <Trash2 size={16} />
+            {isDeleting ? t("sites.deletingSite") : t("sites.deleteSite")}
+          </button>
+        </footer>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -956,32 +1011,32 @@ function CustomerTab({
         <Field label={t("fields.email")} value={site.email} />
         <label className="label">
           จำนวนสัญญา
-          <select className="select" value={contractCount} onChange={(event) => onContractCountChange(Number(event.target.value))}>
+          <AppSelect className="select" value={String(contractCount)} onChange={(event) => onContractCountChange(Number(event.target.value))}>
             {contractCountOptions.map((count) => (
               <option key={count} value={count}>{count} สัญญา</option>
             ))}
-          </select>
+          </AppSelect>
         </label>
         <Field label={t("common.province")} value={site.province} />
         <label className="label">
           {t("fields.regionArea")}
-          <select className="select" defaultValue={site.region}>
+          <AppSelect className="select" defaultValue={site.region}>
             <option>{t("fields.selectRegion")}</option>
             {regions.map((region) => (
               <option key={region}>{region}</option>
             ))}
-          </select>
+          </AppSelect>
         </label>
         <label className="label">
           {t("fields.siteOwner")}
-          <select className="select" value={ownerExists ? selectedOwner : ""} onChange={(event) => onOwnerChange(event.target.value)}>
+          <AppSelect className="select" firstNameOnly value={ownerExists ? selectedOwner : ""} onChange={(event) => onOwnerChange(event.target.value)}>
             <option value="" disabled>{t("fields.siteOwner")}</option>
             {systemUsers.map((user) => (
               <option key={user.id} value={user.name}>
                 {user.name}
               </option>
             ))}
-          </select>
+          </AppSelect>
         </label>
         <Field label={t("fields.latitude")} value="13.7563" />
         <Field label={t("fields.longitude")} value="100.5018" />
@@ -1045,15 +1100,15 @@ function ContractTab({
       <div className="formGrid">
         <label className="label">
           เลือกสัญญา
-          <select className="select" value={selectedContractIndex} onChange={(event) => onSelectedContractIndexChange(Number(event.target.value))}>
+          <AppSelect className="select" value={String(selectedContractIndex)} onChange={(event) => onSelectedContractIndexChange(Number(event.target.value))}>
             {Array.from({ length: contractCount }, (_, index) => (
               <option key={index} value={index}>สัญญา {index + 1}</option>
             ))}
-          </select>
+          </AppSelect>
         </label>
         <label className="label">
           {t("fields.pmCycle")}
-          <select
+          <AppSelect
             className="select"
             value={selectedPmCycle}
             onChange={(event) => updatePmCycle(event.target.value)}
@@ -1061,7 +1116,7 @@ function ContractTab({
             {["รายเดือน", "ราย3เดือน", "ราย4เดือน", "ครึ่งปี", "รายปี"].map((cycle) => (
               <option key={cycle} value={cycle}>{localizeLabel(cycle, lang)}</option>
             ))}
-          </select>
+          </AppSelect>
         </label>
         <label className="label">
           {t("fields.contractNumber")}
@@ -1090,12 +1145,12 @@ function ContractTab({
           <h3>{t("sites.visitMonths")}</h3>
           <span>{visitLimitLabel}</span>
         </div>
-        <select className="select" value="" disabled={!canAddVisitMonth} onChange={(event) => addVisitMonth(event.target.value)}>
+        <AppSelect className="select" value="" disabled={!canAddVisitMonth} onChange={(event) => addVisitMonth(event.target.value)}>
           <option value="">{t("sites.selectVisitMonth")}</option>
           {availableVisitMonths.map((month) => (
             <option key={month.value} value={month.value}>{lang === "th" ? month.th : month.en}</option>
           ))}
-        </select>
+        </AppSelect>
         {orderedSelectedVisitMonths.length > 0 ? (
           <div className="visitMonthChips">
             {orderedSelectedVisitMonths.map((month) => (
@@ -1464,10 +1519,10 @@ function DiagSetPanel({
           ))}
           <label className="label">
             {t("sites.monitorCount")}
-            <select className="select" value={monitorCount} onChange={(event) => onMonitorCountChange(diagSet.id, Number(event.target.value) === 1 ? 1 : 2)}>
+            <AppSelect className="select" value={String(monitorCount)} onChange={(event) => onMonitorCountChange(diagSet.id, Number(event.target.value) === 1 ? 1 : 2)}>
               <option value={1}>1 Monitor</option>
               <option value={2}>2 Monitor</option>
-            </select>
+            </AppSelect>
           </label>
         </div>
         <RadioGroup label={`Antivirus ${diagSet.id}`} items={["Installed", "No Installation"]} />

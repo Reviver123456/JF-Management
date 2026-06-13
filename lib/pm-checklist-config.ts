@@ -1,3 +1,5 @@
+import { getSiteContractAt, type SiteCatalogRecord } from "./pm-data";
+
 export const pmChecklistKeys = ["synapse", "server", "switch", "storage", "environment", "diag"] as const;
 
 export type PmChecklistKey = (typeof pmChecklistKeys)[number];
@@ -158,4 +160,26 @@ export function writeSitePmChecklistConfig(siteId: string, config: PmChecklistCo
   const store = readStore();
   store[siteId] = normalizeConfig(config);
   window.localStorage.setItem(storageKey, JSON.stringify(store));
+}
+
+export function readSiteContractChecklistConfig(
+  site: Pick<SiteCatalogRecord, "id" | "contract" | "contractDetails"> | null | undefined,
+  contractIndex: number
+): PmChecklistConfig {
+  const contract = getSiteContractAt(site, contractIndex);
+  const contractConfig = contract.checklistConfig;
+
+  if (contractConfig) {
+    return normalizePmChecklistConfig(contractConfig);
+  }
+
+  if (contractIndex === 0 && site?.contractDetails?.checklistConfig) {
+    return normalizePmChecklistConfig(site.contractDetails.checklistConfig);
+  }
+
+  if (contractIndex === 0 && site?.id) {
+    return readSitePmChecklistConfig(site.id);
+  }
+
+  return defaultPmChecklistConfig;
 }

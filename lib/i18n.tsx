@@ -112,6 +112,8 @@ const dictionaries: Record<Lang, Dictionary> = {
     },
     fields: {
       username: "ชื่อผู้ใช้งาน",
+      firstName: "ชื่อ",
+      lastName: "นามสกุล",
       email: "อีเมล",
       phone: "เบอร์โทรศัพท์",
       contactOther: "ข้อมูลติดต่ออื่น ๆ",
@@ -220,6 +222,7 @@ const dictionaries: Record<Lang, Dictionary> = {
       phoneShort: "โทร",
       region: "ภาค",
       pmCycle: "รอบ PM",
+      selectContract: "เลือกสัญญา",
       navigateGoogleMaps: "นำทางไป Google Maps",
       noChecklist: "ไซต์นี้ยังไม่ได้เลือกหมวดเช็กลิสต์",
       addPart: "เพิ่มอะไหล่",
@@ -489,6 +492,8 @@ const dictionaries: Record<Lang, Dictionary> = {
     },
     fields: {
       username: "Username",
+      firstName: "First name",
+      lastName: "Last name",
       email: "Email",
       phone: "Phone",
       contactOther: "Other contact",
@@ -597,6 +602,7 @@ const dictionaries: Record<Lang, Dictionary> = {
       phoneShort: "Phone",
       region: "Region",
       pmCycle: "PM cycle",
+      selectContract: "Select contract",
       navigateGoogleMaps: "Open Google Maps",
       noChecklist: "No checklist category selected for this site",
       addPart: "Add part",

@@ -26,13 +26,13 @@ import {
   X
 } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
+import { AppSelect } from "@/components/AppSelect";
 import { FeedbackPopups } from "@/components/AppPopup";
 import type { SystemUser } from "@/lib/auth/system-users";
 import { useUi, type Lang } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
 import {
-  normalizePmChecklistConfig,
-  readSitePmChecklistConfig,
+  readSiteContractChecklistConfig,
   type PmChecklistConfig,
   type PmChecklistKey
 } from "@/lib/pm-checklist-config";
@@ -53,8 +53,12 @@ import {
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import {
   filterPmJobsByParticipant,
-  getContractVisitTotal,
+  getContractCount,
   getDateString,
+  getSiteContractAt,
+  getSiteContractItems,
+  getSiteContractLabel,
+  getSiteContractVisitTotal,
   getSiteRecordJobKey,
   getUniquePmJobs,
   getVisitRoundForJob,
@@ -227,10 +231,8 @@ function diagCalibrateStatusKey(groupKey: string, setTitle: string, blockIndex: 
   return `${groupKey}:calibrate-status:${setTitle}:${blockIndex}:${title}`;
 }
 
-function readChecklistConfigForSite(site: SiteRecord): PmChecklistConfig {
-  return site.contractDetails?.checklistConfig
-    ? normalizePmChecklistConfig(site.contractDetails.checklistConfig)
-    : readSitePmChecklistConfig(site.id);
+function readChecklistConfigForSite(site: SiteRecord, contractIndex = 0): PmChecklistConfig {
+  return readSiteContractChecklistConfig(site, contractIndex);
 }
 
 function getMissingRequiredCount({
@@ -487,7 +489,14 @@ function DetailView({
   const [checkResults, setCheckResults] = useState<Record<string, CheckResult>>(savedDetails?.checkResults ?? {});
   const [checkNotes, setCheckNotes] = useState<Record<string, string>>(savedDetails?.checkNotes ?? {});
   const [activeCheckNoteKey, setActiveCheckNoteKey] = useState("");
-  const [checklistConfig, setChecklistConfig] = useState<PmChecklistConfig>(() => readChecklistConfigForSite(site));
+  const contractCount = getContractCount(site.contractDetails);
+  const contractItems = useMemo(() => getSiteContractItems(site), [site]);
+  const [selectedContractIndex, setSelectedContractIndex] = useState(() => {
+    const savedIndex = savedDetails?.contractIndex ?? 0;
+    return Math.min(Math.max(savedIndex, 0), Math.max(contractCount - 1, 0));
+  });
+  const selectedContract = getSiteContractAt(site, selectedContractIndex);
+  const [checklistConfig, setChecklistConfig] = useState<PmChecklistConfig>(() => readChecklistConfigForSite(site, selectedContractIndex));
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(savedDetails?.fieldValues ?? {});
   const [radioValues, setRadioValues] = useState<Record<string, string>>(savedDetails?.radioValues ?? {});
   const [photos, setPhotos] = useState<PhotoState>(() => mergePhotoState(savedDetails?.photos));
@@ -525,7 +534,8 @@ function DetailView({
   const autosavePromiseRef = useRef<Promise<void> | null>(null);
   const inspectorExists = systemUsers.some((user) => user.name === inspector);
   const visitRound = getVisitRoundForJob(pmJobs, site.id, site.jobId, site.visitDate, site.visitTime);
-  const visitTotal = getContractVisitTotal(site.contractDetails, site.pmCycle);
+  const visitTotal = getSiteContractVisitTotal(site, selectedContractIndex, site.pmCycle);
+  const displayPmCycle = selectedContract.pmCycle ?? site.pmCycle;
   const configuredGroups = useMemo(() => buildConfiguredChecklistGroups(checklistConfig, lang), [checklistConfig, lang]);
   const group = configuredGroups.find((item) => item.key === activeTab) ?? configuredGroups[0];
   const missingRequiredCount = useMemo(() => getMissingRequiredCount({
@@ -545,7 +555,7 @@ function DetailView({
   const saveSuccessMessage = lang === "th" ? "บันทึกข้อมูลงาน PM แล้ว" : "PM job saved.";
 
   useEffect(() => {
-    const refreshConfig = () => setChecklistConfig(readChecklistConfigForSite(site));
+    const refreshConfig = () => setChecklistConfig(readChecklistConfigForSite(site, selectedContractIndex));
 
     refreshConfig();
     window.addEventListener("focus", refreshConfig);
@@ -554,7 +564,13 @@ function DetailView({
       window.removeEventListener("focus", refreshConfig);
       window.removeEventListener("storage", refreshConfig);
     };
-  }, [site]);
+  }, [selectedContractIndex, site]);
+
+  const selectContractIndex = (nextIndex: number) => {
+    const boundedIndex = Math.min(Math.max(nextIndex, 0), contractCount - 1);
+    setSelectedContractIndex(boundedIndex);
+    setChecklistConfig(readChecklistConfigForSite(site, boundedIndex));
+  };
 
   useEffect(() => {
     if (configuredGroups.length > 0 && !configuredGroups.some((item) => item.key === activeTab)) {
@@ -629,6 +645,7 @@ function DetailView({
     checkNotes: trimRecordValues(checkNotes),
     checkResults,
     checklistSnapshot: configuredGroups,
+    contractIndex: selectedContractIndex,
     customerSignature,
     expenses: trimExpenses(expenses),
     fieldValues: trimRecordValues(fieldValues),
@@ -648,6 +665,7 @@ function DetailView({
     checkNotes,
     checkResults,
     configuredGroups,
+    selectedContractIndex,
     customerSignature,
     endTime,
     expenses,
@@ -886,7 +904,7 @@ function DetailView({
           <Info label={t("common.province")} value={site.province} />
           <Info label={t("pm.region")} value={site.region} />
           <Info label={t("common.owner")} value={site.owner} />
-          <Info label={t("pm.pmCycle")} value={localizeLabel(site.pmCycle, lang)} />
+          <Info label={t("pm.pmCycle")} value={localizeLabel(displayPmCycle, lang)} />
           <Info label={t("history.visitRound")} value={`${visitRound}/${visitTotal || "-"}`} />
         </div>
         <button
@@ -914,17 +932,17 @@ function DetailView({
           </label>
           <label className={`${inspector.trim() ? "label" : "label missingRequired"} inspectorField`}>
             <RequiredLabel label={t("common.inspector")} required={!inspector.trim()} />
-            <select className="select" value={inspector} onChange={(event) => setInspector(event.target.value)}>
+            <AppSelect className="select" firstNameOnly value={inspector} onChange={(event) => setInspector(event.target.value)}>
               <option value="" disabled>{t("common.inspector")}</option>
               {!inspectorExists && inspector ? <option value={inspector}>{inspector}</option> : null}
               {systemUsers.map((user) => (
                 <option key={user.id} value={user.name}>{user.name}</option>
               ))}
-            </select>
+            </AppSelect>
           </label>
         </div>
       </section>
-
+      {/* 
       <section className="card">
         <h2><ReceiptText size={17} /> {t("pm.expenses")}</h2>
         <div className="expenseGrid">
@@ -940,10 +958,18 @@ function DetailView({
             </label>
           ))}
         </div>
-      </section>
+      </section> */}
 
       <section className="card">
         <h2><ClipboardCheck size={17} /> {t("pm.checklist")}</h2>
+        <label className="label contractSelectField">
+          {t("pm.selectContract")}
+          <AppSelect className="select" value={String(selectedContractIndex)} onChange={(event) => selectContractIndex(Number(event.target.value))}>
+            {contractItems.map((contract, index) => (
+              <option key={index} value={index}>{getSiteContractLabel(contract, index)}</option>
+            ))}
+          </AppSelect>
+        </label>
         <div className="tabs">
           {configuredGroups.map((tab) => (
             <button className={tab.key === activeTab ? "activeTab" : "tab"} type="button" key={tab.key} onClick={() => setActiveTab(tab.key)}>

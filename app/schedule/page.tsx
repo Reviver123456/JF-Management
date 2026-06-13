@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, Plus, Trash2, UserRound, X } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
+import { AppSelect } from "@/components/AppSelect";
 import { AlertPopup, FeedbackPopups } from "@/components/AppPopup";
 import type { SystemUser } from "@/lib/auth/system-users";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
@@ -367,15 +368,16 @@ export default function SchedulePage() {
                 <div className="scheduleActions">
                   <label className="ownerFilter">
                     <span>{t("fields.siteOwner")}</span>
-                    <select
+                    <AppSelect
                       className="select"
+                      firstNameOnly
                       value={activeOwner}
                       onChange={(event) => setSelectedOwner(event.target.value)}
                     >
                       {ownerOptions.map((owner) => (
                         <option key={owner} value={owner}>{owner}</option>
                       ))}
-                    </select>
+                    </AppSelect>
                   </label>
                 </div>
               }
@@ -677,13 +679,13 @@ function AddPlanModal({
           </label>
           <label className="label">
             {t("fields.siteSelect")}
-            <select className="select" value={selectedSiteId} onChange={(event) => setSiteId(event.target.value)}>
+            <AppSelect className="select" value={selectedSiteId} onChange={(event) => setSiteId(event.target.value)}>
               {availableSites.map((site) => (
                 <option key={site.id} value={site.id}>
                   {site.site} - {site.customer}
                 </option>
               ))}
-            </select>
+            </AppSelect>
           </label>
           <div className="scheduleDateRange">
             <label className="label">
@@ -715,7 +717,7 @@ function AddPlanModal({
           </label>
           <label className="label">
             {followersLabel}
-            <select
+            <AppSelect
               className="select"
               value={followerSelect}
               disabled={availableFollowerUsers.length === 0}
@@ -728,7 +730,7 @@ function AddPlanModal({
               {availableFollowerUsers.map((user) => (
                 <option key={user.id} value={user.name}>{user.name}</option>
               ))}
-            </select>
+            </AppSelect>
           </label>
           {followers.length > 0 ? (
             <div className="selectedFollowers">

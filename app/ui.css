@@ -532,7 +532,6 @@
   grid-template-columns: 52px minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  border: 1px solid rgba(31, 43, 67, 0.8);
   border-radius: 9px;
   background: var(--panel-3);
   padding: 10px;
@@ -738,7 +737,7 @@
 /* History */
 .historyPage .toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 150px 170px 150px 150px;
+  grid-template-columns: minmax(0, 1fr) 150px 170px minmax(180px, 240px);
   gap: 10px;
   margin-bottom: 18px;
 }
@@ -759,7 +758,9 @@
 
 .historyPage .historyFilterField .searchControl,
 .historyPage .historyFilterField .select,
-.historyPage .historyFilterField .field {
+.historyPage .historyFilterField .field,
+.historyPage .historyFilterField .dateRangePicker,
+.historyPage .historyFilterField .dateRangePickerTrigger {
   width: 100%;
   min-width: 0;
   height: 38px;
@@ -832,7 +833,9 @@
 
   .historyPage .historyFilterField .searchControl,
   .historyPage .historyFilterField .select,
-  .historyPage .historyFilterField .field {
+  .historyPage .historyFilterField .field,
+  .historyPage .historyFilterField .dateRangePicker,
+  .historyPage .historyFilterField .dateRangePickerTrigger {
     min-height: 44px;
     height: 44px;
   }
@@ -1104,6 +1107,11 @@
 
 .pmWorkPage .card h2 svg {
   color: var(--primary);
+}
+
+.pmWorkPage .contractSelectField {
+  margin: 0 0 14px;
+  max-width: min(100%, 360px);
 }
 
 .pmWorkPage .infoGrid,
@@ -1989,7 +1997,7 @@
 /* Reports */
 .reportsPage .toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 170px 150px 150px;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 240px) 170px;
   gap: 10px;
   margin-bottom: 18px;
 }
@@ -2010,7 +2018,9 @@
 
 .reportsPage .reportFilterField .searchControl,
 .reportsPage .reportFilterField .select,
-.reportsPage .reportFilterField .field {
+.reportsPage .reportFilterField .field,
+.reportsPage .reportFilterField .dateRangePicker,
+.reportsPage .reportFilterField .dateRangePickerTrigger {
   width: 100%;
   min-width: 0;
   height: 38px;
@@ -2444,7 +2454,7 @@
 .reportsPage .templateTable th {
   background: #e7f0fb;
   color: #102a4c;
-  font-weight: 500;
+  font-weight: 800;
 }
 
 .reportsPage .infoTemplateTable {
@@ -3713,7 +3723,9 @@
 
   .reportsPage .reportFilterField .searchControl,
   .reportsPage .reportFilterField .select,
-  .reportsPage .reportFilterField .field {
+  .reportsPage .reportFilterField .field,
+  .reportsPage .reportFilterField .dateRangePicker,
+  .reportsPage .reportFilterField .dateRangePickerTrigger {
     min-height: 44px;
     height: 44px;
   }
@@ -5714,7 +5726,7 @@
   outline-offset: 2px;
 }
 
-.sitesPage .siteDeleteConfirmMessage {
+.siteDeleteConfirmMessage {
   margin: 0;
   color: var(--text-soft);
   font-size: 15px;
@@ -5722,48 +5734,104 @@
   line-height: 1.6;
 }
 
-.sitesPage .confirmOverlay {
+.siteDeleteConfirmOverlay {
   position: fixed;
   inset: 0;
-  z-index: 120;
+  z-index: 300;
   display: grid;
   place-items: center;
   padding: 20px;
+  background: var(--overlay-backdrop);
+  backdrop-filter: blur(8px);
 }
 
-.sitesPage .confirmBackdrop {
+.siteDeleteConfirmBackdrop {
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgba(0, 0, 0, 0.62);
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
-.sitesPage .confirmDialog {
+.siteDeleteConfirmBackdrop:disabled {
+  cursor: not-allowed;
+}
+
+.siteDeleteConfirmDialog {
   position: relative;
-  width: min(100%, 380px);
+  z-index: 1;
+  width: min(100%, 440px);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
-  background: #0b1222;
+  background: var(--panel);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.56);
-  padding: 20px;
+  overflow: hidden;
 }
 
-.sitesPage .confirmDialog h3 {
-  margin: 0 0 8px;
+.siteDeleteConfirmHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 20px 0;
+}
+
+.siteDeleteConfirmHeader h3 {
+  margin: 0;
   color: var(--text);
-  font-size: 16px;
+  font-size: 18px;
+  line-height: 1.25;
 }
 
-.sitesPage .confirmDialog p {
-  margin: 0 0 20px;
+.siteDeleteConfirmSubtitle {
+  margin: 6px 0 0;
   color: var(--text-soft);
   font-size: 13px;
   font-weight: 500;
 }
 
-.sitesPage .confirmActions {
+.siteDeleteConfirmClose {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-soft);
+  display: grid;
+  place-items: center;
+}
+
+.siteDeleteConfirmClose:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--panel-2);
+}
+
+.siteDeleteConfirmClose:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.siteDeleteConfirmBody {
+  padding: 16px 20px 20px;
+}
+
+.siteDeleteConfirmFooter {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-2);
+}
+
+.siteDeleteConfirmFooterActions {
+  margin-right: auto;
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
@@ -5843,7 +5911,7 @@
 [data-theme="light"] .reportsPage .overlay,
 [data-theme="light"] .schedulePage .overlay,
 [data-theme="light"] .sitesPage .overlay,
-[data-theme="light"] .sitesPage .confirmOverlay,
+[data-theme="light"] .siteDeleteConfirmOverlay,
 [data-theme="light"] .settingsPage .settingsSignatureOverlay,
 [data-theme="light"] .pwaGuideOverlay {
   background: var(--overlay-backdrop);
@@ -5876,4 +5944,372 @@
 [data-theme="light"] .shell .bottomNav {
   background: var(--sidebar);
   border-color: var(--border);
+}
+
+/* Date Range Picker */
+.dateRangePicker {
+  width: 100%;
+  min-width: 0;
+}
+
+.dateRangePickerControl {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.dateRangePickerTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  font-weight: 400;
+  padding-right: 10px;
+}
+
+.dateRangePickerTriggerIcon {
+  flex: 0 0 auto;
+  color: var(--primary-strong);
+}
+
+.dateRangePickerTriggerLabel {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.dateRangePickerTriggerLabel.isPlaceholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.dateRangePicker.isOpen .dateRangePickerTrigger,
+.dateRangePickerTrigger:hover {
+  border-color: var(--border-strong);
+  background: var(--panel-3);
+}
+
+.dateRangePicker.isOpen .dateRangePickerTrigger {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.dateRangePickerClear {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.dateRangePickerClear:hover {
+  background: var(--nav-hover-bg);
+  color: var(--text);
+}
+
+.dateRangePickerPanel {
+  position: fixed;
+  z-index: 430;
+  width: min(268px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--elevated-surface);
+  box-shadow: var(--shadow);
+  animation: dateRangePickerPanelIn 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes dateRangePickerPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dateRangePickerBody {
+  background: var(--elevated-surface);
+  padding: 10px 10px 6px;
+}
+
+.dateRangePickerNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.dateRangePickerMonthButton {
+  border: 0;
+  background: transparent;
+  color: var(--text-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dateRangePickerMonthButton svg {
+  transition: transform 160ms ease;
+}
+
+.dateRangePickerMonthButton svg.isOpen {
+  transform: rotate(180deg);
+}
+
+.dateRangePickerNavActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.dateRangePickerNavButton {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.dateRangePickerNavButton:hover {
+  background: var(--nav-hover-bg);
+  color: var(--text);
+}
+
+.dateRangePickerWeekHeader {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin-bottom: 2px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.dateRangePickerWeekHeader span {
+  min-height: 18px;
+  display: grid;
+  place-items: center;
+}
+
+.dateRangePickerGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px 0;
+}
+
+.dateRangePickerDay {
+  position: relative;
+  min-height: 28px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.dateRangePickerDay.isOutside .dateRangePickerDayInner {
+  color: var(--text-muted);
+  opacity: 0.45;
+}
+
+.dateRangePickerDay.isInRange::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 24px;
+  transform: translateY(-50%);
+  background: var(--date-range-bar);
+  z-index: 0;
+}
+
+.dateRangePickerDay.isRangeStart.isInRange::before {
+  left: 50%;
+}
+
+.dateRangePickerDay.isRangeEnd.isInRange::before {
+  right: 50%;
+}
+
+.dateRangePickerDay.isRangeStart.isWeekStart.isInRange::before {
+  left: 4px;
+  border-top-left-radius: 999px;
+  border-bottom-left-radius: 999px;
+}
+
+.dateRangePickerDay.isRangeEnd.isWeekEnd.isInRange::before {
+  right: 4px;
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
+}
+
+.dateRangePickerDay.isSingleDay.isInRange::before {
+  display: none;
+}
+
+.dateRangePickerDayInner {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 24px);
+  aspect-ratio: 1;
+  margin: 2px auto;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 500;
+  transition: background-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.dateRangePickerDay:hover .dateRangePickerDayInner:not(.isRangeStart):not(.isRangeEnd) {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+.dateRangePickerDayInner.isRangeStart,
+.dateRangePickerDayInner.isRangeEnd {
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(47, 125, 246, 0.22);
+}
+
+.dateRangePickerDayInner.isPreviewEnd {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  box-shadow: none;
+}
+
+.dateRangePickerDayInner.isInRangeMiddle {
+  color: var(--primary-strong);
+}
+
+.dateRangePickerDay.isToday:not(.isRangeStart):not(.isRangeEnd) .dateRangePickerDayInner {
+  box-shadow: inset 0 0 0 1px var(--text-soft);
+}
+
+.dateRangePickerYearGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  max-height: 180px;
+  overflow: auto;
+  padding: 2px 0 4px;
+  scrollbar-width: thin;
+}
+
+.dateRangePickerYear {
+  min-height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.dateRangePickerYear:hover {
+  background: var(--nav-hover-bg);
+  color: var(--text);
+}
+
+.dateRangePickerYear.isSelected {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.dateRangePickerFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--elevated-surface);
+  padding: 6px 10px 8px;
+}
+
+.dateRangePickerFooterButton {
+  border: 0;
+  background: transparent;
+  color: var(--primary-strong);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+.dateRangePickerFooterButton.isPrimary {
+  color: var(--primary);
+}
+
+.dateRangePickerFooterButton:hover {
+  opacity: 0.82;
+}
+
+[data-theme="light"] .dateRangePickerDayInner.isRangeStart,
+[data-theme="light"] .dateRangePickerDayInner.isRangeEnd {
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.18);
+}
+
+.historyPage .historyDateRangeField,
+.reportsPage .reportDateRangeField {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+
+  .historyPage .historyDateRangeField,
+  .reportsPage .reportDateRangeField {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .dateRangePickerBody {
+    padding: 8px 8px 6px;
+  }
+
+  .dateRangePickerFooter {
+    padding: 6px 8px 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dateRangePickerPanel {
+    animation: none;
+  }
+
+  .dateRangePickerMonthButton svg {
+    transition: none;
+  }
 }

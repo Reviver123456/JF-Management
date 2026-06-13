@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { Building2, CalendarCheck2, CheckCircle2, Clock3, ClipboardCheck, MapPin, Timer } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
+import { AppSelect } from "@/components/AppSelect";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { usePageEnterVisible } from "@/components/PageEnterTransition";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
@@ -110,12 +111,12 @@ export default function DashboardPage() {
             <div className="dashboardActions">
               <label className="ownerFilter">
                 <span>{t("fields.siteOwner")}</span>
-                <select className="select" value={activeOwner} onChange={(event) => setSelectedOwner(event.target.value)}>
+                <AppSelect className="select" firstNameOnly value={activeOwner} onChange={(event) => setSelectedOwner(event.target.value)}>
                   <option value={allOwnersValue}>{t("common.all")}</option>
                   {ownerOptions.map((owner) => (
                     <option key={owner} value={owner}>{owner}</option>
                   ))}
-                </select>
+                </AppSelect>
               </label>
             </div>
           }
