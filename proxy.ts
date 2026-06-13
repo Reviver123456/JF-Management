@@ -1,10 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { supabaseCookieOptions, supabaseSsrCookieMethods } from "@/lib/supabase/ssr-options";
+
 const publicPaths = [
   "/login",
   "/reset-password",
-  "/api/db/health"
+  "/api/db/health",
+  "/api/auth/cleanup-metadata"
 ];
 
 export async function proxy(request: NextRequest) {
@@ -18,7 +21,9 @@ export async function proxy(request: NextRequest) {
 
   let supabaseResponse = NextResponse.next({ request });
   const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    cookieOptions: supabaseCookieOptions,
     cookies: {
+      ...supabaseSsrCookieMethods,
       getAll() {
         return request.cookies.getAll();
       },

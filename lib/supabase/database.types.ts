@@ -113,6 +113,24 @@ export type Database = {
           }
         ];
       };
+      user_profiles: {
+        Row: {
+          user_id: string;
+          signature: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          signature?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          signature?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

@@ -54,10 +54,12 @@ export async function POST(request: Request) {
     }
 
     const adminClient = createAdminClient();
+    const { signature: _removedSignature, ...metadataWithoutSignature } = verifiedLogin.user.user_metadata ?? {};
     const { error: updateError } = await adminClient.auth.admin.updateUserById(verifiedLogin.user.id, {
       password: newPassword,
       user_metadata: {
-        ...verifiedLogin.user.user_metadata,
+        ...metadataWithoutSignature,
+        signature: null,
         must_change_password: false
       }
     });

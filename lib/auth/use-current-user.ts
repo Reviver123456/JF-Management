@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { createClient } from "@/lib/supabase/client";
 
 type CurrentUserState = {
@@ -10,6 +11,33 @@ type CurrentUserState = {
   signature: string;
   userName: string;
 };
+
+async function loadSignatureFromDb(localFallback: string) {
+  const response = await fetch("/api/auth/signature", { cache: "no-store" });
+  const payload = await response.json() as { ok?: boolean; signature?: string; message?: string };
+
+  if (!response.ok || !payload.ok) {
+    throw new Error(payload.message ?? "Cannot load signature.");
+  }
+
+  const dbSignature = payload.signature ?? "";
+
+    if (!dbSignature && localFallback) {
+      const migrateResponse = await fetch("/api/auth/signature", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ signature: localFallback })
+      });
+
+      if (migrateResponse.ok) {
+        return localFallback;
+      }
+    }
+
+    return dbSignature || localFallback;
+}
 
 export function useCurrentUser(): CurrentUserState {
   const [state, setState] = useState<CurrentUserState>({
@@ -39,11 +67,19 @@ export function useCurrentUser(): CurrentUserState {
         const userName = typeof metadata.full_name === "string" && metadata.full_name.trim()
           ? metadata.full_name.trim()
           : user?.email ?? "";
-        const signature = typeof metadata.signature === "string" ? metadata.signature : "";
+        const userEmail = user?.email ?? "";
+        const localSignature = userEmail
+          ? window.localStorage.getItem(getUserSignatureStorageKey(userEmail)) ?? ""
+          : "";
+        const signature = user ? await loadSignatureFromDb(localSignature) : "";
+
+        if (userEmail && signature && signature !== localSignature) {
+          window.localStorage.setItem(getUserSignatureStorageKey(userEmail), signature);
+        }
 
         if (isCurrent) {
           setState({
-            email: user?.email ?? "",
+            email: userEmail,
             error: null,
             isLoading: false,
             signature,

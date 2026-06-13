@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { LockKeyhole, UserRound } from "lucide-react";
 import { FeedbackPopups } from "@/components/AppPopup";
+import { clearSupabaseAuthCookies, getAuthCookieSize } from "@/lib/auth/clear-auth-cookies";
 import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 
@@ -17,6 +18,21 @@ export default function LoginPage() {
   const [messageTone, setMessageTone] = useState<"error" | "success">("error");
   const [resetMode, setResetMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const hasLegacyCookies = document.cookie.split(";").some((entry) => {
+      const name = entry.trim().split("=")[0];
+      return name.startsWith("sb-") && !name.startsWith("sb-auth");
+    });
+
+    if (hasLegacyCookies || getAuthCookieSize() > 8192) {
+      clearSupabaseAuthCookies();
+      setMessageTone("success");
+      setMessage(lang === "th"
+        ? "ล้าง session เก่าที่ใหญ่เกินไปแล้ว กรุณาเข้าสู่ระบบใหม่"
+        : "Cleared an oversized session. Please sign in again.");
+    }
+  }, [lang]);
 
   const signIn = async () => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -58,6 +74,9 @@ export default function LoginPage() {
       }
       return;
     }
+
+    await fetch("/api/auth/cleanup-metadata", { method: "POST" });
+    await supabase.auth.refreshSession();
 
     router.replace("/dashboard");
     router.refresh();

@@ -86,6 +86,8 @@ export type PmWorkDetails = {
   radioValues?: Record<string, string>;
   savedAt?: string;
   signerName?: string;
+  inspectorSignature?: string;
+  customerSignature?: string;
   spareParts?: SavedSparePart[];
   startTime?: string;
   endTime?: string;

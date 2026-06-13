@@ -302,7 +302,7 @@ function PmWorkFallback() {
 function PmWorkContent() {
   const { t } = useUi();
   const { data, error, isLoading, reload } = usePmData();
-  const { error: userError, isLoading: isUserLoading, userName } = useCurrentUser();
+  const { error: userError, isLoading: isUserLoading, userName, signature: userSignature } = useCurrentUser();
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [usersError, setUsersError] = useState("");
   const router = useRouter();
@@ -422,6 +422,7 @@ function PmWorkContent() {
             systemUsers={systemUsers}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
+            userSignature={userSignature}
             onBack={closeDetail}
             onSaved={reload}
           />
@@ -461,6 +462,7 @@ function DetailView({
   systemUsers,
   activeTab,
   setActiveTab,
+  userSignature,
   onBack,
   onSaved
 }: {
@@ -469,6 +471,7 @@ function DetailView({
   systemUsers: SystemUser[];
   activeTab: PmChecklistKey;
   setActiveTab: (value: PmChecklistKey) => void;
+  userSignature: string;
   onBack: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -507,6 +510,8 @@ function DetailView({
   });
   const [summaryNote, setSummaryNote] = useState(savedDetails?.summaryNote ?? "");
   const [signerName, setSignerName] = useState(savedDetails?.signerName ?? "");
+  const [inspectorSignature, setInspectorSignature] = useState(savedDetails?.inspectorSignature ?? "");
+  const [customerSignature, setCustomerSignature] = useState(savedDetails?.customerSignature ?? "");
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState("");
@@ -533,6 +538,12 @@ function DetailView({
     ? `\u0e22\u0e31\u0e07\u0e02\u0e32\u0e14\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25 ${missingRequiredCount} \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23`
     : `${missingRequiredCount} required items remaining`;
   const saveSuccessMessage = lang === "th" ? "บันทึกข้อมูลงาน PM แล้ว" : "PM job saved.";
+
+  useEffect(() => {
+    if (!savedDetails?.inspectorSignature && userSignature) {
+      setInspectorSignature((current) => current || userSignature);
+    }
+  }, [savedDetails?.inspectorSignature, userSignature]);
 
   useEffect(() => {
     const refreshConfig = () => setChecklistConfig(readChecklistConfigForSite(site));
@@ -619,10 +630,12 @@ function DetailView({
     checkNotes: trimRecordValues(checkNotes),
     checkResults,
     checklistSnapshot: configuredGroups,
+    customerSignature,
     expenses: trimExpenses(expenses),
     fieldValues: trimRecordValues(fieldValues),
     finalStatus,
     inspector,
+    inspectorSignature: inspectorSignature || userSignature,
     ...(pmOrderNo ? { pmOrderNo } : {}),
     photoNotes: trimPhotoNotes(photoNotes),
     photos,
@@ -636,11 +649,13 @@ function DetailView({
     checkNotes,
     checkResults,
     configuredGroups,
+    customerSignature,
     endTime,
     expenses,
     fieldValues,
     finalStatus,
     inspector,
+    inspectorSignature,
     photoNotes,
     photos,
     pmOrderNo,
@@ -648,7 +663,8 @@ function DetailView({
     signerName,
     spareParts,
     startTime,
-    summaryNote
+    summaryNote,
+    userSignature
   ]);
   const draftFingerprint = useMemo(() => JSON.stringify(workDetailsSnapshot), [workDetailsSnapshot]);
   const lastSavedDraftRef = useRef(draftFingerprint);
@@ -1057,7 +1073,7 @@ function DetailView({
           <RequiredLabel label={t("fields.signerName")} required={!signerName.trim()} />
           <input className="field" value={signerName} onChange={(event) => setSignerName(event.target.value)} />
         </label>
-        <SignaturePad />
+        <SignaturePad value={customerSignature} onChange={setCustomerSignature} />
       </section>
 
       <div className="stickyActions">
@@ -1171,7 +1187,13 @@ function PhotoPopup({
   );
 }
 
-function SignaturePad() {
+function SignaturePad({
+  value,
+  onChange
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
   const { t } = useUi();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -1200,12 +1222,29 @@ function SignaturePad() {
       context.lineWidth = 2.4;
       context.lineCap = "round";
       context.lineJoin = "round";
+
+      if (value) {
+        const image = new window.Image();
+        image.onload = () => {
+          context.drawImage(image, 0, 0, width, height);
+        };
+        image.src = value;
+      }
     };
 
     setupCanvas();
     window.addEventListener("resize", setupCanvas);
     return () => window.removeEventListener("resize", setupCanvas);
-  }, []);
+  }, [value]);
+
+  const exportSignature = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) {
+      return;
+    }
+
+    onChange(canvas.toDataURL("image/png"));
+  };
 
   const getPoint = (event: ReactPointerEvent<HTMLCanvasElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -1247,6 +1286,7 @@ function SignaturePad() {
 
     event.currentTarget.releasePointerCapture(event.pointerId);
     setIsDrawing(false);
+    exportSignature();
   };
   const clearSignature = () => {
     const canvas = canvasRef.current;
@@ -1257,6 +1297,7 @@ function SignaturePad() {
 
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    onChange("");
   };
 
   return (

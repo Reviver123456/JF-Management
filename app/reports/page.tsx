@@ -340,6 +340,8 @@ function CoverTemplatePage({
   site: SiteCatalogRecord | null;
 }) {
   const customerSignerName = row.workDetails?.signerName?.trim() || row.customer;
+  const inspectorSignature = row.workDetails?.inspectorSignature?.trim() || responsibleSignature;
+  const customerSignature = row.workDetails?.customerSignature?.trim() || "";
   const projectName = getSiteProjectName(site, contractIndex) || row.site;
   const visitRoundText = getVisitRoundText(pmJobs, row, site, contractIndex);
 
@@ -399,13 +401,14 @@ function CoverTemplatePage({
           label="ผู้เข้าดำเนินการ"
           name={responsibleName || row.inspector}
           placeholder="ลายเซ็นผู้เข้าดำเนินการ"
-          signature={responsibleSignature}
+          signature={inspectorSignature}
         />
         <SignaturePersonBox
           date={row.date}
           label="ผู้ตรวจสอบ"
           name={customerSignerName}
           placeholder="ลายเซ็นลูกค้า"
+          signature={customerSignature}
         />
       </div>
     </section>

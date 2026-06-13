@@ -216,7 +216,7 @@ function SettingsSignaturePad({ email }: { email: string }) {
       return;
     }
 
-    const setupCanvas = () => {
+    const setupCanvas = async () => {
       const width = canvas.clientWidth;
       const height = canvas.clientHeight;
       const ratio = window.devicePixelRatio || 1;
@@ -236,18 +236,33 @@ function SettingsSignaturePad({ email }: { email: string }) {
       context.lineJoin = "round";
 
       const savedSignature = window.localStorage.getItem(getUserSignatureStorageKey(email));
-      if (savedSignature) {
+      let signature = savedSignature ?? "";
+
+      try {
+        const response = await fetch("/api/auth/signature", { cache: "no-store" });
+        const payload = await response.json() as { signature?: string };
+        if (response.ok && payload.signature) {
+          signature = payload.signature;
+        }
+      } catch {
+        // Keep local fallback when the profile API is unavailable.
+      }
+
+      if (signature) {
         const image = new window.Image();
         image.onload = () => {
           context.drawImage(image, 0, 0, width, height);
         };
-        image.src = savedSignature;
+        image.src = signature;
       }
     };
 
-    setupCanvas();
-    window.addEventListener("resize", setupCanvas);
-    return () => window.removeEventListener("resize", setupCanvas);
+    void setupCanvas();
+    const handleResize = () => {
+      void setupCanvas();
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, [email, isOpen]);
 
   const saveSignature = async () => {
@@ -258,15 +273,20 @@ function SettingsSignaturePad({ email }: { email: string }) {
     }
 
     const signature = canvas.toDataURL("image/png");
+    const response = await fetch("/api/auth/signature", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ signature })
+    });
+
+    if (!response.ok) {
+      return;
+    }
+
     window.localStorage.setItem(getUserSignatureStorageKey(email), signature);
     setSignatureRevision((current) => current + 1);
-
-    const supabase = createClient();
-    await supabase.auth.updateUser({
-      data: {
-        signature
-      }
-    });
   };
 
   const getPoint = (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -311,7 +331,7 @@ function SettingsSignaturePad({ email }: { email: string }) {
     setIsDrawing(false);
     void saveSignature();
   };
-  const clearSignature = () => {
+  const clearSignature = async () => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext("2d");
     if (!canvas || !context) {
@@ -320,6 +340,13 @@ function SettingsSignaturePad({ email }: { email: string }) {
 
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    await fetch("/api/auth/signature", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ signature: "" })
+    });
     window.localStorage.removeItem(getUserSignatureStorageKey(email));
     setSignatureRevision((current) => current + 1);
   };
