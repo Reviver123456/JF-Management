@@ -461,6 +461,7 @@ export function buildPmAppData({
   sites: SiteRecord[];
 }): PmAppData {
   const uniquePmJobs = getUniquePmJobs(pmJobs);
+  const currentMonth = getDateString().slice(0, 7);
 
   return {
     siteCatalog,
@@ -468,7 +469,7 @@ export function buildPmAppData({
     sites,
     metrics: [
       { id: "sites", value: String(siteCatalog.length), trend: "+0", color: "blue" },
-      { id: "monthly", value: String(uniquePmJobs.filter((job) => job.visitDate.startsWith("2026-06")).length), trend: "+0", color: "purple" },
+      { id: "monthly", value: String(uniquePmJobs.filter((job) => job.visitDate.startsWith(currentMonth)).length), trend: "+0", color: "purple" },
       { id: "done", value: String(uniquePmJobs.filter((job) => job.status === "completed").length), trend: "+0", color: "green" },
       { id: "backlog", value: String(uniquePmJobs.filter((job) => job.status === "pending" || job.status === "inProgress").length), trend: "", color: "orange" }
     ],
@@ -478,6 +479,14 @@ export function buildPmAppData({
     owners: Array.from(new Set(pmJobs.map((job) => job.owner))),
     regions: Array.from(new Set(siteCatalog.map((site) => site.region)))
   };
+}
+
+function hasSavedWorkDetails(details?: PmWorkDetails | null) {
+  return Boolean(
+    details?.savedAt
+    || details?.finalStatus
+    || (details?.checklistSnapshot?.length ?? 0) > 0
+  );
 }
 
 function buildReportRows(pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecord[]) {
@@ -525,7 +534,12 @@ function buildReportRows(pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecord[]
 
       currentRow.startTime = currentRow.startTime || job.startTime || job.visitTime;
       currentRow.endTime = currentRow.endTime || job.endTime || "";
-      currentRow.workDetails = currentRow.workDetails ?? job.workDetails;
+
+      if (hasSavedWorkDetails(job.workDetails) && !hasSavedWorkDetails(currentRow.workDetails)) {
+        currentRow.workDetails = job.workDetails;
+      } else {
+        currentRow.workDetails = currentRow.workDetails ?? job.workDetails;
+      }
     });
 
   return Array.from(reportRows.values()).sort((first, second) => second.date.localeCompare(first.date));

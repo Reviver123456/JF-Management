@@ -52,6 +52,10 @@ import {
   type SiteCatalogRecord
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
+import {
+  ALL_OWNERS_VALUE,
+  buildUniqueOwnerOptions
+} from "@/lib/owner-filter";
 type ChecklistTemplateKey = "synapse" | "server" | "switch" | "storage" | "environment" | "diag";
 
 type ChecklistTemplate = {
@@ -67,7 +71,6 @@ type PreviewState = {
   title: string;
 };
 
-const allOwnersValue = "__all";
 const reportPageWidth = 794;
 
 const checklistTemplates: ChecklistTemplate[] = [
@@ -81,16 +84,22 @@ const checklistTemplates: ChecklistTemplate[] = [
 
 export default function ReportsPage() {
   const { lang, t } = useUi();
-  const { email, isLoading: userLoading, signature, userName } = useCurrentUser();
-  const { data, error, isLoading } = usePmData();
+  const { email, signature, userName } = useCurrentUser();
+  const { data, error } = usePmData();
   const [query, setQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState(allOwnersValue);
+  const [ownerFilter, setOwnerFilter] = useState(ALL_OWNERS_VALUE);
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const responsibleName = userName.trim() || email || "";
   const responsibleSignature = signature || getStoredUserSignature(email);
-  const ownerOptions = useMemo(() => getOwnerOptions(data.reportRows, data.siteCatalog), [data.reportRows, data.siteCatalog]);
+  const ownerOptions = useMemo(
+    () => buildUniqueOwnerOptions(
+      data.reportRows.flatMap((row) => row.inspector.split(", ")),
+      data.siteCatalog.map((site) => site.owner)
+    ),
+    [data.reportRows, data.siteCatalog]
+  );
   const filteredReports = useMemo(() => (
     data.reportRows.filter((row) => rowMatchesFilters({
       endDate,
@@ -104,7 +113,7 @@ export default function ReportsPage() {
   ), [data.reportRows, endDate, ownerFilter, query, startDate]);
   const openReportPreview = (row: ReportRow) => {
     setPreview({
-      contractIndex: 0,
+      contractIndex: row.workDetails?.contractIndex ?? 0,
       row,
       site: data.siteCatalog.find((site) => site.id === row.siteId) ?? null,
       title: `รายงาน PM - ${row.site}`
@@ -146,7 +155,7 @@ export default function ReportsPage() {
               <label className="reportFilterField">
                 <span>{t("common.inspector")}</span>
                 <AppSelect className="select" firstNameOnly value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
-                  <option value={allOwnersValue}>{t("common.all")}</option>
+                  <option value={ALL_OWNERS_VALUE}>{t("common.all")}</option>
                   {ownerOptions.map((owner) => (
                     <option key={owner} value={owner}>{owner}</option>
                   ))}
@@ -1808,27 +1817,6 @@ function sanitizeFileName(value: string) {
   return value.replace(/[\\/:*?"<>|]+/g, "-").trim() || "pm-report";
 }
 
-function getOwnerOptions(reportRows: ReportRow[], siteCatalog: SiteCatalogRecord[]) {
-  const owners = [
-    ...reportRows.flatMap((row) => row.inspector.split(", ")),
-    ...siteCatalog.map((site) => site.owner)
-  ];
-  const seenOwners = new Set<string>();
-
-  return owners
-    .map((owner) => owner.trim())
-    .filter((owner) => {
-      const normalizedOwner = normalizeOwnerName(owner);
-
-      if (!normalizedOwner || seenOwners.has(normalizedOwner)) {
-        return false;
-      }
-
-      seenOwners.add(normalizedOwner);
-      return true;
-    });
-}
-
 function getVisitRoundText(pmJobs: PmJobRecord[], row: ReportRow, site: SiteCatalogRecord | null, contractIndex = 0) {
   const matchedJob = getMatchingReportJob(pmJobs, row);
   const visitRound = getVisitRoundForReport(pmJobs, row);
@@ -1880,7 +1868,7 @@ function rowMatchesFilters({
   startDate: string;
 }) {
   const matchesQuery = query.trim() ? searchableText.toLowerCase().includes(query.trim().toLowerCase()) : true;
-  const matchesOwner = ownerFilter === allOwnersValue
+  const matchesOwner = ownerFilter === ALL_OWNERS_VALUE
     ? true
     : owners.some((owner) => normalizeOwnerName(owner) === normalizeOwnerName(ownerFilter));
   const matchesStart = startDate ? rowDate >= startDate : true;

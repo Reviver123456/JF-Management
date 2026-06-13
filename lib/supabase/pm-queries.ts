@@ -168,42 +168,6 @@ export async function getWorkSiteBySiteIdFromDb(siteId: string) {
   return data ? toSiteRecord(data as PmJobWithSiteRow) : null;
 }
 
-export async function listReportRowsFromDb() {
-  const supabase = await createDataClient();
-  const { data, error } = await supabase
-    .from("pm_jobs")
-    .select("*, sites(*)")
-    .in("status", ["completed", "abnormal"])
-    .order("visit_date", { ascending: false });
-
-  if (error) {
-    throw new Error(`Supabase reports query failed: ${error.message}`);
-  }
-
-  return (data as PmJobWithSiteRow[]).flatMap((row) => {
-    const site = toSiteRecord(row);
-
-    if (!site) {
-      return [];
-    }
-
-    return {
-      id: row.id.replace("PM-", "R-"),
-      jobId: row.id,
-      siteId: site.id,
-      site: site.site,
-      customer: site.customer,
-      date: formatReportDate(row.visit_date),
-      inspector: row.owner,
-      province: site.province,
-      startTime: row.start_time ?? row.visit_time,
-      endTime: row.end_time ?? "",
-      workDetails: toWorkDetails(row.work_details),
-      result: row.result ?? (row.status === "abnormal" ? "ผิดปกติ" : "ปกติ")
-    };
-  });
-}
-
 export async function getPmAppDataFromDb() {
   const [siteCatalog, pmJobs, sites] = await Promise.all([
     listSitesFromDb(),

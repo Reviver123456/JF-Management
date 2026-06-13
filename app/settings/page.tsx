@@ -6,6 +6,7 @@ import { AppShell, PageTitle } from "@/components/AppShell";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { PwaInstallGuidePage } from "@/components/PwaInstallGuideModal";
 import { PwaInstallSection } from "@/components/PwaInstallSection";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
@@ -174,7 +175,7 @@ export default function SettingsPage() {
 
           <article className="card">
             <h2><PenLine size={17} /> {t("settings.mySignature")}</h2>
-            <SettingsSignaturePad email={email} onOpen={() => setSignatureEditorOpen(true)} />
+            <SettingsSignaturePad onOpen={() => setSignatureEditorOpen(true)} />
           </article>
 
           <article className="card">
@@ -243,8 +244,9 @@ function PasswordField({
   );
 }
 
-function SettingsSignaturePad({ email, onOpen }: { email: string; onOpen: () => void }) {
-  const hasSignature = typeof window !== "undefined" && Boolean(window.localStorage.getItem(getUserSignatureStorageKey(email)));
+function SettingsSignaturePad({ onOpen }: { onOpen: () => void }) {
+  const { signature } = useCurrentUser();
+  const hasSignature = Boolean(signature.trim());
 
   return (
     <div className="settingsSignaturePad">

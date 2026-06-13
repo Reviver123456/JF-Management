@@ -20,6 +20,13 @@ import {
   type SiteCatalogRecord
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
+import { useOwnerFromUrl } from "@/lib/hooks/use-owner-from-url";
+import {
+  ALL_OWNERS_VALUE,
+  buildUniqueOwnerOptions,
+  isAllOwners,
+  resolveActiveOwner
+} from "@/lib/owner-filter";
 const weekDaysByLang: Record<Lang, string[]> = {
   th: ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"],
   en: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -92,11 +99,11 @@ function getMonthPlan(lang: Lang, pmJobs: PmJobRecord[], siteCatalog: SiteCatalo
 
 export default function SchedulePage() {
   const { lang, t } = useUi();
-  const { data, error, isLoading, reload } = usePmData();
-  const { error: userError, isLoading: userLoading, userName } = useCurrentUser();
+  const { data, error, reload } = usePmData();
+  const { error: userError, userName } = useCurrentUser();
+  const ownerParam = useOwnerFromUrl();
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [usersError, setUsersError] = useState("");
-  const [usersLoading, setUsersLoading] = useState(true);
   const [yearMonth, setYearMonth] = useState(() => getDateString().slice(0, 7));
   const [selectedDay, setSelectedDay] = useState<number | null>(() => Number(getDateString().slice(-2)));
   const [addingDate, setAddingDate] = useState<{ yearMonth: string; day: number; siteId?: string } | null>(null);
@@ -107,12 +114,16 @@ export default function SchedulePage() {
   const [actionMessage, setActionMessage] = useState("");
   const [actionTitle, setActionTitle] = useState("");
   const [actionTone, setActionTone] = useState<"error" | "success">("success");
-  const activeOwner = selectedOwner || userName;
+  const activeOwner = resolveActiveOwner({ selectedOwner, ownerParam, userName });
+  const showAllOwners = isAllOwners(activeOwner);
   const todayDate = useMemo(() => getDateString(), []);
-  const sites = useMemo(() => filterSitesByOwner(data.siteCatalog, activeOwner), [activeOwner, data.siteCatalog]);
+  const sites = useMemo(
+    () => showAllOwners ? data.siteCatalog : filterSitesByOwner(data.siteCatalog, activeOwner),
+    [activeOwner, data.siteCatalog, showAllOwners]
+  );
   const visiblePmJobs = useMemo(
-    () => filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, activeOwner),
-    [activeOwner, data.pmJobs, data.siteCatalog]
+    () => showAllOwners ? data.pmJobs : filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, activeOwner),
+    [activeOwner, data.pmJobs, data.siteCatalog, showAllOwners]
   );
   const weekDays = weekDaysByLang[lang];
   const month = useMemo(() => getMonthPlan(lang, visiblePmJobs, data.siteCatalog, yearMonth), [data.siteCatalog, lang, visiblePmJobs, yearMonth]);
@@ -134,23 +145,14 @@ export default function SchedulePage() {
     () => data.siteCatalog.filter((site) => !allPlannedSiteIds.has(site.id)),
     [allPlannedSiteIds, data.siteCatalog]
   );
-  const ownerOptions = useMemo(() => {
-    const owners = [userName, ...systemUsers.map((user) => user.name), ...data.siteCatalog.map((site) => site.owner)];
-    const seenOwners = new Set<string>();
-
-    return owners
-      .map((owner) => owner.trim())
-      .filter((owner) => {
-        const normalizedOwner = normalizeOwnerName(owner);
-
-        if (!normalizedOwner || seenOwners.has(normalizedOwner)) {
-          return false;
-        }
-
-        seenOwners.add(normalizedOwner);
-        return true;
-      });
-  }, [data.siteCatalog, systemUsers, userName]);
+  const ownerOptions = useMemo(
+    () => buildUniqueOwnerOptions(
+      [userName],
+      systemUsers.map((user) => user.name),
+      data.siteCatalog.map((site) => site.owner)
+    ),
+    [data.siteCatalog, systemUsers, userName]
+  );
   const days = useMemo(() => Array.from({ length: month.dayCount }, (_, index) => index + 1), [month.dayCount]);
   const selectedDate = selectedDay ? `${month.yearMonth ?? yearMonth}-${String(selectedDay).padStart(2, "0")}` : "";
   const selectedDateIsPast = Boolean(selectedDate && selectedDate < todayDate);
@@ -165,8 +167,6 @@ export default function SchedulePage() {
     let isCurrent = true;
 
     async function loadSystemUsers() {
-      setUsersLoading(true);
-
       try {
         const response = await fetch("/api/auth/users", { cache: "no-store" });
         const payload = await response.json() as { users?: SystemUser[]; message?: string };
@@ -182,10 +182,6 @@ export default function SchedulePage() {
       } catch (loadError) {
         if (isCurrent) {
           setUsersError(loadError instanceof Error ? loadError.message : "Cannot load users.");
-        }
-      } finally {
-        if (isCurrent) {
-          setUsersLoading(false);
         }
       }
     }
@@ -376,6 +372,7 @@ export default function SchedulePage() {
                       value={activeOwner}
                       onChange={(event) => setSelectedOwner(event.target.value)}
                     >
+                      <option value={ALL_OWNERS_VALUE}>{t("common.all")}</option>
                       {ownerOptions.map((owner) => (
                         <option key={owner} value={owner}>{owner}</option>
                       ))}

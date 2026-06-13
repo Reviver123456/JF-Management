@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -74,21 +74,15 @@ import {
   type SiteRecord
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
+import { useIsClient } from "@/lib/hooks/use-is-client";
+import { isAllOwners, resolveActiveOwner } from "@/lib/owner-filter";
 import { isDateLikeField } from "@/lib/date-input";
 import { formatDecimalInputValue, isDecimalLikeField } from "@/lib/decimal-input";
 
-const allOwnersValue = "__all";
 type CheckResult = "ok" | "bad";
 type FinalStatus = "normal" | "abnormal";
 type PhotoKey = "device" | "overview" | "issue" | "part";
 
-function useIsClient() {
-  return useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false
-  );
-}
 type PhotoState = Record<PhotoKey, string[]>;
 type PhotoNotes = Partial<Record<PhotoKey, string>>;
 type ExpenseKey = keyof Required<PmExpenseDetails>;
@@ -305,11 +299,10 @@ function PmWorkFallback() {
 
 function PmWorkContent() {
   const { t } = useUi();
-  const { data, error, isLoading, reload } = usePmData();
-  const { error: userError, isLoading: userLoading, userName, signature: userSignature } = useCurrentUser();
+  const { data, error, reload } = usePmData();
+  const { error: userError, userName, signature: userSignature } = useCurrentUser();
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [usersError, setUsersError] = useState("");
-  const [usersLoading, setUsersLoading] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
   const siteIdParam = searchParams.get("siteId");
@@ -320,8 +313,8 @@ function PmWorkContent() {
   const showAllJobs = viewParam === "all";
   const todayDate = useMemo(() => getDateString(), []);
   const visibleSites = useMemo(() => {
-    const activeOwner = ownerParam || userName;
-    const visibleJobs = getUniquePmJobs(activeOwner === allOwnersValue
+    const activeOwner = resolveActiveOwner({ ownerParam, userName });
+    const visibleJobs = getUniquePmJobs(isAllOwners(activeOwner)
       ? data.pmJobs
       : filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, activeOwner));
     const visibleJobKeys = new Set(visibleJobs.map((job) => `${job.siteId}:${job.visitDate}:${job.visitTime}`));
@@ -335,8 +328,6 @@ function PmWorkContent() {
     let isCurrent = true;
 
     async function loadSystemUsers() {
-      setUsersLoading(true);
-
       try {
         const response = await fetch("/api/auth/users", { cache: "no-store" });
         const payload = await response.json() as { users?: SystemUser[]; message?: string };
@@ -352,10 +343,6 @@ function PmWorkContent() {
       } catch (loadError) {
         if (isCurrent) {
           setUsersError(loadError instanceof Error ? loadError.message : "Cannot load users.");
-        }
-      } finally {
-        if (isCurrent) {
-          setUsersLoading(false);
         }
       }
     }
@@ -444,7 +431,7 @@ function PmWorkContent() {
               {filteredSites.length > 0 ? filteredSites.map((site) => {
                 const status = statusMeta[site.status];
                 return (
-                  <button className="listRow" key={site.id} type="button" onClick={() => openSite(site)}>
+                  <button className="listRow" key={site.jobId} type="button" onClick={() => openSite(site)}>
                     <div>
                       <strong>{site.site}</strong>
                       <span className={`statusPill ${status.className}`}>{t(statusLabelKeys[site.status])}</span>

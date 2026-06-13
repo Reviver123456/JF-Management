@@ -18,8 +18,10 @@ import {
 } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
 import { AppSelect } from "@/components/AppSelect";
+import { FormDateInput } from "@/components/FormDateInput";
 import { AlertPopup, FeedbackPopups, type AlertTone } from "@/components/AppPopup";
 import { Pagination } from "@/components/Pagination";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
 import type { SystemUser } from "@/lib/auth/system-users";
 import { useUi } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
@@ -48,6 +50,7 @@ import {
 } from "@/lib/pm-checklist-data";
 import {
   contractCountOptions,
+  filterSitesByOwner,
   getContractCount,
   getSiteContractItems,
   getVisitCountForPmCycle,
@@ -56,6 +59,13 @@ import {
   type SiteContractItem
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
+import { useOwnerFromUrl } from "@/lib/hooks/use-owner-from-url";
+import {
+  ALL_OWNERS_VALUE,
+  buildUniqueOwnerOptions,
+  isAllOwners,
+  resolveActiveOwner
+} from "@/lib/owner-filter";
 type SiteTab = "customer" | "contract" | "synapse" | "server" | "switch" | "storage" | "environment" | "diag";
 type InspectionTab = PmChecklistKey;
 
@@ -266,17 +276,21 @@ const SITES_PAGE_SIZE = 10;
 
 export default function SitesPage() {
   const { t } = useUi();
-  const { data, error, isLoading, reload } = usePmData();
+  const { data, error, reload } = usePmData();
+  const { userName } = useCurrentUser();
+  const ownerParam = useOwnerFromUrl();
   const sites = data.siteCatalog;
   const regions = data.regions;
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [usersError, setUsersError] = useState("");
-  const [usersLoading, setUsersLoading] = useState(true);
   const [modalSite, setModalSite] = useState<SiteCatalogRecord | null>(null);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
   const [query, setQuery] = useState("");
   const [regionFilter, setRegionFilter] = useState("");
   const [siteStatusFilter, setSiteStatusFilter] = useState("");
+  const [selectedOwner, setSelectedOwner] = useState("");
+  const activeOwner = resolveActiveOwner({ selectedOwner, ownerParam, userName });
+  const showAllOwners = isAllOwners(activeOwner);
   const [page, setPage] = useState(1);
   const listTopRef = useRef<HTMLDivElement>(null);
   const [actionMessage, setActionMessage] = useState("");
@@ -293,8 +307,6 @@ export default function SitesPage() {
     let isCurrent = true;
 
     async function loadSystemUsers() {
-      setUsersLoading(true);
-
       try {
         const response = await fetch("/api/auth/users", { cache: "no-store" });
         const payload = await response.json() as { users?: SystemUser[]; message?: string };
@@ -311,10 +323,6 @@ export default function SitesPage() {
         if (isCurrent) {
           setUsersError(loadError instanceof Error ? loadError.message : "Cannot load users.");
         }
-      } finally {
-        if (isCurrent) {
-          setUsersLoading(false);
-        }
       }
     }
 
@@ -325,10 +333,20 @@ export default function SitesPage() {
     };
   }, []);
 
+  const ownerOptions = useMemo(
+    () => buildUniqueOwnerOptions(
+      [userName],
+      systemUsers.map((user) => user.name),
+      sites.map((site) => site.owner)
+    ),
+    [sites, systemUsers, userName]
+  );
+
   const filteredSites = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
+    const ownerFilteredSites = showAllOwners ? sites : filterSitesByOwner(sites, activeOwner);
 
-    return sites.filter((site) => {
+    return ownerFilteredSites.filter((site) => {
       const isActiveSite = site.owner.trim().length > 0;
       const searchableText = `${site.site} ${site.customer} ${site.province} ${site.owner} ${site.phone}`.toLowerCase();
       const matchesQuery = normalizedQuery ? searchableText.includes(normalizedQuery) : true;
@@ -339,7 +357,7 @@ export default function SitesPage() {
 
       return matchesQuery && matchesRegion && matchesStatus;
     });
-  }, [query, regionFilter, siteStatusFilter, sites]);
+  }, [activeOwner, query, regionFilter, showAllOwners, siteStatusFilter, sites]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -349,7 +367,7 @@ export default function SitesPage() {
     return () => {
       window.cancelAnimationFrame(frame);
     };
-  }, [query, regionFilter, siteStatusFilter]);
+  }, [activeOwner, query, regionFilter, siteStatusFilter]);
 
   const pagination = useMemo(
     () => paginate(filteredSites, page, SITES_PAGE_SIZE),
@@ -422,6 +440,18 @@ export default function SitesPage() {
                 <option value="">{t("sites.allStatuses")}</option>
                 <option value="active">{t("common.active")}</option>
                 <option value="inactive">{t("common.inactive")}</option>
+              </AppSelect>
+              <AppSelect
+                aria-label={t("fields.siteOwner")}
+                className="select"
+                firstNameOnly
+                value={activeOwner}
+                onChange={(event) => setSelectedOwner(event.target.value)}
+              >
+                <option value={ALL_OWNERS_VALUE}>{t("common.all")}</option>
+                {ownerOptions.map((owner) => (
+                  <option key={owner} value={owner}>{owner}</option>
+                ))}
               </AppSelect>
             </section>
 
@@ -1176,11 +1206,19 @@ function ContractTab({
         </label> */}
         <label className="label">
           {t("fields.contractStartDate")}
-          <input className="field" type="date" value={contractStartDate} onChange={(event) => updateContractDetails("contractStartDate", event.target.value)} />
+          <FormDateInput
+            aria-label={t("fields.contractStartDate")}
+            value={contractStartDate}
+            onChange={(nextValue) => updateContractDetails("contractStartDate", nextValue)}
+          />
         </label>
         <label className="label">
           {t("fields.contractEndDate")}
-          <input className="field" type="date" value={contractEndDate} onChange={(event) => updateContractDetails("contractEndDate", event.target.value)} />
+          <FormDateInput
+            aria-label={t("fields.contractEndDate")}
+            value={contractEndDate}
+            onChange={(nextValue) => updateContractDetails("contractEndDate", nextValue)}
+          />
         </label>
       </div>
 
@@ -1648,7 +1686,7 @@ function DiagRow({
 
 function Field({
   label,
-  value,
+  value = "",
   placeholder,
   type = "text"
 }: {
@@ -1660,11 +1698,29 @@ function Field({
   const { lang } = useUi();
   const localizedLabel = localizeLabel(label, lang);
   const localizedPlaceholder = localizeLabel(placeholder ?? label, lang);
+  const [dateValue, setDateValue] = useState(value);
+
+  useEffect(() => {
+    setDateValue(value);
+  }, [value]);
+
+  if (type === "date") {
+    return (
+      <label className="label">
+        {localizedLabel}
+        <FormDateInput
+          aria-label={localizedLabel}
+          value={dateValue}
+          onChange={setDateValue}
+        />
+      </label>
+    );
+  }
 
   return (
     <label className="label">
       {localizedLabel}
-      <input className="field" type={type} defaultValue={value} placeholder={type === "date" ? undefined : localizedPlaceholder} />
+      <input className="field" type={type} defaultValue={value} placeholder={localizedPlaceholder} />
     </label>
   );
 }

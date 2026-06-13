@@ -32,13 +32,21 @@ import {
   type SiteRecord
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
+import { useOwnerFromUrl } from "@/lib/hooks/use-owner-from-url";
+import {
+  ALL_OWNERS_VALUE,
+  buildUniqueOwnerOptions,
+  isAllOwners,
+  resolveActiveOwner
+} from "@/lib/owner-filter";
+
 const checklistTabs = ["SYNAPSE", "Server", "Switch", "Storage", "Environment", "DIAG"] as const;
-const allOwnersValue = "__all";
 
 export default function HistoryPage() {
   const { lang, t } = useUi();
-  const { data, error, isLoading } = usePmData();
-  const { error: userError, isLoading: userLoading, userName } = useCurrentUser();
+  const { data, error } = usePmData();
+  const { error: userError, userName } = useCurrentUser();
+  const ownerParam = useOwnerFromUrl();
   const reportRows = data.reportRows;
   const [query, setQuery] = useState("");
   const [resultFilter, setResultFilter] = useState("");
@@ -46,24 +54,15 @@ export default function HistoryPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [activeReport, setActiveReport] = useState<ReportRow | null>(null);
-  const activeOwnerFilter = ownerFilter || userName || allOwnersValue;
-  const ownerOptions = useMemo(() => {
-    const owners = [userName, ...data.owners, ...reportRows.flatMap((row) => row.inspector.split(", "))];
-    const seenOwners = new Set<string>();
-
-    return owners
-      .map((owner) => owner.trim())
-      .filter((owner) => {
-        const normalizedOwner = normalizeOwnerName(owner);
-
-        if (!normalizedOwner || seenOwners.has(normalizedOwner)) {
-          return false;
-        }
-
-        seenOwners.add(normalizedOwner);
-        return true;
-      });
-  }, [data.owners, reportRows, userName]);
+  const activeOwnerFilter = resolveActiveOwner({ selectedOwner: ownerFilter, ownerParam, userName });
+  const ownerOptions = useMemo(
+    () => buildUniqueOwnerOptions(
+      [userName],
+      data.owners,
+      reportRows.flatMap((row) => row.inspector.split(", "))
+    ),
+    [data.owners, reportRows, userName]
+  );
   const activeSite = activeReport
     ? data.sites.find((site) => site.id === activeReport.siteId && site.visitDate === toInputDate(activeReport.date))
       ?? getWorkSiteByJobId(data.sites, activeReport.jobId)
@@ -74,7 +73,7 @@ export default function HistoryPage() {
     const rowDate = toInputDate(row.date);
     const matchesQuery = query.trim() ? searchableText.includes(query.trim().toLowerCase()) : true;
     const matchesResult = resultFilter ? row.result === resultFilter : true;
-    const matchesOwner = activeOwnerFilter === allOwnersValue
+    const matchesOwner = isAllOwners(activeOwnerFilter)
       ? true
       : row.inspector.split(", ").some((owner) => normalizeOwnerName(owner) === normalizeOwnerName(activeOwnerFilter));
     const matchesStart = startDate ? rowDate >= startDate : true;
@@ -114,7 +113,7 @@ export default function HistoryPage() {
             <label className="historyFilterField">
               <span>{t("common.inspector")}</span>
               <AppSelect className="select" firstNameOnly value={activeOwnerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
-              <option value={allOwnersValue}>{t("common.all")}</option>
+              <option value={ALL_OWNERS_VALUE}>{t("common.all")}</option>
               {ownerOptions.map((owner) => (
                 <option key={owner} value={owner}>{owner}</option>
               ))}

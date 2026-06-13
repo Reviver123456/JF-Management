@@ -4972,7 +4972,7 @@
 
 .sitesPage .toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 180px 140px;
+  grid-template-columns: minmax(0, 1fr) 180px 140px minmax(160px, 180px);
   gap: 10px;
   margin-bottom: 18px;
 }

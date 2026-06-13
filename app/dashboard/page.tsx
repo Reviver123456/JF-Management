@@ -19,12 +19,17 @@ import {
   getSiteRecordJobKey,
   getUniquePmJobs,
   getWorkSitesByDate,
-  normalizeOwnerName,
   statusMeta,
   type Metric
 } from "@/lib/pm-data";
+import {
+  ALL_OWNERS_VALUE,
+  appendOwnerQuery,
+  buildUniqueOwnerOptions,
+  isAllOwners,
+  resolveActiveOwner
+} from "@/lib/owner-filter";
 import { usePmData } from "@/lib/use-pm-data";
-const allOwnersValue = "__all";
 
 const metricIcons = {
   sites: Building2,
@@ -50,25 +55,16 @@ export default function DashboardPage() {
   const { data, error, isLoading } = usePmData();
   const { error: userError, isLoading: userLoading, userName } = useCurrentUser();
   const [selectedOwner, setSelectedOwner] = useState("");
-  const activeOwner = selectedOwner || userName || allOwnersValue;
-  const showAllOwners = activeOwner === allOwnersValue;
-  const ownerOptions = useMemo(() => {
-    const owners = [userName, ...data.siteCatalog.map((site) => site.owner), ...data.pmJobs.map((job) => job.owner)];
-    const seenOwners = new Set<string>();
-
-    return owners
-      .map((owner) => owner.trim())
-      .filter((owner) => {
-        const normalizedOwner = normalizeOwnerName(owner);
-
-        if (!normalizedOwner || seenOwners.has(normalizedOwner)) {
-          return false;
-        }
-
-        seenOwners.add(normalizedOwner);
-        return true;
-      });
-  }, [data.pmJobs, data.siteCatalog, userName]);
+  const activeOwner = resolveActiveOwner({ selectedOwner, userName });
+  const showAllOwners = isAllOwners(activeOwner);
+  const ownerOptions = useMemo(
+    () => buildUniqueOwnerOptions(
+      [userName],
+      data.siteCatalog.map((site) => site.owner),
+      data.pmJobs.map((job) => job.owner)
+    ),
+    [data.pmJobs, data.siteCatalog, userName]
+  );
   const todayDate = getDateString();
   const assignedSites = showAllOwners ? data.siteCatalog : filterSitesByOwner(data.siteCatalog, activeOwner);
   const visiblePmJobs = getUniquePmJobs(showAllOwners ? data.pmJobs : filterPmJobsByParticipant(data.pmJobs, data.siteCatalog, activeOwner));
@@ -109,7 +105,7 @@ export default function DashboardPage() {
               <label className="ownerFilter">
                 <span>{t("fields.siteOwner")}</span>
                 <AppSelect className="select" firstNameOnly value={activeOwner} onChange={(event) => setSelectedOwner(event.target.value)}>
-                  <option value={allOwnersValue}>{t("common.all")}</option>
+                  <option value={ALL_OWNERS_VALUE}>{t("common.all")}</option>
                   {ownerOptions.map((owner) => (
                     <option key={owner} value={owner}>{owner}</option>
                   ))}
@@ -152,7 +148,7 @@ export default function DashboardPage() {
               {today.slice(0, 4).map((site) => {
                 const status = statusMeta[site.status];
                 return (
-                  <div className="jobRow" key={site.id}>
+                  <div className="jobRow" key={site.jobId}>
                     <span className="timeBadge">{formatVisitTime(site.visitTime)}</span>
                     <div>
                       <strong>{site.site}</strong>
@@ -162,7 +158,7 @@ export default function DashboardPage() {
                       <span className={`statusPill ${status.className}`}>{t(statusLabelKeys[site.status])}</span>
                     </div>
                     {site.status !== "completed" ? (
-                      <Link className="button primary" href={`/pm-work?siteId=${site.id}`}>{t("common.startWork")}</Link>
+                      <Link className="button primary" href={appendOwnerQuery(`/pm-work?siteId=${site.id}`, activeOwner)}>{t("common.startWork")}</Link>
                     ) : null}
                   </div>
                 );
@@ -218,16 +214,14 @@ export default function DashboardPage() {
 }
 
 function getMetricHref(metricId: Metric["id"], activeOwner: string) {
-  const ownerQuery = activeOwner ? `&owner=${encodeURIComponent(activeOwner)}` : "";
-
   switch (metricId) {
     case "sites":
-      return "/sites";
+      return appendOwnerQuery("/sites", activeOwner);
     case "monthly":
-      return "/schedule";
+      return appendOwnerQuery("/schedule", activeOwner);
     case "done":
-      return "/history";
+      return appendOwnerQuery("/history", activeOwner);
     case "backlog":
-      return `/pm-work?view=all&status=backlog${ownerQuery}`;
+      return appendOwnerQuery("/pm-work?view=all&status=backlog", activeOwner);
   }
 }
