@@ -49,10 +49,15 @@ curl -s -X POST "http://127.0.0.1:54321/auth/v1/admin/users" \
 
 ### Non-obvious gotchas
 
-- The DB schema is applied automatically by `supabase start` via `supabase/migrations/`, which
-  mirrors `supabase/schema.sql` (the hosted-setup script referenced in `README.md`).
-- RLS only grants table access to the `authenticated` role. `GET /api/db/health` is a public route
-  but its query still runs as `anon`, so it returns `{ ok: false }` until you have a logged-in
-  session — this is expected, not a misconfiguration. Verify the DB through the authenticated UI.
+- The DB schema is applied automatically by `supabase start` / `supabase db reset` via
+  `supabase/migrations/`:
+  - `00000000000000_init_schema.sql` mirrors `supabase/schema.sql` (the hosted-setup script in
+    `README.md`).
+  - `00000000000001_local_grants.sql` is **local-only**: it grants `select/insert/update/delete`
+    on the tables to `anon`/`authenticated`/`service_role`. Hosted Supabase grants these by
+    default; the local Postgres image does not, so without it the API returns
+    `permission denied for table`. Do NOT add these grants to `schema.sql` (hosted already has them).
+- `supabase db reset` re-applies migrations + `supabase/seed.sql` but **wipes auth users**. After a
+  reset, recreate the test user (see "Test user" above).
 - The middleware file is `proxy.ts` (Next.js 16 renamed `middleware` to `proxy`); it redirects
   unauthenticated users to `/login` and `/` to `/dashboard`.
