@@ -118,13 +118,13 @@ export default function HistoryPage() {
               ))}
               </select>
             </label>
-            <label className="dateField">
-              {t("reports.startDate")}
-              <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+            <label className="historyFilterField">
+              <span>{t("reports.startDate")}</span>
+              <input className="field" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
             </label>
-            <label className="dateField">
-              {t("reports.endDate")}
-              <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+            <label className="historyFilterField">
+              <span>{t("reports.endDate")}</span>
+              <input className="field" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
             </label>
           </section>
 

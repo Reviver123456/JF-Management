@@ -706,7 +706,6 @@
   margin-bottom: 18px;
 }
 
-.historyPage .dateField,
 .historyPage .historyFilterField {
   color: var(--text-soft);
   display: grid;
@@ -721,25 +720,13 @@
   display: block;
 }
 
-.historyPage .dateField input {
+.historyPage .historyFilterField .searchControl,
+.historyPage .historyFilterField .select,
+.historyPage .historyFilterField .field {
   width: 100%;
   min-width: 0;
   height: 38px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  outline: 0;
-  background: var(--field);
-  color: var(--text);
-  color-scheme: dark;
-  font: inherit;
-  font-weight: 900;
-  padding: 0 11px;
-}
-
-.historyPage .historyFilterField .searchControl,
-.historyPage .historyFilterField .select {
-  width: 100%;
-  height: 38px;
+  min-height: 38px;
 }
 
 .historyPage .rows {
@@ -804,6 +791,13 @@
   .historyPage .toolbar,
   .historyPage .row {
     grid-template-columns: 1fr;
+  }
+
+  .historyPage .historyFilterField .searchControl,
+  .historyPage .historyFilterField .select,
+  .historyPage .historyFilterField .field {
+    min-height: 44px;
+    height: 44px;
   }
 
   .historyPage .row>svg {
@@ -1887,7 +1881,6 @@
   margin-bottom: 18px;
 }
 
-.reportsPage .dateField,
 .reportsPage .reportFilterField {
   color: var(--text-soft);
   display: grid;
@@ -1902,25 +1895,13 @@
   display: block;
 }
 
-.reportsPage .dateField input {
+.reportsPage .reportFilterField .searchControl,
+.reportsPage .reportFilterField .select,
+.reportsPage .reportFilterField .field {
   width: 100%;
   min-width: 0;
   height: 38px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  outline: 0;
-  background: var(--field);
-  color: var(--text);
-  color-scheme: dark;
-  font: inherit;
-  font-weight: 900;
-  padding: 0 11px;
-}
-
-.reportsPage .reportFilterField .searchControl,
-.reportsPage .reportFilterField .select {
-  width: 100%;
-  height: 38px;
+  min-height: 38px;
 }
 
 .reportsPage .rows {
@@ -2073,6 +2054,21 @@
   white-space: nowrap;
 }
 
+.reportsPage .reportModalControlsPreview {
+  flex-shrink: 0;
+}
+
+.reportsPage .reportExportMessage {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  background: rgba(254, 226, 226, 0.45);
+  color: #991b1b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .reportsPage .reportDocumentHidden {
   display: none;
 }
@@ -2202,61 +2198,56 @@
 }
 
 .reportsPage .templateHeader {
-  display: grid;
-  grid-template-columns: 150px minmax(0, 1fr) 260px;
-  align-items: start;
-  gap: 12px;
-  min-height: 55px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 62px;
   margin-bottom: 20px;
   padding-bottom: 7px;
   border-bottom: 3px solid #1f376d;
-  position: relative;
 }
 
-.reportsPage .templateHeader img {
+.reportsPage .templateHeaderLogo {
+  flex: 0 0 150px;
+  width: 150px;
+}
+
+.reportsPage .templateHeaderLogo img {
   width: 132px;
   height: auto;
   display: block;
-  margin-top: 0;
 }
 
-.reportsPage .templateHeader>strong {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: max-content;
-  justify-self: center;
+.reportsPage .templateHeaderTitle {
+  flex: 1 1 auto;
+  margin: 0;
   color: #111827;
   font-size: 15px;
   line-height: 1.2;
-  margin-top: 1rem;
+  font-weight: 800;
   text-align: center;
+  white-space: nowrap;
 }
 
-.reportsPage .templateHeader>div {
+.reportsPage .templateHeaderMeta {
+  flex: 0 0 220px;
+  width: 220px;
   display: grid;
   justify-items: end;
   gap: 2px;
   color: #111827;
   text-align: right;
   font-weight: 700;
-  grid-column: 3;
-  margin-top: 0;
 }
 
-.reportsPage .templateHeader span {
+.reportsPage .templateHeaderMeta span {
   font-size: 11px;
+  line-height: 1.25;
 }
 
-.reportsPage .templateHeader .pmOrderNo {
+.reportsPage .templateHeaderMeta .pmOrderNo {
   font-size: 11px;
-  font-weight: 800;
-}
-
-.reportsPage .templateHeader b {
-  max-width: 260px;
-  font-size: 12px;
   font-weight: 800;
 }
 
@@ -2615,8 +2606,8 @@
   position: absolute;
   left: 1px;
   top: 9px;
-  width: 22px;
-  height: 7px;
+  width: 14px;
+  height: 2px;
   background: currentColor;
   border-radius: 999px;
   transform-origin: center;
@@ -2907,20 +2898,35 @@
   color: #111827;
 }
 
-.reportsPage .coverSignatureLine {
+.reportsPage .coverSignatureSlot {
   min-height: 54px;
-  display: grid;
-  place-items: center;
-  color: #64748b;
-  font-weight: 700;
-  border-bottom: 1px solid #000000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   width: 100%;
+  padding-bottom: 4px;
 }
 
-.reportsPage .coverSignatureLine img {
+.reportsPage .coverSignatureSlot img {
+  display: block;
   max-width: 100%;
-  max-height: 54px;
+  max-height: 50px;
   object-fit: contain;
+}
+
+.reportsPage .coverSignaturePlaceholder {
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.reportsPage .coverSignatureRule {
+  width: 100%;
+  height: 0;
+  border-bottom: 1px solid #000000;
 }
 
 .reportsPage .diagCalibrateTable,
@@ -3303,10 +3309,144 @@
   color: var(--text);
 }
 
+.reportsPage .overlayReportPreview {
+  padding: 0;
+  background: rgba(0, 0, 0, 0.82);
+}
+
+.reportsPage .previewModal.previewModalReportOnly {
+  width: 100%;
+  max-width: 100%;
+  max-height: 100vh;
+  min-height: 100dvh;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.reportsPage .previewModal.previewModalReportOnly .reportPreviewViewport {
+  flex: 1;
+  min-height: 100dvh;
+  border-radius: 0;
+  padding:
+    max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+}
+
+.reportsPage .reportPreviewFloatBack {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 120;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #ffffff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
+  cursor: pointer;
+}
+
 .reportsPage .previewModal {
   width: min(100%, 1060px);
   max-height: calc(100vh - 40px);
   overflow: auto;
+}
+
+.reportsPage .previewModal.previewModalExpanded {
+  width: min(100%, 1060px);
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.reportsPage .reportPreviewViewport {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  background: #dbeafe;
+  border-radius: var(--radius-sm);
+  padding: 8px;
+}
+
+.reportsPage .reportPreviewScaleShell {
+  margin: 0 auto;
+  overflow: hidden;
+}
+
+.reportsPage .reportPreviewViewport .reportDocumentStack {
+  width: 794px;
+  gap: 16px;
+  padding: 0;
+  justify-items: stretch;
+}
+
+.reportsPage .reportPreviewViewport .templateSheet {
+  width: 794px;
+  max-width: none;
+  min-height: auto;
+  padding: 28px 34px;
+  font-size: 11px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  border-radius: 4px;
+  box-sizing: border-box;
+}
+
+.reportsPage .reportPreviewViewport .coverSheet {
+  padding-top: 28px;
+}
+
+.reportsPage .reportPreviewViewport .templateHeader {
+  gap: 12px;
+  min-height: 58px;
+  margin-bottom: 14px;
+}
+
+.reportsPage .reportPreviewViewport .templateHeaderLogo {
+  flex-basis: 132px;
+  width: 132px;
+}
+
+.reportsPage .reportPreviewViewport .templateHeaderLogo img {
+  width: 118px;
+}
+
+.reportsPage .reportPreviewViewport .templateHeaderTitle {
+  font-size: 14px;
+}
+
+.reportsPage .reportPreviewViewport .templateHeaderMeta {
+  flex-basis: 190px;
+  width: 190px;
+}
+
+.reportsPage .reportPreviewViewport .templateHeaderMeta span {
+  font-size: 10px;
+}
+
+.reportsPage .reportPreviewViewport .templateTable th,
+.reportsPage .reportPreviewViewport .templateTable td {
+  height: auto;
+  min-height: 22px;
+  padding: 4px 6px;
+  font-size: 9px;
+}
+
+.reportsPage .reportPreviewViewport .coverSignatureCard {
+  min-width: 0;
+  padding: 8px 6px;
+}
+
+.reportsPage .reportPreviewViewport .signatureGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
 }
 
 .reportsPage .previewSummarySheet {
@@ -3397,6 +3537,34 @@
   .reportsPage .reportListPanel {
     position: static;
     max-height: none;
+  }
+
+  .reportsPage .reportFilterField .searchControl,
+  .reportsPage .reportFilterField .select,
+  .reportsPage .reportFilterField .field {
+    min-height: 44px;
+    height: 44px;
+  }
+
+  .reportsPage .overlay {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .reportsPage .previewModal.previewModalExpanded {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    border-left: 0;
+    border-right: 0;
+    padding:
+      max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  }
+
+  .reportsPage .reportPreviewViewport {
+    padding: 8px;
   }
 
   .reportsPage .paperCheckRow {

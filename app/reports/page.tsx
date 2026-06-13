@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import {
   CalendarDays,
@@ -67,6 +67,7 @@ type PreviewState = {
 };
 
 const allOwnersValue = "__all";
+const reportPageWidth = 794;
 
 const checklistTemplates: ChecklistTemplate[] = [
   { key: "synapse", title: "Synapse", heading: "Synapse Maintenance Checklist" },
@@ -120,13 +121,13 @@ export default function ReportsPage() {
             <span>{t("common.search")}</span>
             <SearchControl placeholder={t("reports.searchInput")} value={query} onChange={setQuery} />
           </div>
-          <label className="dateField">
-            {t("reports.startDate")}
-            <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+          <label className="reportFilterField">
+            <span>{t("reports.startDate")}</span>
+            <input className="field" type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
           </label>
-          <label className="dateField">
-            {t("reports.endDate")}
-            <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+          <label className="reportFilterField">
+            <span>{t("reports.endDate")}</span>
+            <input className="field" type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
           </label>
           <label className="reportFilterField">
             <span>{t("common.inspector")}</span>
@@ -431,7 +432,7 @@ function SignaturePersonBox({
   return (
     <div className="coverSignatureCard">
       <strong>{label}</strong>
-      <div className="coverSignatureLine">
+      <div className="coverSignatureSlot">
         {signature ? (
           <Image
             src={signature}
@@ -440,10 +441,13 @@ function SignaturePersonBox({
             height={54}
             unoptimized
           />
-        ) : placeholder}
+        ) : (
+          <span className="coverSignaturePlaceholder">{placeholder}</span>
+        )}
       </div>
+      <div className="coverSignatureRule" aria-hidden="true" />
       <span>{name}</span>
-      <span>{date}</span>
+      <span className="signatureDate">{date}</span>
     </div>
   );
 }
@@ -509,11 +513,13 @@ type DiagCalibrateBlockEntry = {
 function TemplateHeader({ heading, row }: { heading: string; row?: ReportRow }) {
   return (
     <header className="templateHeader">
-      <Image src="/report-templates/LOGO-JF.webp" alt="JF Advance Med" width={132} height={62} />
-      <strong>{heading}</strong>
-      <div>
+      <div className="templateHeaderLogo">
+        <Image src="/report-templates/LOGO-JF.webp" alt="JF Advance Med" width={132} height={62} />
+      </div>
+      <strong className="templateHeaderTitle">{heading}</strong>
+      <div className="templateHeaderMeta">
         <span>JF Advance Med CO., LTD</span>
-        <span>PM Order No. : {row ? getDisplayPmOrderNo(row) : ""}</span>
+        <span className="pmOrderNo">PM Order No. : {row ? getDisplayPmOrderNo(row) : ""}</span>
         <span>{row?.date ?? ""}</span>
       </div>
     </header>
@@ -1273,95 +1279,205 @@ function PreviewModal({
   responsibleSignature: string;
 }) {
   const { t } = useUi();
+  const viewportRef = useRef<HTMLDivElement | null>(null);
+  const scaleShellRef = useRef<HTMLDivElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
   const [downloadType, setDownloadType] = useState<"pdf" | "word" | "excel">("pdf");
   const [showPreview, setShowPreview] = useState(false);
+  const [exportMessage, setExportMessage] = useState("");
   const contracts = getSiteContractItems(preview.site);
   const selectedContract = getSiteContractAt(preview.site, preview.contractIndex);
   const selectedContractLabel = getSiteContractLabel(selectedContract, preview.contractIndex);
-  const printReport = () => {
-    printReportPdf(documentRef.current?.innerHTML ?? "", `${preview.title} - ${selectedContractLabel}`);
-  };
-  const downloadReport = async () => {
-    if (downloadType === "pdf") {
-      printReport();
+
+  const updatePreviewScale = useCallback(() => {
+    const viewport = viewportRef.current;
+    const documentNode = documentRef.current;
+    const shell = scaleShellRef.current;
+
+    if (!viewport || !documentNode || !shell) {
       return;
     }
 
-    const html = await prepareOfficeExportContent(documentRef.current?.innerHTML ?? "");
-    const isExcel = downloadType === "excel";
-    const extension = isExcel ? "xls" : "doc";
-    const mimeType = isExcel ? "application/vnd.ms-excel;charset=utf-8" : "application/msword;charset=utf-8";
-    const blob = new Blob([
-      "\ufeff",
-      buildExportHtml(html, `${preview.title} - ${selectedContractLabel}`, isExcel ? "excel" : "word")
-    ], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${sanitizeFileName(preview.row.site)}-${selectedContractLabel}.${extension}`;
-    link.click();
-    URL.revokeObjectURL(url);
+    const availableWidth = Math.max(240, viewport.clientWidth - 12);
+    const nextScale = Math.min(1, availableWidth / reportPageWidth);
+
+    documentNode.style.width = `${reportPageWidth}px`;
+    documentNode.style.transformOrigin = "top left";
+    documentNode.style.transform = nextScale < 1 ? `scale(${nextScale})` : "none";
+
+    shell.style.width = `${reportPageWidth * nextScale}px`;
+    shell.style.height = `${documentNode.scrollHeight * nextScale}px`;
+  }, []);
+
+  useEffect(() => {
+    if (!showPreview) {
+      return;
+    }
+
+    updatePreviewScale();
+    const settleTimer = window.setTimeout(updatePreviewScale, 150);
+
+    const viewport = viewportRef.current;
+    const documentNode = documentRef.current;
+
+    if (!viewport || !documentNode) {
+      return () => {
+        window.clearTimeout(settleTimer);
+      };
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      updatePreviewScale();
+    });
+
+    resizeObserver.observe(viewport);
+    resizeObserver.observe(documentNode);
+    window.addEventListener("resize", updatePreviewScale);
+
+    return () => {
+      window.clearTimeout(settleTimer);
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updatePreviewScale);
+    };
+  }, [preview.contractIndex, preview.row.id, showPreview, updatePreviewScale]);
+
+  const getReportExportContent = useCallback(() => {
+    return (documentRef.current?.innerHTML ?? "").trim();
+  }, []);
+
+  const printReport = () => {
+    const content = getReportExportContent();
+
+    if (!content) {
+      setExportMessage("ไม่พบเนื้อหารายงาน กรุณารอสักครู่แล้วลองใหม่");
+      return;
+    }
+
+    const didPrint = printReportPdf(content, `${preview.title} - ${selectedContractLabel}`);
+
+    if (!didPrint) {
+      setExportMessage("ไม่สามารถเปิดหน้าพิมพ์ได้ กรุณาลองใหม่อีกครั้ง");
+      return;
+    }
+
+    setExportMessage("");
+  };
+
+  const downloadReport = async () => {
+    try {
+      const content = getReportExportContent();
+
+      if (!content) {
+        setExportMessage("ไม่พบเนื้อหารายงาน กรุณารอสักครู่แล้วลองใหม่");
+        return;
+      }
+
+      if (downloadType === "pdf") {
+        printReport();
+        return;
+      }
+
+      const html = await prepareOfficeExportContent(content);
+      const isExcel = downloadType === "excel";
+      const extension = isExcel ? "xls" : "doc";
+      const mimeType = isExcel ? "application/vnd.ms-excel;charset=utf-8" : "application/msword;charset=utf-8";
+      const blob = new Blob([
+        "\ufeff",
+        buildExportHtml(html, `${preview.title} - ${selectedContractLabel}`, isExcel ? "excel" : "word")
+      ], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${sanitizeFileName(preview.row.site)}-${selectedContractLabel}.${extension}`;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setExportMessage("");
+    } catch {
+      setExportMessage("ไม่สามารถดาวน์โหลดไฟล์ได้ กรุณาลองใหม่อีกครั้ง");
+    }
   };
 
   return (
     <div
-      className="overlay"
+      className={`overlay${showPreview ? " overlayReportPreview" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-label={preview.title}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
+        if (!showPreview && event.target === event.currentTarget) {
           onClose();
         }
       }}
     >
-      <article className="modal previewModal">
-        <div className="modalHeader">
-          <h2>{preview.title}</h2>
-          <button type="button" onClick={onClose} aria-label={t("common.close")}><X size={18} /></button>
-        </div>
-        {!showPreview ? (
-          <div className="reportModalControls">
-            <label className="label">
-              เลือกสัญญา
-              <select className="select" value={preview.contractIndex} onChange={(event) => onContractIndexChange(Number(event.target.value))}>
-                {contracts.map((contract, index) => (
-                  <option key={index} value={index}>{getSiteContractLabel(contract, index)}</option>
-                ))}
-              </select>
-            </label>
-            <label className="label">
-              ประเภทไฟล์
-              <select className="select" value={downloadType} onChange={(event) => setDownloadType(event.target.value as "pdf" | "word" | "excel")}>
-                <option value="pdf">PDF</option>
-                <option value="word">Word</option>
-                <option value="excel">Excel</option>
-              </select>
-            </label>
-            <button className="button subtle" type="button" onClick={printReport}>
-              <Printer size={16} />
-              {t("common.print")}
-            </button>
-            <button className="button subtle" type="button" onClick={downloadReport}>
-              <Download size={16} />
-              {t("common.download")}
-            </button>
-            <button className="button primary" type="button" onClick={() => setShowPreview(true)}>
-              <Eye size={16} />
-              {t("reports.preview")}
-            </button>
+      <article className={`modal previewModal${showPreview ? " previewModalExpanded previewModalReportOnly" : ""}`}>
+        {showPreview ? (
+          <button
+            className="reportPreviewFloatBack"
+            type="button"
+            aria-label={t("common.back")}
+            onClick={() => setShowPreview(false)}
+          >
+            <X size={18} />
+          </button>
+        ) : (
+          <>
+            <div className="modalHeader">
+              <h2>{preview.title}</h2>
+              <button type="button" onClick={onClose} aria-label={t("common.close")}><X size={18} /></button>
+            </div>
+            <div className="reportModalControls">
+              <label className="label">
+                เลือกสัญญา
+                <select className="select" value={preview.contractIndex} onChange={(event) => onContractIndexChange(Number(event.target.value))}>
+                  {contracts.map((contract, index) => (
+                    <option key={index} value={index}>{getSiteContractLabel(contract, index)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="label">
+                ประเภทไฟล์
+                <select className="select" value={downloadType} onChange={(event) => setDownloadType(event.target.value as "pdf" | "word" | "excel")}>
+                  <option value="pdf">PDF</option>
+                  <option value="word">Word</option>
+                  <option value="excel">Excel</option>
+                </select>
+              </label>
+              <button className="button subtle" type="button" onClick={printReport}>
+                <Printer size={16} />
+                {t("common.print")}
+              </button>
+              <button className="button subtle" type="button" onClick={() => void downloadReport()}>
+                <Download size={16} />
+                {t("common.download")}
+              </button>
+              <button className="button primary" type="button" onClick={() => setShowPreview(true)}>
+                <Eye size={16} />
+                {t("reports.preview")}
+              </button>
+            </div>
+            {exportMessage ? <p className="reportExportMessage">{exportMessage}</p> : null}
+          </>
+        )}
+        <div
+          ref={viewportRef}
+          className={showPreview ? "reportPreviewViewport" : "reportDocumentHidden"}
+          aria-hidden={!showPreview}
+        >
+          <div ref={scaleShellRef} className="reportPreviewScaleShell">
+            <div ref={documentRef} className="reportDocumentStack">
+              <ReportDocumentPacket
+                contractIndex={preview.contractIndex}
+                pmJobs={pmJobs}
+                responsibleName={responsibleName}
+                responsibleSignature={responsibleSignature}
+                row={preview.row}
+                site={preview.site}
+              />
+            </div>
           </div>
-        ) : null}
-        <div ref={documentRef} className={showPreview ? undefined : "reportDocumentHidden"} aria-hidden={!showPreview}>
-          <ReportDocumentPacket
-            contractIndex={preview.contractIndex}
-            pmJobs={pmJobs}
-            responsibleName={responsibleName}
-            responsibleSignature={responsibleSignature}
-            row={preview.row}
-            site={preview.site}
-          />
         </div>
       </article>
     </div>
@@ -1446,27 +1562,29 @@ function buildExportHtml(content: string, title: string, exportType: "word" | "e
 </html>`;
 }
 
-function printReportPdf(content: string, title: string) {
+function printReportPdf(content: string, title: string): boolean {
   if (!content.trim()) {
-    return;
+    return false;
   }
 
-  const printWindow = window.open("", "_blank", "width=960,height=900");
+  const printFrame = getReportPrintFrame();
+  const frameWindow = printFrame.contentWindow;
+  const frameDocument = printFrame.contentDocument ?? frameWindow?.document;
 
-  if (!printWindow) {
-    return;
+  if (!frameWindow || !frameDocument) {
+    return false;
   }
 
-  printWindow.document.open();
-  printWindow.document.write(buildPdfPrintHtml(content, title));
-  printWindow.document.close();
+  frameDocument.open();
+  frameDocument.write(buildPdfPrintHtml(content, title));
+  frameDocument.close();
 
   const triggerPrint = () => {
-    printWindow.focus();
-    printWindow.print();
+    frameWindow.focus();
+    frameWindow.print();
   };
 
-  const waitForImages = Array.from(printWindow.document.images).map((image) => (
+  const waitForImages = Array.from(frameDocument.images).map((image) => (
     image.complete
       ? Promise.resolve()
       : new Promise<void>((resolve) => {
@@ -1475,9 +1593,33 @@ function printReportPdf(content: string, title: string) {
       })
   ));
 
-  Promise.all(waitForImages).then(() => {
+  void Promise.all(waitForImages).then(() => {
     window.setTimeout(triggerPrint, 250);
   });
+
+  return true;
+}
+
+let reportPrintFrame: HTMLIFrameElement | null = null;
+
+function getReportPrintFrame() {
+  if (reportPrintFrame?.isConnected) {
+    return reportPrintFrame;
+  }
+
+  reportPrintFrame = document.createElement("iframe");
+  reportPrintFrame.setAttribute("title", "PM report print");
+  reportPrintFrame.setAttribute("aria-hidden", "true");
+  reportPrintFrame.style.position = "fixed";
+  reportPrintFrame.style.right = "0";
+  reportPrintFrame.style.bottom = "0";
+  reportPrintFrame.style.width = "0";
+  reportPrintFrame.style.height = "0";
+  reportPrintFrame.style.border = "0";
+  reportPrintFrame.style.opacity = "0";
+  reportPrintFrame.style.pointerEvents = "none";
+  document.body.appendChild(reportPrintFrame);
+  return reportPrintFrame;
 }
 
 function buildPdfPrintHtml(content: string, title: string) {
@@ -1496,13 +1638,13 @@ function buildPdfPrintHtml(content: string, title: string) {
 }
 
 function getPrintableStyles() {
-  const appStyles = Array.from(document.styleSheets).flatMap((sheet) => {
+  const appStyles = sanitizeStylesForInlineHtml(Array.from(document.styleSheets).flatMap((sheet) => {
     try {
       return Array.from(sheet.cssRules).map((rule) => rule.cssText);
     } catch {
       return [];
     }
-  }).join("\n");
+  }).join("\n"));
 
   return `${appStyles}
 @page {
@@ -1547,6 +1689,30 @@ body {
 .printReportRoot * {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
+}
+
+.printReportRoot .signatureGrid,
+.printReportRoot .coverSignatureCard {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.printReportRoot .coverSignatureSlot {
+  min-height: 54px;
+  padding-bottom: 4px;
+}
+
+.printReportRoot .coverSignatureSlot img {
+  display: block;
+  max-width: 100%;
+  max-height: 50px;
+  object-fit: contain;
+}
+
+.printReportRoot .coverSignatureRule {
+  width: 100%;
+  height: 0;
+  border-bottom: 1px solid #000000;
 }`;
 }
 
@@ -1636,6 +1802,10 @@ function escapeHtml(value: string) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function sanitizeStylesForInlineHtml(value: string) {
+  return value.replace(/<\/style/gi, "<\\/style");
 }
 
 function sanitizeFileName(value: string) {

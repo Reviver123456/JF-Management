@@ -252,6 +252,32 @@ a {
   box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
+input[type="date"].field {
+  appearance: none;
+  -webkit-appearance: none;
+  color-scheme: dark;
+  font-weight: 900;
+  line-height: 1.2;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+input[type="date"].field::-webkit-date-and-time-value {
+  min-height: 1.2em;
+  text-align: left;
+}
+
+html[data-theme="light"] input[type="date"].field {
+  color-scheme: light;
+}
+
+@media (max-width: 760px) {
+
+  input[type="date"].field {
+    min-height: 44px;
+  }
+}
+
 .textarea {
   min-height: 86px;
   resize: vertical;
