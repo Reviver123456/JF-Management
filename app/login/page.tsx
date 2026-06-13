@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { LockKeyhole, UserRound } from "lucide-react";
 import { FeedbackPopups } from "@/components/AppPopup";
-import { clearSupabaseAuthCookies, getAuthCookieSize } from "@/lib/auth/clear-auth-cookies";
+import { clearAppBrowserCache } from "@/lib/auth/clear-app-cache";
 import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 
@@ -20,19 +20,24 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const hasLegacyCookies = document.cookie.split(";").some((entry) => {
-      const name = entry.trim().split("=")[0];
-      return name.startsWith("sb-") && !name.startsWith("sb-auth");
-    });
+    let isCurrent = true;
 
-    if (hasLegacyCookies || getAuthCookieSize() > 8192) {
-      clearSupabaseAuthCookies();
-      setMessageTone("success");
-      setMessage(lang === "th"
-        ? "ล้าง session เก่าที่ใหญ่เกินไปแล้ว กรุณาเข้าสู่ระบบใหม่"
-        : "Cleared an oversized session. Please sign in again.");
+    async function prepareLoginPage() {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      await clearAppBrowserCache();
+
+      if (!isCurrent) {
+        return;
+      }
     }
-  }, [lang]);
+
+    void prepareLoginPage();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   const signIn = async () => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -50,6 +55,9 @@ export default function LoginPage() {
     setMessageTone("error");
 
     const supabase = createClient();
+    await supabase.auth.signOut();
+    await clearAppBrowserCache();
+
     const { error } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password

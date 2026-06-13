@@ -21,6 +21,7 @@ import {
   X
 } from "lucide-react";
 import { useUi } from "@/lib/i18n";
+import { clearAppBrowserCache } from "@/lib/auth/clear-app-cache";
 import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
@@ -43,6 +44,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
+    await clearAppBrowserCache();
     router.replace("/login");
     router.refresh();
   };

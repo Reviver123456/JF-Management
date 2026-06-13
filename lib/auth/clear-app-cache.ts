@@ -29,3 +29,26 @@ export function getAuthCookieSize() {
         : total;
     }, 0);
 }
+
+export async function clearBrowserCaches() {
+  if (typeof window === "undefined" || !("caches" in window)) {
+    return;
+  }
+
+  const cacheNames = await caches.keys();
+  await Promise.all(cacheNames.map((name) => caches.delete(name)));
+}
+
+export function clearSessionStorage() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.clear();
+}
+
+export async function clearAppBrowserCache() {
+  clearSupabaseAuthCookies();
+  clearSessionStorage();
+  await clearBrowserCaches();
+}
