@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, ListFilter, MapPin, Plus, Trash2, UserRound, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Plus, Trash2, UserRound, X } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { AlertPopup, FeedbackPopups } from "@/components/AppPopup";
 import type { SystemUser } from "@/lib/auth/system-users";
@@ -502,9 +502,6 @@ function PlanDetailModal({ job, onClose }: { job: DisplayPlanJob; onClose: () =>
       <article className="scheduleModal">
         <header className="modalHeader">
           <h2>{t("schedule.jobDetailTitle")}</h2>
-          <button type="button" onClick={onClose} aria-label={t("common.close")}>
-            <X size={18} />
-          </button>
         </header>
         <div className="planDetailGrid">
           <InfoLine label={t("common.site")} value={job.site} />
@@ -636,14 +633,16 @@ function AddPlanModal({
       >
         <header className="modalHeader">
           <h2>{modalTitle} - {formatModalDate(day, yearMonth)}</h2>
-          <button type="button" onClick={onClose} aria-label={t("common.close")}>
-            <X size={18} />
-          </button>
         </header>
-        <button className="button subtle allSitesButton" type="button" onClick={() => setShowAllSitesInModal((current) => !current)}>
-          <ListFilter size={15} />
-          {showAllSitesInModal ? t("schedule.mySites") : t("schedule.viewAllSites")}
-        </button>
+        <label className="allSitesToggle">
+          <input
+            type="checkbox"
+            checked={showAllSitesInModal}
+            onChange={(event) => setShowAllSitesInModal(event.target.checked)}
+          />
+          <span aria-hidden="true" />
+          {t("schedule.viewAllSites")}
+        </label>
         <label className="label">
           {t("fields.siteSelect")}
           <select className="select" value={selectedSiteId} onChange={(event) => setSiteId(event.target.value)}>

@@ -688,10 +688,10 @@
 }
 
 @media (max-width: 700px) {
-
+  /*
   .dashboardPage .metrics {
     grid-template-columns: 1fr;
-  }
+  } */
 
   .dashboardPage .jobRow {
     grid-template-columns: 1fr;
@@ -885,6 +885,18 @@
 .loginPage .form {
   display: grid;
   gap: 14px;
+}
+
+.loginPage .form .loginError {
+  margin: -2px 0 0;
+  border: 1px solid rgba(248, 113, 113, 0.42);
+  border-radius: var(--radius-sm);
+  background: rgba(248, 113, 113, 0.1);
+  color: #fca5a5;
+  padding: 9px 11px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
 }
 
 .loginPage .inputWrap {
@@ -1758,10 +1770,34 @@
 }
 
 .pmWorkPage .requiredHint {
-  margin-right: auto;
   color: #facc15;
   font-size: 12px;
   font-weight: 900;
+}
+
+.pmWorkPage .saveStatusGroup {
+  min-width: 0;
+  margin-right: auto;
+  display: grid;
+  gap: 3px;
+}
+
+.pmWorkPage .autosaveStatus {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.pmWorkPage .autosaveStatus.saving {
+  color: var(--primary-strong);
+}
+
+.pmWorkPage .autosaveStatus.saved {
+  color: #34d399;
+}
+
+.pmWorkPage .autosaveStatus.error {
+  color: #f87171;
 }
 
 .pmWorkPage .button:disabled {
@@ -1781,10 +1817,28 @@
 
   .pmWorkPage .toolbar,
   .pmWorkPage .detailTitle,
-  .pmWorkPage .infoGrid,
-  .pmWorkPage .formGrid,
-  .pmWorkPage .tabs {
+  .pmWorkPage .infoGrid {
     grid-template-columns: 1fr;
+  }
+
+  .pmWorkPage .formGrid {
+    gap: 12px;
+  }
+
+  .pmWorkPage .inspectorField {
+    grid-column: 1 / -1;
+  }
+
+  .pmWorkPage .stickyActions {
+    flex-wrap: wrap;
+  }
+
+  .pmWorkPage .saveStatusGroup {
+    width: 100%;
+  }
+
+  .pmWorkPage .tabs {
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .pmWorkPage .listRow {
@@ -1816,8 +1870,7 @@
   }
 
   .pmWorkPage .partRow,
-  .pmWorkPage .photoActions,
-  .pmWorkPage .summaryChoices {
+  .pmWorkPage .photoActions {
     grid-template-columns: 1fr;
   }
 
@@ -3383,8 +3436,62 @@
   cursor: not-allowed;
 }
 
-.schedulePage .allSitesButton {
-  min-height: 36px;
+.schedulePage .allSitesToggle {
+  width: max-content;
+  max-width: 100%;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.schedulePage .allSitesToggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.schedulePage .allSitesToggle span {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--field);
+  display: grid;
+  place-items: center;
+  transition: border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.schedulePage .allSitesToggle span::after {
+  content: "";
+  width: 8px;
+  height: 4px;
+  border-right: 2px solid #ffffff;
+  border-bottom: 2px solid #ffffff;
+  opacity: 0;
+  transform: translateY(-1px) rotate(45deg) scale(0.7);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.schedulePage .allSitesToggle input:checked+span {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+
+.schedulePage .allSitesToggle input:checked+span::after {
+  opacity: 1;
+  transform: translateY(-1px) rotate(45deg) scale(1);
+}
+
+.schedulePage .allSitesToggle input:focus-visible+span {
+  box-shadow: 0 0 0 3px rgba(47, 125, 246, 0.25);
 }
 
 .schedulePage .layout {

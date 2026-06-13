@@ -869,10 +869,14 @@ function ReportInfoGrid({
 }
 
 function ReportFieldValue({ label, value }: ReportField) {
+  const displayValue = stripFieldColon(label).toLowerCase() === "running date"
+    ? formatDefinitionDate(value ?? "")
+    : value;
+
   return (
     <div className="fieldLabel">
       <span>{formatFieldLabel(label)}</span>
-      <i>{value ?? ""}</i>
+      <i>{displayValue ?? ""}</i>
     </div>
   );
 }
@@ -965,7 +969,7 @@ function getSynapseChecklistDetail(details: PmWorkDetails | undefined, groupKey:
 
   if (normalizedItem === "antivirus definition" || normalizedItem === "antivirus definition date") {
     const definitionDate = getSavedFieldValueByLabels(details, groupKey, setTitle, ["Antivirus Definition Date", "Definition Date"]);
-    return ["Definition Date", definitionDate].filter(Boolean).join(" ");
+    return ["Definition Date", formatDefinitionDate(definitionDate)].filter(Boolean).join(" ");
   }
 
   return null;
@@ -973,6 +977,11 @@ function getSynapseChecklistDetail(details: PmWorkDetails | undefined, groupKey:
 
 function formatFreeTotalDetail(freeValue: string, totalValue: string) {
   return freeValue || totalValue ? `Free/Total(GB) ${freeValue}/${totalValue}` : "";
+}
+
+function formatDefinitionDate(value: string) {
+  const dateParts = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return dateParts ? `${dateParts[3]}/${dateParts[2]}/${dateParts[1]}` : value;
 }
 
 function getSavedFieldValueByLabel(

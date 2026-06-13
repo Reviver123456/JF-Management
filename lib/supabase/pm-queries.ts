@@ -1,5 +1,4 @@
 import { buildPmAppData, type PmJobRecord, type PmWorkDetails, type SiteCatalogRecord, type SiteContractDetails, type SiteRecord } from "@/lib/pm-data";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
@@ -92,9 +91,7 @@ function uniqueSiteRecords(sites: SiteRecord[]) {
 }
 
 async function createDataClient() {
-  return process.env.NODE_ENV !== "production" && process.env.AUTH_BYPASS === "true"
-    ? createAdminClient()
-    : await createClient();
+  return createClient();
 }
 
 function formatReportDate(date: string) {

@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { t } = useUi();
+  const { lang, t } = useUi();
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [message, setMessage] = useState("");
@@ -23,7 +23,9 @@ export default function LoginPage() {
 
     if (!normalizedEmail || password.length < 8) {
       setMessageTone("error");
-      setMessage("Please enter a valid email and password.");
+      setMessage(lang === "th"
+        ? "กรุณากรอกอีเมลและรหัสผ่านให้ถูกต้อง"
+        : "Please enter a valid email and password.");
       return;
     }
 
@@ -41,12 +43,23 @@ export default function LoginPage() {
 
     if (error) {
       setMessageTone("error");
-      setMessage(error.message);
+      if (error.code === "invalid_credentials") {
+        setMessage(lang === "th"
+          ? "อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบแล้วลองอีกครั้ง"
+          : "Incorrect email or password. Please check and try again.");
+      } else if (error.code === "email_not_confirmed") {
+        setMessage(lang === "th"
+          ? "อีเมลนี้ยังไม่ได้ยืนยัน กรุณาตรวจสอบอีเมลของคุณ"
+          : "This email has not been confirmed. Please check your inbox.");
+      } else {
+        setMessage(lang === "th"
+          ? `ไม่สามารถเข้าสู่ระบบได้: ${error.message}`
+          : `Unable to sign in: ${error.message}`);
+      }
       return;
     }
 
-    const nextPath = new URLSearchParams(window.location.search).get("next") ?? "/dashboard";
-    router.replace(nextPath);
+    router.replace("/dashboard");
     router.refresh();
   };
   const sendPasswordReset = async () => {
@@ -111,7 +124,10 @@ export default function LoginPage() {
                 autoComplete="username"
                 required
                 value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setMessage("");
+                }}
               />
             </span>
           </label>
@@ -127,7 +143,10 @@ export default function LoginPage() {
                   minLength={8}
                   required
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    setMessage("");
+                  }}
                 />
               </span>
             </label>
@@ -135,6 +154,9 @@ export default function LoginPage() {
           <button className="button primary" type="submit" disabled={isSubmitting}>
             {resetMode ? "ส่งลิงก์รหัสผ่าน" : t("login.signIn")}
           </button>
+          {!resetMode && messageTone === "error" && message ? (
+            <p className="loginError" role="alert">{message}</p>
+          ) : null}
         </form>
         <button
           className="forgotPasswordButton"

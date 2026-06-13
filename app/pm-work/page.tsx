@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { FeedbackPopups, LoadingPopup } from "@/components/AppPopup";
+import type { SystemUser } from "@/lib/auth/system-users";
 import { useUi, type Lang } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
 import {
@@ -52,14 +53,17 @@ import {
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import {
   filterPmJobsByParticipant,
+  getContractVisitTotal,
   getDateString,
   getSiteRecordJobKey,
   getUniquePmJobs,
+  getVisitRoundForJob,
   getWorkSiteByJobId,
   getWorkSiteBySiteId,
   getWorkSitesByDate,
   statusMeta,
   type PmExpenseDetails,
+  type PmJobRecord,
   type PmWorkDetails,
   type SiteRecord
 } from "@/lib/pm-data";
@@ -81,6 +85,7 @@ type SparePart = {
 type ChecklistField = {
   label: string;
   placeholder?: string;
+  type?: "text" | "date";
   value?: string;
 };
 
@@ -192,6 +197,15 @@ function trimRecordValues(value: Record<string, string>) {
   );
 }
 
+function toDateInputValue(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+
+  const dateParts = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return dateParts ? `${dateParts[3]}-${dateParts[2]}-${dateParts[1]}` : "";
+}
+
 function fieldKey(groupKey: string, setTitle: string, blockIndex: number, label: string) {
   return `${groupKey}:field:${setTitle}:${blockIndex}:${label}`;
 }
@@ -289,6 +303,8 @@ function PmWorkContent() {
   const { t } = useUi();
   const { data, error, isLoading, reload } = usePmData();
   const { error: userError, isLoading: isUserLoading, userName } = useCurrentUser();
+  const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
+  const [usersError, setUsersError] = useState("");
   const router = useRouter();
   const searchParams = useSearchParams();
   const siteIdParam = searchParams.get("siteId");
@@ -309,6 +325,36 @@ function PmWorkContent() {
   }, [data.pmJobs, data.siteCatalog, data.sites, ownerParam, userName]);
 
   const [activeTab, setActiveTab] = useState<PmChecklistKey>("synapse");
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    async function loadSystemUsers() {
+      try {
+        const response = await fetch("/api/auth/users", { cache: "no-store" });
+        const payload = await response.json() as { users?: SystemUser[]; message?: string };
+
+        if (!response.ok) {
+          throw new Error(payload.message ?? "Cannot load users.");
+        }
+
+        if (isCurrent) {
+          setSystemUsers(payload.users ?? []);
+          setUsersError("");
+        }
+      } catch (loadError) {
+        if (isCurrent) {
+          setUsersError(loadError instanceof Error ? loadError.message : "Cannot load users.");
+        }
+      }
+    }
+
+    loadSystemUsers();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   const selectedSite = useMemo(
     () => {
@@ -366,10 +412,19 @@ function PmWorkContent() {
         <FeedbackPopups
           loading={pageIsLoading}
           loadingMessage={t("pm.loadingSubtitle")}
-          alertMessage={error ?? userError}
+          alertMessage={error ?? userError ?? usersError}
         />
         {selectedSite ? (
-          <DetailView key={selectedSite.jobId} site={selectedSite} activeTab={activeTab} setActiveTab={setActiveTab} onBack={closeDetail} onSaved={reload} />
+          <DetailView
+            key={selectedSite.jobId}
+            site={selectedSite}
+            pmJobs={data.pmJobs}
+            systemUsers={systemUsers}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onBack={closeDetail}
+            onSaved={reload}
+          />
         ) : (
           <>
             <PageTitle title={t("pm.title")} subtitle={listSubtitle} />
@@ -402,12 +457,16 @@ function PmWorkContent() {
 
 function DetailView({
   site,
+  pmJobs,
+  systemUsers,
   activeTab,
   setActiveTab,
   onBack,
   onSaved
 }: {
   site: SiteRecord;
+  pmJobs: PmJobRecord[];
+  systemUsers: SystemUser[];
   activeTab: PmChecklistKey;
   setActiveTab: (value: PmChecklistKey) => void;
   onBack: () => void;
@@ -451,6 +510,12 @@ function DetailView({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState("");
+  const [autosaveState, setAutosaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const autosaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autosavePromiseRef = useRef<Promise<void> | null>(null);
+  const inspectorExists = systemUsers.some((user) => user.name === inspector);
+  const visitRound = getVisitRoundForJob(pmJobs, site.id, site.jobId, site.visitDate, site.visitTime);
+  const visitTotal = getContractVisitTotal(site.contractDetails, site.pmCycle);
   const configuredGroups = useMemo(() => buildConfiguredChecklistGroups(checklistConfig, lang), [checklistConfig, lang]);
   const group = configuredGroups.find((item) => item.key === activeTab) ?? configuredGroups[0];
   const missingRequiredCount = useMemo(() => getMissingRequiredCount({
@@ -464,7 +529,6 @@ function DetailView({
     endTime
   }), [configuredGroups, endTime, fieldValues, finalStatus, inspector, signerName, site, startTime]);
   const canSubmit = missingRequiredCount === 0;
-  const draftSuccessMessage = lang === "th" ? "\u0e1a\u0e31\u0e19\u0e17\u0e36\u0e01\u0e23\u0e48\u0e32\u0e07\u0e41\u0e25\u0e49\u0e27" : "Draft saved.";
   const requiredMessage = lang === "th"
     ? `\u0e22\u0e31\u0e07\u0e02\u0e32\u0e14\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25 ${missingRequiredCount} \u0e23\u0e32\u0e22\u0e01\u0e32\u0e23`
     : `${missingRequiredCount} required items remaining`;
@@ -551,11 +615,10 @@ function DetailView({
   const updateExpense = (key: ExpenseKey, value: string) => {
     setExpenses((current) => ({ ...current, [key]: value }));
   };
-  const buildWorkDetails = (draftStatus: PmWorkDetails["draftStatus"]): PmWorkDetails => ({
+  const workDetailsSnapshot = useMemo(() => ({
     checkNotes: trimRecordValues(checkNotes),
     checkResults,
     checklistSnapshot: configuredGroups,
-    draftStatus,
     expenses: trimExpenses(expenses),
     fieldValues: trimRecordValues(fieldValues),
     finalStatus,
@@ -564,43 +627,185 @@ function DetailView({
     photoNotes: trimPhotoNotes(photoNotes),
     photos,
     radioValues: trimRecordValues(radioValues),
-    savedAt: new Date().toISOString(),
     signerName,
     spareParts,
     startTime,
     endTime,
     summaryNote
+  }), [
+    checkNotes,
+    checkResults,
+    configuredGroups,
+    endTime,
+    expenses,
+    fieldValues,
+    finalStatus,
+    inspector,
+    photoNotes,
+    photos,
+    pmOrderNo,
+    radioValues,
+    signerName,
+    spareParts,
+    startTime,
+    summaryNote
+  ]);
+  const draftFingerprint = useMemo(() => JSON.stringify(workDetailsSnapshot), [workDetailsSnapshot]);
+  const lastSavedDraftRef = useRef(draftFingerprint);
+  const buildWorkDetails = useCallback((draftStatus: PmWorkDetails["draftStatus"]): PmWorkDetails => ({
+    ...workDetailsSnapshot,
+    draftStatus,
+    savedAt: new Date().toISOString()
+  }), [workDetailsSnapshot]);
+  const latestDraftRef = useRef({
+    details: buildWorkDetails("draft"),
+    fingerprint: draftFingerprint
   });
-  const saveWork = async (mode: "draft" | "submit") => {
+
+  useEffect(() => {
+    latestDraftRef.current = {
+      details: buildWorkDetails("draft"),
+      fingerprint: draftFingerprint
+    };
+  }, [buildWorkDetails, draftFingerprint]);
+  const persistDraft = useCallback((fingerprint: string, details: PmWorkDetails) => {
+    const previousSave = autosavePromiseRef.current ?? Promise.resolve();
+    const nextSave = previousSave
+      .catch(() => undefined)
+      .then(async () => {
+        setAutosaveState("saving");
+
+        const response = await fetch(`/api/pm-jobs/${encodeURIComponent(site.jobId)}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            details,
+            status: "inProgress",
+            startTime: details.startTime ?? "",
+            endTime: details.endTime ?? "",
+            result: null
+          })
+        });
+        const payload = await response.json() as { message?: string };
+
+        if (!response.ok) {
+          throw new Error(payload.message ?? "Cannot autosave PM job.");
+        }
+
+        lastSavedDraftRef.current = fingerprint;
+        setAutosaveState("saved");
+      })
+      .catch((error) => {
+        setAutosaveState("error");
+        throw error;
+      });
+
+    autosavePromiseRef.current = nextSave;
+    return nextSave;
+  }, [site.jobId]);
+
+  useEffect(() => {
+    if (draftFingerprint === lastSavedDraftRef.current) {
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      autosaveTimeoutRef.current = null;
+      void persistDraft(draftFingerprint, buildWorkDetails("draft")).catch(() => undefined);
+    }, 1000);
+    autosaveTimeoutRef.current = timeout;
+
+    return () => {
+      clearTimeout(timeout);
+      if (autosaveTimeoutRef.current === timeout) {
+        autosaveTimeoutRef.current = null;
+      }
+    };
+  }, [buildWorkDetails, draftFingerprint, persistDraft]);
+
+  useEffect(() => () => {
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current);
+    }
+
+    const latestDraft = latestDraftRef.current;
+
+    if (latestDraft.fingerprint === lastSavedDraftRef.current) {
+      return;
+    }
+
+    void fetch(`/api/pm-jobs/${encodeURIComponent(site.jobId)}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        details: latestDraft.details,
+        status: "inProgress",
+        startTime: latestDraft.details.startTime ?? "",
+        endTime: latestDraft.details.endTime ?? "",
+        result: null
+      }),
+      keepalive: true
+    });
+  }, [site.jobId]);
+
+  const flushAutosave = useCallback(async () => {
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current);
+      autosaveTimeoutRef.current = null;
+    }
+
+    if (draftFingerprint !== lastSavedDraftRef.current) {
+      await persistDraft(draftFingerprint, buildWorkDetails("draft"));
+      return;
+    }
+
+    await autosavePromiseRef.current;
+  }, [buildWorkDetails, draftFingerprint, persistDraft]);
+
+  const handleBack = async () => {
+    try {
+      await flushAutosave();
+      await onSaved();
+      onBack();
+    } catch {
+      // Keep the form open when autosave fails so the user can retry.
+    }
+  };
+
+  const saveWork = async () => {
     setSaveError("");
     setSaveSuccess("");
 
-    if (mode === "submit" && !canSubmit) {
+    if (!canSubmit) {
       setSaveError(requiredMessage);
       return;
     }
 
-    const nextStatus = mode === "draft"
-      ? "inProgress"
-      : finalStatus === "abnormal" ? "abnormal" : "completed";
-    const nextResult = mode === "draft"
-      ? null
-      : finalStatus === "abnormal" ? "ผิดปกติ" : "ปกติ";
+    if (autosaveTimeoutRef.current) {
+      clearTimeout(autosaveTimeoutRef.current);
+      autosaveTimeoutRef.current = null;
+    }
 
     setIsSaving(true);
 
     try {
+      await autosavePromiseRef.current?.catch(() => undefined);
+
       const response = await fetch(`/api/pm-jobs/${encodeURIComponent(site.jobId)}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          details: buildWorkDetails(mode === "draft" ? "draft" : "submitted"),
-          status: nextStatus,
+          details: buildWorkDetails("submitted"),
+          status: finalStatus === "abnormal" ? "abnormal" : "completed",
           startTime,
           endTime,
-          result: nextResult
+          result: finalStatus === "abnormal" ? "ผิดปกติ" : "ปกติ"
         })
       });
       const payload = await response.json() as { message?: string };
@@ -609,14 +814,22 @@ function DetailView({
         throw new Error(payload.message ?? "Cannot save PM job.");
       }
 
+      lastSavedDraftRef.current = draftFingerprint;
       await onSaved();
-      setSaveSuccess(mode === "draft" ? draftSuccessMessage : saveSuccessMessage);
+      setSaveSuccess(saveSuccessMessage);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Cannot save PM job.");
     } finally {
       setIsSaving(false);
     }
   };
+  const autosaveMessage = autosaveState === "saving"
+    ? (lang === "th" ? "กำลังบันทึกร่างอัตโนมัติ..." : "Autosaving draft...")
+    : autosaveState === "saved"
+      ? (lang === "th" ? "บันทึกร่างอัตโนมัติแล้ว" : "Draft autosaved")
+      : autosaveState === "error"
+        ? (lang === "th" ? "บันทึกร่างอัตโนมัติไม่สำเร็จ" : "Draft autosave failed")
+        : (lang === "th" ? "บันทึกร่างอัตโนมัติ" : "Draft autosave enabled");
 
   return (
     <div className="detailPage">
@@ -627,7 +840,7 @@ function DetailView({
         alertTone={saveSuccess ? "success" : "error"}
       />
       <div className="detailTitle">
-        <button className="backButton" type="button" onClick={onBack} aria-label={t("common.back")}>
+        <button className="backButton" type="button" onClick={handleBack} aria-label={t("common.back")}>
           <ArrowLeft size={20} />
         </button>
         <div>
@@ -646,6 +859,7 @@ function DetailView({
           <Info label={t("pm.region")} value={site.region} />
           <Info label={t("common.owner")} value={site.owner} />
           <Info label={t("pm.pmCycle")} value={localizeLabel(site.pmCycle, lang)} />
+          <Info label={t("history.visitRound")} value={`${visitRound}/${visitTotal || "-"}`} />
         </div>
         <button
           className="button subtle"
@@ -670,9 +884,15 @@ function DetailView({
             <RequiredLabel label={t("fields.endTime")} required={!endTime.trim()} />
             <input className="field" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
           </label>
-          <label className={inspector.trim() ? "label" : "label missingRequired"}>
+          <label className={`${inspector.trim() ? "label" : "label missingRequired"} inspectorField`}>
             <RequiredLabel label={t("common.inspector")} required={!inspector.trim()} />
-            <input className="field" value={inspector} onChange={(event) => setInspector(event.target.value)} />
+            <select className="select" value={inspector} onChange={(event) => setInspector(event.target.value)}>
+              <option value="" disabled>{t("common.inspector")}</option>
+              {!inspectorExists && inspector ? <option value={inspector}>{inspector}</option> : null}
+              {systemUsers.map((user) => (
+                <option key={user.id} value={user.name}>{user.name}</option>
+              ))}
+            </select>
           </label>
         </div>
       </section>
@@ -841,10 +1061,12 @@ function DetailView({
       </section>
 
       <div className="stickyActions">
-        {!canSubmit ? <span className="requiredHint">{requiredMessage}</span> : null}
-        <button className="button ghost" type="button" onClick={onBack}>{t("common.back")}</button>
-        <button className="button subtle" type="button" onClick={() => saveWork("draft")} disabled={isSaving}>{t("common.saveDraft")}</button>
-        <button className="button primary" type="button" onClick={() => saveWork("submit")} disabled={isSaving || !canSubmit}>
+        <div className="saveStatusGroup">
+          {!canSubmit ? <span className="requiredHint">{requiredMessage}</span> : null}
+          <span className={`autosaveStatus ${autosaveState}`}>{autosaveMessage}</span>
+        </div>
+        <button className="button ghost" type="button" onClick={handleBack}>{t("common.back")}</button>
+        <button className="button primary" type="button" onClick={saveWork} disabled={isSaving || !canSubmit}>
           <Save size={16} />
           {t("common.save")}
         </button>
@@ -1112,8 +1334,9 @@ function ChecklistBlockView({
                 <RequiredLabel label={localizeLabel(field.label, lang)} required={missingValue} />
                 <input
                   className="field"
-                  value={value}
-                  placeholder={localizeLabel(field.placeholder ?? field.label, lang)}
+                  type={field.type ?? "text"}
+                  value={field.type === "date" ? toDateInputValue(value) : value}
+                  placeholder={field.type === "date" ? undefined : localizeLabel(field.placeholder ?? field.label, lang)}
                   onChange={(event) => setFieldValue(key, event.target.value)}
                 />
               </label>
@@ -1391,7 +1614,7 @@ function buildChecklistSet(key: PmChecklistKey, setId: number, config: PmCheckli
               { label: "Host Name" },
               { label: "License Studies" },
               { label: "Current Studies Per Year" },
-              { label: "Antivirus Definition Date", placeholder: "DD/MM/YYYY" }
+              { label: "Antivirus Definition Date", type: "date" }
             ]
           },
           {
@@ -1412,7 +1635,7 @@ function buildChecklistSet(key: PmChecklistKey, setId: number, config: PmCheckli
           { type: "fields", title: "BACKUP DEVICE / DATA BACKUP CHECKING", fields: [{ label: "Location" }] },
           { type: "radios", label: "Hardware Status", items: ["ปกติ", "ผิดปกติ"] },
           { type: "radios", label: "Backup Status", items: ["ปกติ", "ผิดปกติ"] },
-          { type: "fields", title: "RUNNING DATE", fields: [{ label: "Running Date", placeholder: "DD/MM/YYYY" }] }
+          { type: "fields", title: "RUNNING DATE", fields: [{ label: "Running Date", type: "date" }] }
         ])
       };
     case "server":

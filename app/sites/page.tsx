@@ -1143,7 +1143,7 @@ function SynapseSetPanel({
           <Field label="Host Name" placeholder="Host Name" />
           <Field label="License Studies" placeholder="License Studies" />
           <Field label="Current Studies Per Year" placeholder="Current Studies Per Year" />
-          <Field label="Antivirus Definition Date" placeholder="DD/MM/YYYY" />
+          <Field label="Antivirus Definition Date" type="date" />
         </div>
       </section>
 
@@ -1166,7 +1166,7 @@ function SynapseSetPanel({
         <Field label="Location" placeholder="Location" />
         <RadioGroup label={`Hardware Status ${setId}`} items={["ปกติ", "ผิดปกติ"]} />
         <RadioGroup label={`Backup Status ${setId}`} items={["ปกติ", "ผิดปกติ"]} />
-        <Field label="Running Date" placeholder="DD/MM/YYYY" />
+        <Field label="Running Date" type="date" />
       </section>
     </>
   );
@@ -1480,7 +1480,17 @@ function DiagRow({
   );
 }
 
-function Field({ label, value, placeholder }: { label: string; value?: string; placeholder?: string }) {
+function Field({
+  label,
+  value,
+  placeholder,
+  type = "text"
+}: {
+  label: string;
+  value?: string;
+  placeholder?: string;
+  type?: "text" | "date";
+}) {
   const { lang } = useUi();
   const localizedLabel = localizeLabel(label, lang);
   const localizedPlaceholder = localizeLabel(placeholder ?? label, lang);
@@ -1488,7 +1498,7 @@ function Field({ label, value, placeholder }: { label: string; value?: string; p
   return (
     <label className="label">
       {localizedLabel}
-      <input className="field" defaultValue={value} placeholder={localizedPlaceholder} />
+      <input className="field" type={type} defaultValue={value} placeholder={type === "date" ? undefined : localizedPlaceholder} />
     </label>
   );
 }

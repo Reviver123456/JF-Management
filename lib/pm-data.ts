@@ -358,6 +358,27 @@ export function getUniquePmJobs(pmJobs: PmJobRecord[]) {
   return Array.from(jobsByKey.values());
 }
 
+export function getVisitRoundForJob(
+  pmJobs: PmJobRecord[],
+  siteId: string,
+  jobId: string,
+  visitDate: string,
+  visitTime: string
+) {
+  const uniqueJobs = getUniquePmJobs(pmJobs.filter((job) => job.siteId === siteId))
+    .sort((first, second) => (
+      first.visitDate.localeCompare(second.visitDate) ||
+      first.visitTime.localeCompare(second.visitTime)
+    ));
+  const jobIndex = uniqueJobs.findIndex((job) => job.id === jobId);
+
+  if (jobIndex >= 0) {
+    return jobIndex + 1;
+  }
+
+  return uniqueJobs.findIndex((job) => job.visitDate === visitDate && job.visitTime === visitTime) + 1 || 1;
+}
+
 export function getScheduleDaysForSites(pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecord[]) {
   const siteById = new Map(siteCatalog.map((site) => [site.id, site]));
   const seenJobs = new Set<string>();
