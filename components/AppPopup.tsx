@@ -213,7 +213,8 @@ export function FeedbackPopups({
   alertVariant = "default",
   loading,
   loadingMessage,
-  loadingProgress
+  loadingProgress,
+  onAlertClose
 }: {
   alertMessage?: string | null;
   alertTitle?: string;
@@ -222,6 +223,7 @@ export function FeedbackPopups({
   loading?: boolean;
   loadingMessage?: string;
   loadingProgress?: number;
+  onAlertClose?: () => void;
 }) {
   const { t } = useUi();
   const [dismissedMessage, setDismissedMessage] = useState("");
@@ -260,7 +262,10 @@ export function FeedbackPopups({
         title={resolvedTitle}
         tone={alertTone}
         variant={alertVariant}
-        onClose={() => setDismissedMessage(message)}
+        onClose={() => {
+          setDismissedMessage(message);
+          onAlertClose?.();
+        }}
       />
     </>
   );

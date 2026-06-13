@@ -52,8 +52,6 @@ import {
   type SiteCatalogRecord
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
-import { usePageShellLoading } from "@/lib/use-page-shell-loading";
-
 type ChecklistTemplateKey = "synapse" | "server" | "switch" | "storage" | "environment" | "diag";
 
 type ChecklistTemplate = {
@@ -85,7 +83,6 @@ export default function ReportsPage() {
   const { lang, t } = useUi();
   const { email, isLoading: userLoading, signature, userName } = useCurrentUser();
   const { data, error, isLoading } = usePmData();
-  const pageLoading = usePageShellLoading(isLoading, userLoading);
   const [query, setQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -115,7 +112,7 @@ export default function ReportsPage() {
   };
 
   return (
-    <AppShell loading={pageLoading}>
+    <AppShell>
       <div className="reportsPage">
         <FeedbackPopups alertMessage={error} />
 

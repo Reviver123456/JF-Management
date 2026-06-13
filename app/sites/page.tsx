@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
 import { AppSelect } from "@/components/AppSelect";
-import { AlertPopup, FeedbackPopups } from "@/components/AppPopup";
+import { AlertPopup, FeedbackPopups, type AlertTone } from "@/components/AppPopup";
 import { Pagination } from "@/components/Pagination";
 import type { SystemUser } from "@/lib/auth/system-users";
 import { useUi } from "@/lib/i18n";
@@ -56,8 +56,6 @@ import {
   type SiteContractItem
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
-import { usePageShellLoading } from "@/lib/use-page-shell-loading";
-
 type SiteTab = "customer" | "contract" | "synapse" | "server" | "switch" | "storage" | "environment" | "diag";
 type InspectionTab = PmChecklistKey;
 
@@ -281,8 +279,15 @@ export default function SitesPage() {
   const [siteStatusFilter, setSiteStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const listTopRef = useRef<HTMLDivElement>(null);
+  const [actionMessage, setActionMessage] = useState("");
+  const [actionTitle, setActionTitle] = useState("");
+  const [actionTone, setActionTone] = useState<AlertTone>("success");
 
-  const pageLoading = usePageShellLoading(isLoading, usersLoading);
+  const showActionFeedback = useCallback((title: string, message: string, tone: AlertTone) => {
+    setActionTitle(title);
+    setActionMessage(message);
+    setActionTone(tone);
+  }, []);
 
   useEffect(() => {
     let isCurrent = true;
@@ -369,9 +374,18 @@ export default function SitesPage() {
   };
 
   return (
-    <AppShell loading={pageLoading}>
+    <AppShell>
       <div className="sitesPage">
-        <FeedbackPopups alertMessage={error ?? usersError} />
+        <FeedbackPopups
+          alertMessage={actionMessage || (error ?? usersError)}
+          alertTitle={actionMessage ? actionTitle : undefined}
+          alertTone={actionMessage ? actionTone : "error"}
+          alertVariant="status"
+          onAlertClose={() => {
+            setActionMessage("");
+            setActionTitle("");
+          }}
+        />
 
         {modalSite ? (
           <SiteModal
@@ -380,6 +394,7 @@ export default function SitesPage() {
             regions={regions}
             systemUsers={systemUsers}
             onClose={() => setModalSite(null)}
+            onFeedback={showActionFeedback}
             onSaved={reload}
           />
         ) : (
@@ -458,6 +473,7 @@ function SiteModal({
   regions,
   systemUsers,
   onClose,
+  onFeedback,
   onSaved
 }: {
   mode: "add" | "edit";
@@ -465,6 +481,7 @@ function SiteModal({
   regions: string[];
   systemUsers: SystemUser[];
   onClose: () => void;
+  onFeedback: (title: string, message: string, tone: AlertTone) => void;
   onSaved: () => Promise<void>;
 }) {
   const { t } = useUi();
@@ -474,6 +491,8 @@ function SiteModal({
   const [contractDetails, setContractDetails] = useState<SiteContractDetails>(() => site.contractDetails ?? {});
   const [selectedContractIndex, setSelectedContractIndex] = useState(0);
   const [saveError, setSaveError] = useState("");
+  const [saveErrorTitle, setSaveErrorTitle] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const initialChecklistConfig = readContractChecklistConfig(site.id, site.contractDetails ?? {}, site.contract, 0);
@@ -708,63 +727,77 @@ function SiteModal({
   }, []);
 
   const saveChecklistConfig = async () => {
-    const currentChecklistConfig = getCurrentChecklistConfig();
-    const contractsWithChecklistConfig = normalizeContractItems(contractNumber, contractDetails).map((contract, index) => (
-      index === selectedContractIndex ? { ...contract, checklistConfig: currentChecklistConfig } : contract
-    ));
-    const normalizedContracts = contractsWithChecklistConfig.map((contract) => {
-      const pmCycle = contract.pmCycle ?? "ครึ่งปี";
-      const visitCount = getVisitCountForPmCycle(pmCycle);
+    setIsSaving(true);
+    setSaveError("");
+    setSaveErrorTitle("");
 
-      return {
-        ...contract,
-        pmCycle,
-        visitCount: visitCount ? String(visitCount) : contract.visitCount,
-        visitMonths: (contract.visitMonths ?? []).slice(0, visitCount || undefined)
-      };
-    });
-    const normalizedContractsWithConfigs = normalizedContracts.map((contract, index) => ({
-      ...contract,
-      checklistConfig: normalizePmChecklistConfig(
-        contract.checklistConfig ?? (index === 0 ? contractDetails.checklistConfig ?? readSitePmChecklistConfig(site.id) : defaultContractChecklistConfig())
-      )
-    }));
-    const primaryChecklistConfig = normalizePmChecklistConfig(normalizedContractsWithConfigs[0]?.checklistConfig);
-    const normalizedContractDetailsWithList: SiteContractDetails = {
-      ...writeContractDetailsRoot(contractDetails, normalizedContractsWithConfigs),
-      checklistConfig: primaryChecklistConfig
-    };
-    const normalizedContractNumber = normalizedContractsWithConfigs[0]?.contractNumber ?? contractNumber;
+    try {
+      const currentChecklistConfig = getCurrentChecklistConfig();
+      const contractsWithChecklistConfig = normalizeContractItems(contractNumber, contractDetails).map((contract, index) => (
+        index === selectedContractIndex ? { ...contract, checklistConfig: currentChecklistConfig } : contract
+      ));
+      const normalizedContracts = contractsWithChecklistConfig.map((contract) => {
+        const pmCycle = contract.pmCycle ?? "ครึ่งปี";
+        const visitCount = getVisitCountForPmCycle(pmCycle);
 
-    writeSitePmChecklistConfig(site.id, primaryChecklistConfig);
-
-    if (site.id) {
-      const response = await fetch(`/api/sites/${encodeURIComponent(site.id)}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          contract: normalizedContractNumber,
-          contractDetails: normalizedContractDetailsWithList,
-          owner: selectedOwner
-        })
+        return {
+          ...contract,
+          pmCycle,
+          visitCount: visitCount ? String(visitCount) : contract.visitCount,
+          visitMonths: (contract.visitMonths ?? []).slice(0, visitCount || undefined)
+        };
       });
-      const payload = await response.json() as { message?: string };
+      const normalizedContractsWithConfigs = normalizedContracts.map((contract, index) => ({
+        ...contract,
+        checklistConfig: normalizePmChecklistConfig(
+          contract.checklistConfig ?? (index === 0 ? contractDetails.checklistConfig ?? readSitePmChecklistConfig(site.id) : defaultContractChecklistConfig())
+        )
+      }));
+      const primaryChecklistConfig = normalizePmChecklistConfig(normalizedContractsWithConfigs[0]?.checklistConfig);
+      const normalizedContractDetailsWithList: SiteContractDetails = {
+        ...writeContractDetailsRoot(contractDetails, normalizedContractsWithConfigs),
+        checklistConfig: primaryChecklistConfig
+      };
+      const normalizedContractNumber = normalizedContractsWithConfigs[0]?.contractNumber ?? contractNumber;
 
-      if (!response.ok) {
-        setSaveError(payload.message ?? "Cannot update site owner.");
-        return;
+      writeSitePmChecklistConfig(site.id, primaryChecklistConfig);
+
+      if (site.id) {
+        const response = await fetch(`/api/sites/${encodeURIComponent(site.id)}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contract: normalizedContractNumber,
+            contractDetails: normalizedContractDetailsWithList,
+            owner: selectedOwner
+          })
+        });
+        const payload = await response.json() as { message?: string };
+
+        if (!response.ok) {
+          setSaveErrorTitle(t("feedback.saveFailed"));
+          setSaveError(payload.message ?? "Cannot update site owner.");
+          return;
+        }
       }
-    }
 
-    await onSaved();
-    onClose();
+      await onSaved();
+      onFeedback(t("feedback.saveSuccess"), t("sites.saveSuccess"), "success");
+      onClose();
+    } catch (error) {
+      setSaveErrorTitle(t("feedback.saveFailed"));
+      setSaveError(error instanceof Error ? error.message : "Cannot save site.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const deleteSite = async () => {
     setIsDeleting(true);
     setSaveError("");
+    setSaveErrorTitle("");
 
     try {
       const response = await fetch(`/api/sites/${encodeURIComponent(site.id)}`, {
@@ -773,14 +806,17 @@ function SiteModal({
       const payload = await response.json() as { message?: string };
 
       if (!response.ok) {
+        setSaveErrorTitle(t("feedback.deleteFailed"));
         setSaveError(payload.message ?? "Cannot delete site.");
         setIsDeleting(false);
         return;
       }
 
       await onSaved();
+      onFeedback(t("feedback.deleteSuccess"), t("sites.deleteSuccess"), "success");
       onClose();
     } catch (error) {
+      setSaveErrorTitle(t("feedback.deleteFailed"));
       setSaveError(error instanceof Error ? error.message : "Cannot delete site.");
       setIsDeleting(false);
     }
@@ -859,13 +895,21 @@ function SiteModal({
 
       <div className="siteEditorBody">{content}</div>
 
+      <FeedbackPopups
+        loading={isSaving || isDeleting}
+        loadingMessage={isDeleting ? t("sites.deletingSite") : t("sites.saveSite")}
+      />
+
       <AlertPopup
         message={saveError}
         open={Boolean(saveError)}
-        title={t("feedback.saveFailed")}
+        title={saveErrorTitle || t("feedback.saveFailed")}
         tone="error"
         variant="status"
-        onClose={() => setSaveError("")}
+        onClose={() => {
+          setSaveError("");
+          setSaveErrorTitle("");
+        }}
       />
 
       <SiteDeleteConfirmPopup
@@ -892,7 +936,7 @@ function SiteModal({
             </button>
           )}
         </div>
-        <button className="button primary" type="button" onClick={saveChecklistConfig} disabled={isDeleting}>
+        <button className="button primary" type="button" onClick={saveChecklistConfig} disabled={isDeleting || isSaving}>
           <Save size={16} />
           {t("sites.saveSite")}
         </button>

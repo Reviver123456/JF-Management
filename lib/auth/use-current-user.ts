@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { cacheUserProfile, readCachedUserProfile } from "@/lib/app-bootstrap-cache";
 import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +11,14 @@ type CurrentUserState = {
   isLoading: boolean;
   signature: string;
   userName: string;
+};
+
+const emptyCurrentUserState: CurrentUserState = {
+  email: "",
+  error: null,
+  isLoading: true,
+  signature: "",
+  userName: ""
 };
 
 async function loadSignatureFromDb(localFallback: string) {
@@ -41,36 +49,28 @@ async function loadSignatureFromDb(localFallback: string) {
 }
 
 export function useCurrentUser(): CurrentUserState {
-  const cachedProfile = readCachedUserProfile();
-  const [state, setState] = useState<CurrentUserState>(() => ({
-    email: cachedProfile?.email ?? "",
-    error: null,
-    isLoading: !cachedProfile,
-    signature: cachedProfile?.signature ?? "",
-    userName: cachedProfile?.userName ?? ""
-  }));
+  const [state, setState] = useState<CurrentUserState>(emptyCurrentUserState);
+
+  useLayoutEffect(() => {
+    const cachedProfile = readCachedUserProfile();
+
+    if (!cachedProfile) {
+      return;
+    }
+
+    setState({
+      email: cachedProfile.email,
+      error: null,
+      isLoading: false,
+      signature: cachedProfile.signature,
+      userName: cachedProfile.userName
+    });
+  }, []);
 
   useEffect(() => {
     let isCurrent = true;
     const supabase = createClient();
     const cachedProfile = readCachedUserProfile();
-    let frame = 0;
-
-    if (cachedProfile) {
-      frame = window.requestAnimationFrame(() => {
-        if (!isCurrent) {
-          return;
-        }
-
-        setState({
-          email: cachedProfile.email,
-          error: null,
-          isLoading: false,
-          signature: cachedProfile.signature,
-          userName: cachedProfile.userName
-        });
-      });
-    }
 
     async function loadCurrentUser() {
       if (isCurrent && !cachedProfile) {
@@ -136,7 +136,6 @@ export function useCurrentUser(): CurrentUserState {
 
     return () => {
       isCurrent = false;
-      window.cancelAnimationFrame(frame);
     };
   }, []);
 

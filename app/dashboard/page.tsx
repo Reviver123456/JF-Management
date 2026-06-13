@@ -24,8 +24,6 @@ import {
   type Metric
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
-import { usePageShellLoading } from "@/lib/use-page-shell-loading";
-
 const allOwnersValue = "__all";
 
 const metricIcons = {
@@ -51,7 +49,6 @@ export default function DashboardPage() {
   const { t } = useUi();
   const { data, error, isLoading } = usePmData();
   const { error: userError, isLoading: userLoading, userName } = useCurrentUser();
-  const pageLoading = usePageShellLoading(isLoading, userLoading);
   const [selectedOwner, setSelectedOwner] = useState("");
   const activeOwner = selectedOwner || userName || allOwnersValue;
   const showAllOwners = activeOwner === allOwnersValue;
@@ -95,11 +92,11 @@ export default function DashboardPage() {
   const teamBarMax = Math.max(1, teamCompletedCount, teamInProgressCount, teamBacklogCount, teamAbnormalCount);
   const getTeamBarWidth = (count: number) => `${count === 0 ? 0 : Math.max(10, Math.round((count / teamBarMax) * 100))}%`;
   const pathname = usePathname();
-  const teamBarsReady = usePageEnterVisible(pathname, !pageLoading);
+  const teamBarsReady = usePageEnterVisible(pathname, !isLoading && !userLoading);
   const nextSite = sites.find((site) => site.visitDate >= todayDate);
 
   return (
-    <AppShell loading={pageLoading}>
+    <AppShell>
       <div className="dashboardPage">
         <FeedbackPopups
           alertMessage={error ?? userError}

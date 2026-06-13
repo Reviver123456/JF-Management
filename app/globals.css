@@ -437,6 +437,144 @@ a {
   .appSelectChevron {
     transition: none;
   }
+
+  .timePickerMenu {
+    animation: none;
+  }
+}
+
+.timePicker {
+  position: relative;
+  width: 100%;
+}
+
+.timePickerTrigger.select {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  background-image: none;
+  cursor: pointer;
+}
+
+.timePickerReadOnly .timePickerTrigger.select {
+  cursor: default;
+}
+
+.timePickerValue {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+
+.timePickerValue.isPlaceholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.timePickerIcon {
+  flex: 0 0 auto;
+  color: var(--select-chevron);
+  transition: color 140ms ease;
+}
+
+.timePicker.isOpen .timePickerIcon {
+  color: var(--primary-strong);
+}
+
+.timePicker.isOpen .timePickerTrigger.select {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.timePickerMenu {
+  position: fixed;
+  z-index: 420;
+  max-width: calc(100vw - 16px);
+  border: 1px solid var(--select-menu-border);
+  border-radius: var(--radius-sm);
+  background: var(--select-menu-bg);
+  box-shadow: var(--select-menu-shadow);
+  padding: 8px;
+  animation: appSelectMenuIn 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.timePickerColumns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 6px;
+}
+
+.timePickerSeparator {
+  align-self: center;
+  color: var(--text-muted);
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1;
+  padding-top: 2px;
+}
+
+.timePickerColumn {
+  max-height: 232px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  display: grid;
+  gap: 2px;
+  padding: 2px;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: color-mix(in srgb, var(--panel-2) 72%, transparent);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.timePickerColumn::-webkit-scrollbar {
+  display: none;
+}
+
+.timePickerOption {
+  width: 100%;
+  min-height: 36px;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 2px);
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.timePickerOption:hover,
+.timePickerOption:focus-visible {
+  background: var(--select-option-hover);
+  outline: none;
+}
+
+.timePickerOption.isSelected {
+  background: var(--select-option-selected-bg);
+  color: var(--select-option-selected-text);
+  font-weight: 500;
+}
+
+.timePicker.isDisabled .timePickerTrigger.select {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+@media (max-width: 760px) {
+  .timePickerTrigger.select {
+    min-height: 44px;
+  }
 }
 
 [data-theme="light"] .appPopupProgressTrack {

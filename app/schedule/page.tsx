@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, ChevronLeft, ChevronRight, MapPin, Plus, Trash2, UserRound, X } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { AppSelect } from "@/components/AppSelect";
+import { TimePicker } from "@/components/TimePicker";
 import { AlertPopup, FeedbackPopups } from "@/components/AppPopup";
 import type { SystemUser } from "@/lib/auth/system-users";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
@@ -19,8 +20,6 @@ import {
   type SiteCatalogRecord
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
-import { usePageShellLoading } from "@/lib/use-page-shell-loading";
-
 const weekDaysByLang: Record<Lang, string[]> = {
   th: ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"],
   en: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -106,6 +105,7 @@ export default function SchedulePage() {
   const [selectedOwner, setSelectedOwner] = useState("");
   const [deletingJobId, setDeletingJobId] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [actionTitle, setActionTitle] = useState("");
   const [actionTone, setActionTone] = useState<"error" | "success">("success");
   const activeOwner = selectedOwner || userName;
   const todayDate = useMemo(() => getDateString(), []);
@@ -161,8 +161,6 @@ export default function SchedulePage() {
   const trailingBlankDays = (7 - ((month.leadingBlankDays + month.dayCount) % 7)) % 7;
   const followersLabel = lang === "th" ? "ผู้ติดตาม" : "Followers";
 
-  const pageLoading = usePageShellLoading(isLoading, userLoading, usersLoading);
-
   useEffect(() => {
     let isCurrent = true;
 
@@ -207,6 +205,7 @@ export default function SchedulePage() {
   const openAddPlan = (siteId?: string) => {
     if (!selectedDay || selectedDateIsPast) {
       if (selectedDateIsPast) {
+        setActionTitle(t("feedback.notice"));
         setActionTone("error");
         setActionMessage(t("schedule.pastDateBlocked"));
       }
@@ -246,6 +245,7 @@ export default function SchedulePage() {
     }
 
     await reload();
+    setActionTitle(t("feedback.saveSuccess"));
     setActionTone("success");
     setActionMessage(t("schedule.addSuccess"));
   };
@@ -272,6 +272,7 @@ export default function SchedulePage() {
     }
 
     await reload();
+    setActionTitle(t("feedback.saveSuccess"));
     setActionTone("success");
     setActionMessage(t("schedule.updateSuccess"));
   };
@@ -291,10 +292,12 @@ export default function SchedulePage() {
       }
 
       await reload();
+      setActionTitle(t("feedback.deleteSuccess"));
       setActionTone("success");
       setActionMessage(t("schedule.deleteSuccess"));
       setEditingJob(null);
     } catch (error) {
+      setActionTitle(t("feedback.deleteFailed"));
       setActionTone("error");
       setActionMessage(error instanceof Error ? error.message : "Cannot delete PM job.");
     } finally {
@@ -303,18 +306,17 @@ export default function SchedulePage() {
   };
 
   return (
-    <AppShell loading={pageLoading}>
+    <AppShell>
       <div className="schedulePage">
         <FeedbackPopups
-          alertMessage={error ?? userError ?? usersError}
-        />
-        <AlertPopup
-          message={actionMessage}
-          open={Boolean(actionMessage)}
-          title={actionTone === "success" ? t("feedback.saveSuccess") : t("feedback.saveFailed")}
-          tone={actionTone}
-          variant="status"
-          onClose={() => setActionMessage("")}
+          alertMessage={actionMessage || (error ?? userError ?? usersError)}
+          alertTitle={actionMessage ? actionTitle : undefined}
+          alertTone={actionMessage ? actionTone : "error"}
+          alertVariant="status"
+          onAlertClose={() => {
+            setActionMessage("");
+            setActionTitle("");
+          }}
         />
 
         {addingDate ? (
@@ -713,7 +715,7 @@ function AddPlanModal({
           </div>
           <label className="label">
             {t("fields.operationTime")}
-            <input className="field" type="time" value={time} onChange={(event) => setTime(event.target.value)} />
+            <TimePicker value={time} onChange={setTime} />
           </label>
           <label className="label">
             {followersLabel}

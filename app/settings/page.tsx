@@ -138,6 +138,7 @@ export default function SettingsPage() {
       <div className="settingsPage">
       <FeedbackPopups
         alertMessage={message || (saved ? t("settings.saved") : "")}
+        alertTitle={saved ? t("feedback.saveSuccess") : message ? t("feedback.saveFailed") : undefined}
         alertTone={message ? "error" : "success"}
         alertVariant="status"
       />

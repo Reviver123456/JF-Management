@@ -92,7 +92,7 @@ const dictionaries: Record<Lang, Dictionary> = {
       files: "ไฟล์",
       active: "ใช้งาน",
       inactive: "ไม่ใช้งาน",
-      datePlaceholder: "วว/ดด/ปปปป",
+      datePlaceholder: "วว/ดด/ปปปพ (พ.ศ.)",
       phonePrefix: "โทร",
       provincePrefix: "จังหวัด",
       inspectorPrefix: "ผู้ตรวจ",
@@ -171,6 +171,8 @@ const dictionaries: Record<Lang, Dictionary> = {
     feedback: {
       saveSuccess: "บันทึกสำเร็จ",
       saveFailed: "บันทึกไม่สำเร็จ",
+      deleteSuccess: "ลบสำเร็จ",
+      deleteFailed: "ลบไม่สำเร็จ",
       notice: "แจ้งเตือน"
     },
     dashboard: {
@@ -259,7 +261,9 @@ const dictionaries: Record<Lang, Dictionary> = {
       addModalTitle: "เพิ่มไซต์ใหม่",
       editModalTitle: "แก้ไขข้อมูลไซต์",
       saveSite: "บันทึกไซต์",
+      saveSuccess: "บันทึกข้อมูลไซต์เรียบร้อยแล้ว",
       deleteSite: "ลบไซต์",
+      deleteSuccess: "ลบไซต์เรียบร้อยแล้ว",
       deletingSite: "กำลังลบไซต์",
       deleteModalTitle: "ยืนยันการลบไซต์",
       deleteConfirmMessage: "ต้องการลบไซต์ {site} ใช่ไหม? งาน PM ของไซต์นี้จะถูกลบไปด้วย",
@@ -472,7 +476,7 @@ const dictionaries: Record<Lang, Dictionary> = {
       files: "files",
       active: "Active",
       inactive: "Inactive",
-      datePlaceholder: "dd/mm/yyyy",
+      datePlaceholder: "dd/mm/yyyy (AD)",
       phonePrefix: "Phone",
       provincePrefix: "Province",
       inspectorPrefix: "Inspector",
@@ -551,6 +555,8 @@ const dictionaries: Record<Lang, Dictionary> = {
     feedback: {
       saveSuccess: "Saved successfully",
       saveFailed: "Save failed",
+      deleteSuccess: "Deleted successfully",
+      deleteFailed: "Delete failed",
       notice: "Notice"
     },
     dashboard: {
@@ -639,7 +645,9 @@ const dictionaries: Record<Lang, Dictionary> = {
       addModalTitle: "Add new site",
       editModalTitle: "Edit site details",
       saveSite: "Save site",
+      saveSuccess: "Site saved successfully",
       deleteSite: "Delete site",
+      deleteSuccess: "Site deleted successfully",
       deletingSite: "Deleting site",
       deleteModalTitle: "Delete site",
       deleteConfirmMessage: "Delete {site}? PM jobs for this site will be deleted too.",

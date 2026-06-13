@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -27,6 +27,8 @@ import {
 } from "lucide-react";
 import { AppShell, PageTitle } from "@/components/AppShell";
 import { AppSelect } from "@/components/AppSelect";
+import { TimePicker } from "@/components/TimePicker";
+import { FormDateInput } from "@/components/FormDateInput";
 import { FeedbackPopups } from "@/components/AppPopup";
 import type { SystemUser } from "@/lib/auth/system-users";
 import { useUi, type Lang } from "@/lib/i18n";
@@ -72,12 +74,21 @@ import {
   type SiteRecord
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
-import { usePageShellLoading } from "@/lib/use-page-shell-loading";
+import { isDateLikeField } from "@/lib/date-input";
+import { formatDecimalInputValue, isDecimalLikeField } from "@/lib/decimal-input";
 
 const allOwnersValue = "__all";
 type CheckResult = "ok" | "bad";
 type FinalStatus = "normal" | "abnormal";
 type PhotoKey = "device" | "overview" | "issue" | "part";
+
+function useIsClient() {
+  return useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+}
 type PhotoState = Record<PhotoKey, string[]>;
 type PhotoNotes = Partial<Record<PhotoKey, string>>;
 type ExpenseKey = keyof Required<PmExpenseDetails>;
@@ -90,7 +101,7 @@ type SparePart = {
 type ChecklistField = {
   label: string;
   placeholder?: string;
-  type?: "text" | "date";
+  type?: "text" | "date" | "decimal";
   value?: string;
 };
 
@@ -202,15 +213,6 @@ function trimRecordValues(value: Record<string, string>) {
   );
 }
 
-function toDateInputValue(value: string) {
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
-  }
-
-  const dateParts = value.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  return dateParts ? `${dateParts[3]}-${dateParts[2]}-${dateParts[1]}` : "";
-}
-
 function fieldKey(groupKey: string, setTitle: string, blockIndex: number, label: string) {
   return `${groupKey}:field:${setTitle}:${blockIndex}:${label}`;
 }
@@ -293,9 +295,9 @@ function PmWorkFallback() {
   const { t } = useUi();
 
   return (
-    <AppShell loading>
+    <AppShell>
       <div className="pmWorkPage">
-        <PageTitle title={t("pm.title")} subtitle={t("pm.loadingSubtitle")} />
+        <PageTitle title={t("pm.title")} subtitle={t("pm.listSubtitle")} />
       </div>
     </AppShell>
   );
@@ -308,7 +310,6 @@ function PmWorkContent() {
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [usersError, setUsersError] = useState("");
   const [usersLoading, setUsersLoading] = useState(true);
-  const pageLoading = usePageShellLoading(isLoading, userLoading, usersLoading);
   const router = useRouter();
   const searchParams = useSearchParams();
   const siteIdParam = searchParams.get("siteId");
@@ -414,14 +415,17 @@ function PmWorkContent() {
   const listSubtitle = showAllJobs
     ? `${statusParam === "backlog" ? t("dashboard.backlog") : t("pm.title")} · ${filteredSites.length} ${t("common.jobs")}`
     : `${t("pm.todayOnlySubtitle")} · ${todayDate}`;
+  const isClient = useIsClient();
+  const pendingDetail = Boolean(jobIdParam || siteIdParam);
+  const showDetailView = isClient && Boolean(selectedSite);
 
   return (
-    <AppShell loading={pageLoading}>
+    <AppShell>
       <div className="pmWorkPage">
         <FeedbackPopups
           alertMessage={error ?? userError ?? usersError}
         />
-        {selectedSite ? (
+        {showDetailView && selectedSite ? (
           <DetailView
             key={selectedSite.jobId}
             site={selectedSite}
@@ -880,10 +884,15 @@ function DetailView({
     <div className="detailPage">
       <FeedbackPopups
         alertMessage={saveError || saveSuccess}
+        alertTitle={saveSuccess ? t("feedback.saveSuccess") : saveError ? t("feedback.saveFailed") : undefined}
         alertTone={saveSuccess ? "success" : "error"}
         alertVariant="status"
         loading={isSaving}
         loadingMessage={t("pm.loadingSubtitle")}
+        onAlertClose={() => {
+          setSaveError("");
+          setSaveSuccess("");
+        }}
       />
       <div className="detailTitle">
         <button className="backButton" type="button" onClick={handleBack} aria-label={t("common.back")}>
@@ -924,11 +933,11 @@ function DetailView({
         <div className="formGrid">
           <label className={startTime.trim() ? "label" : "label missingRequired"}>
             <RequiredLabel label={t("fields.startTime")} required={!startTime.trim()} />
-            <input className="field" type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+            <TimePicker value={startTime} onChange={setStartTime} />
           </label>
           <label className={endTime.trim() ? "label" : "label missingRequired"}>
             <RequiredLabel label={t("fields.endTime")} required={!endTime.trim()} />
-            <input className="field" type="time" value={endTime} onChange={(event) => setEndTime(event.target.value)} />
+            <TimePicker value={endTime} onChange={setEndTime} />
           </label>
           <label className={`${inspector.trim() ? "label" : "label missingRequired"} inspectorField`}>
             <RequiredLabel label={t("common.inspector")} required={!inspector.trim()} />
@@ -953,7 +962,7 @@ function DetailView({
                 className="field"
                 inputMode="decimal"
                 value={expenses[field.key]}
-                onChange={(event) => updateExpense(field.key, event.target.value)}
+                onChange={(event) => updateExpense(field.key, formatDecimalInputValue(event.target.value))}
               />
             </label>
           ))}
@@ -1406,13 +1415,29 @@ function ChecklistBlockView({
             return (
               <label className={missingValue ? "label missingRequired" : "label"} key={`${block.title}-${field.label}`}>
                 <RequiredLabel label={localizeLabel(field.label, lang)} required={missingValue} />
-                <input
-                  className="field"
-                  type={field.type ?? "text"}
-                  value={field.type === "date" ? toDateInputValue(value) : value}
-                  placeholder={field.type === "date" ? undefined : localizeLabel(field.placeholder ?? field.label, lang)}
-                  onChange={(event) => setFieldValue(key, event.target.value)}
-                />
+                {isDateLikeField(field) ? (
+                  <FormDateInput
+                    value={value}
+                    onChange={(nextValue) => setFieldValue(key, nextValue)}
+                  />
+                ) : isDecimalLikeField(field) ? (
+                  <input
+                    className="field"
+                    inputMode="decimal"
+                    type="text"
+                    value={value}
+                    placeholder={localizeLabel(field.placeholder ?? field.label, lang)}
+                    onChange={(event) => setFieldValue(key, formatDecimalInputValue(event.target.value))}
+                  />
+                ) : (
+                  <input
+                    className="field"
+                    type="text"
+                    value={value}
+                    placeholder={localizeLabel(field.placeholder ?? field.label, lang)}
+                    onChange={(event) => setFieldValue(key, event.target.value)}
+                  />
+                )}
               </label>
             );
           })}
@@ -1686,8 +1711,8 @@ function buildChecklistSet(key: PmChecklistKey, setId: number, config: PmCheckli
               { label: "Customer Name" },
               { label: "Synapse Version" },
               { label: "Host Name" },
-              { label: "License Studies" },
-              { label: "Current Studies Per Year" },
+              { label: "License Studies", type: "decimal" },
+              { label: "Current Studies Per Year", type: "decimal" },
               { label: "Antivirus Definition Date", type: "date" }
             ]
           },
@@ -1696,10 +1721,10 @@ function buildChecklistSet(key: PmChecklistKey, setId: number, config: PmCheckli
             title: "FREE SPACE (GB)",
             columns: "four",
             fields: [
-              { label: "Database O: Free (GB)" },
-              { label: "Database O: Total (GB)" },
-              { label: "Warm DB Free (GB)" },
-              { label: "Warm DB Total (GB)" }
+              { label: "Database O: Free (GB)", type: "decimal" },
+              { label: "Database O: Total (GB)", type: "decimal" },
+              { label: "Warm DB Free (GB)", type: "decimal" },
+              { label: "Warm DB Total (GB)", type: "decimal" }
             ]
           },
           { type: "checks", title: "SYNAPSE SYSTEM CHECKLIST", items: getSelectedItems(config, "synapse", "synapseSystem", synapseSystem, true) },
@@ -1787,13 +1812,19 @@ function buildChecklistSet(key: PmChecklistKey, setId: number, config: PmCheckli
             type: "fields",
             title: "Calibrate: Monitor 1",
             columns: "three",
-            fields: ["Brand / Model", "S/N", "Target Min (cd/m²)", "Target Max (cd/m²)", "Result Min (cd/m²)", "Result Max (cd/m²)"].map((label) => ({ label }))
+            fields: ["Brand / Model", "S/N", "Target Min (cd/m²)", "Target Max (cd/m²)", "Result Min (cd/m²)", "Result Max (cd/m²)"].map((label) => ({
+              label,
+              type: label.includes("cd/m") ? "decimal" as const : undefined
+            }))
           },
           ...(monitorCount === 2 ? [{
             type: "fields",
             title: "Calibrate: Monitor 2",
             columns: "three",
-            fields: ["Brand / Model", "S/N", "Target Min (cd/m²)", "Target Max (cd/m²)", "Result Min (cd/m²)", "Result Max (cd/m²)"].map((label) => ({ label }))
+            fields: ["Brand / Model", "S/N", "Target Min (cd/m²)", "Target Max (cd/m²)", "Result Min (cd/m²)", "Result Max (cd/m²)"].map((label) => ({
+              label,
+              type: label.includes("cd/m") ? "decimal" as const : undefined
+            }))
           } as ChecklistBlock] : []),
           { type: "radios", label: "Diagnostic Monitor / SMPTE Pattern", items: ["ปกติ", "ผิดปกติ"] },
           {
@@ -1802,7 +1833,8 @@ function buildChecklistSet(key: PmChecklistKey, setId: number, config: PmCheckli
             columns: "three",
             fields: physicalStatusFields.map((label) => ({
               label,
-              placeholder: label.includes("Date") ? "DD/MM/YYYY" : label
+              placeholder: label.includes("Date") ? "DD/MM/YYYY" : label,
+              type: label.includes("Date") ? "date" as const : label.includes("Times") ? "decimal" as const : undefined
             }))
           },
           { type: "diagTable", title: "รายการตรวจสอบอุปกรณ์" }

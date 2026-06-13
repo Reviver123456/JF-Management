@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { cachePmData, readCachedPmData } from "@/lib/app-bootstrap-cache";
 import { emptyPmAppData, type PmAppData } from "@/lib/pm-data";
 
@@ -11,18 +11,14 @@ type PmDataState = {
   reload: () => Promise<void>;
 };
 
-function getInitialPmDataState(): Omit<PmDataState, "reload"> {
-  const cached = readCachedPmData();
-
-  return {
-    data: cached ?? emptyPmAppData,
-    error: null,
-    isLoading: !cached
-  };
-}
+const emptyPmDataState: Omit<PmDataState, "reload"> = {
+  data: emptyPmAppData,
+  error: null,
+  isLoading: true
+};
 
 export function usePmData(): PmDataState {
-  const [state, setState] = useState<Omit<PmDataState, "reload">>(getInitialPmDataState);
+  const [state, setState] = useState<Omit<PmDataState, "reload">>(emptyPmDataState);
 
   const loadData = useCallback(async (
     canSetState: () => boolean = () => true,
@@ -63,31 +59,23 @@ export function usePmData(): PmDataState {
     }
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let isCurrent = true;
     const cached = readCachedPmData();
-    let frame = 0;
 
     if (cached) {
-      frame = window.requestAnimationFrame(() => {
-        if (!isCurrent) {
-          return;
-        }
-
-        setState({
-          data: cached,
-          error: null,
-          isLoading: false
-        });
-        void loadData(() => isCurrent, { background: true });
+      setState({
+        data: cached,
+        error: null,
+        isLoading: false
       });
+      void loadData(() => isCurrent, { background: true });
     } else {
       void loadData(() => isCurrent);
     }
 
     return () => {
       isCurrent = false;
-      window.cancelAnimationFrame(frame);
     };
   }, [loadData]);
 

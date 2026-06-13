@@ -16,6 +16,7 @@ import {
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
 import { AppSelect } from "@/components/AppSelect";
 import { DateRangePicker } from "@/components/DateRangePicker";
+import { TimePicker } from "@/components/TimePicker";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { useUi } from "@/lib/i18n";
@@ -31,8 +32,6 @@ import {
   type SiteRecord
 } from "@/lib/pm-data";
 import { usePmData } from "@/lib/use-pm-data";
-import { usePageShellLoading } from "@/lib/use-page-shell-loading";
-
 const checklistTabs = ["SYNAPSE", "Server", "Switch", "Storage", "Environment", "DIAG"] as const;
 const allOwnersValue = "__all";
 
@@ -40,7 +39,6 @@ export default function HistoryPage() {
   const { lang, t } = useUi();
   const { data, error, isLoading } = usePmData();
   const { error: userError, isLoading: userLoading, userName } = useCurrentUser();
-  const pageLoading = usePageShellLoading(isLoading, userLoading);
   const reportRows = data.reportRows;
   const [query, setQuery] = useState("");
   const [resultFilter, setResultFilter] = useState("");
@@ -86,7 +84,7 @@ export default function HistoryPage() {
   });
 
   return (
-    <AppShell loading={pageLoading}>
+    <AppShell>
       {activeReport && activeSite ? (
         <div className="pmWorkPage">
           <HistoryDetailView
@@ -222,11 +220,11 @@ function HistoryDetailView({
           </label>
           <label className="label">
             {t("fields.startTime")}
-            <input className="field" type="time" readOnly defaultValue={site.startTime ?? site.visitTime} />
+            <TimePicker readOnly value={site.startTime ?? site.visitTime ?? ""} />
           </label>
           <label className="label">
             {t("fields.endTime")}
-            <input className="field" type="time" readOnly defaultValue={site.endTime ?? ""} />
+            <TimePicker readOnly value={site.endTime ?? ""} />
           </label>
           <label className="label">
             {t("common.inspector")}
