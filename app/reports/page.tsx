@@ -20,6 +20,7 @@ import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { useUi, type Lang } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
 import { getDisplayPmOrderNo } from "@/lib/pm-order-no";
+import { downloadWorkPhotosZip, mergePhotoState, type PhotoCategory } from "@/lib/pm-photos";
 import {
   configurationBackup,
   diagColumns,
@@ -39,6 +40,7 @@ import {
   getSiteContractLabel,
   getSiteProjectName,
   getUniquePmJobs,
+  mergeWorkDetailsForContract,
   normalizeOwnerName,
   type CheckResult,
   type PmJobRecord,
@@ -64,6 +66,8 @@ type ChecklistTemplate = {
   title: string;
 };
 
+type ReportDownloadType = "pdf" | "word" | "excel" | "photos";
+
 type PreviewState = {
   contractIndex: number;
   row: ReportRow;
@@ -72,6 +76,13 @@ type PreviewState = {
 };
 
 const reportPageWidth = 794;
+
+const photoUploadItems: { key: PhotoCategory; labelKey: "pm.devicePhoto" | "pm.overviewPhoto" | "pm.issuePhoto" | "pm.partPhoto" }[] = [
+  { key: "device", labelKey: "pm.devicePhoto" },
+  { key: "overview", labelKey: "pm.overviewPhoto" },
+  { key: "issue", labelKey: "pm.issuePhoto" },
+  { key: "part", labelKey: "pm.partPhoto" }
+];
 
 const checklistTemplates: ChecklistTemplate[] = [
   { key: "synapse", title: "Synapse", heading: "Synapse Maintenance Checklist" },
@@ -172,6 +183,72 @@ export default function ReportsPage() {
         )}
       </div>
     </AppShell>
+  );
+}
+
+function ReportPhotosPreview({ workDetails }: { workDetails?: PmWorkDetails }) {
+  const { t } = useUi();
+  const photos = mergePhotoState(workDetails?.photos);
+  const photoNotes = workDetails?.photoNotes ?? {};
+  const categoriesWithContent = photoUploadItems.filter(
+    (item) => photos[item.key].length > 0 || Boolean(photoNotes[item.key]?.trim())
+  );
+  const [activePhotoCategory, setActivePhotoCategory] = useState<PhotoCategory>(
+    categoriesWithContent[0]?.key ?? "device"
+  );
+  const activePhotoItem = categoriesWithContent.find((item) => item.key === activePhotoCategory)
+    ?? categoriesWithContent[0];
+
+  useEffect(() => {
+    if (categoriesWithContent.length === 0) {
+      return;
+    }
+
+    if (!categoriesWithContent.some((item) => item.key === activePhotoCategory)) {
+      setActivePhotoCategory(categoriesWithContent[0].key);
+    }
+  }, [activePhotoCategory, categoriesWithContent]);
+
+  if (categoriesWithContent.length === 0) {
+    return <p className="reportPhotoPreviewEmpty">{t("reports.noPhotosToDownload")}</p>;
+  }
+
+  return (
+    <div className="reportPhotoPreviewPanel">
+      <div className="tabs historyTabs reportPhotoTabs">
+        {categoriesWithContent.map((item) => (
+          <button
+            className={item.key === activePhotoCategory ? "activeTab" : "tab"}
+            key={item.key}
+            type="button"
+            onClick={() => setActivePhotoCategory(item.key)}
+          >
+            {t(item.labelKey)}
+            {photos[item.key].length > 0 ? ` (${photos[item.key].length})` : ""}
+          </button>
+        ))}
+      </div>
+
+      {activePhotoItem ? (
+        <div className="reportPhotoPreviewGroup">
+          {photoNotes[activePhotoItem.key]?.trim() ? (
+            <p className="reportPhotoPreviewNote">{photoNotes[activePhotoItem.key]}</p>
+          ) : null}
+          {photos[activePhotoItem.key].length > 0 ? (
+            <div className="reportPhotoPreviewGrid">
+              {photos[activePhotoItem.key].map((photo) => (
+                <figure className="reportPhotoPreviewCard" key={photo.id}>
+                  <img alt={photo.name} src={photo.dataUrl} />
+                  <figcaption>{photo.name}</figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : (
+            <p className="reportPhotoPreviewEmpty">{t("reports.noPhotosToDownload")}</p>
+          )}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -309,7 +386,11 @@ function ReportDocumentPacket({
   row: ReportRow;
   site: SiteCatalogRecord | null;
 }) {
-  const reportGroups = getReportGroups(row.workDetails);
+  const reportRow = useMemo(() => ({
+    ...row,
+    workDetails: mergeWorkDetailsForContract(row.workDetails, contractIndex)
+  }), [contractIndex, row]);
+  const reportGroups = getReportGroups(reportRow.workDetails);
 
   return (
     <div className="reportDocumentStack">
@@ -319,7 +400,7 @@ function ReportDocumentPacket({
         pmJobs={pmJobs}
         responsibleName={responsibleName}
         responsibleSignature={responsibleSignature}
-        row={row}
+        row={reportRow}
         site={site}
       />
       {reportGroups.map((group) => (
@@ -327,7 +408,7 @@ function ReportDocumentPacket({
           <ChecklistSetPage
             group={group}
             key={`${group.key}-${set.title}-${setIndex}`}
-            row={row}
+            row={reportRow}
             set={set}
             site={site}
           />
@@ -1296,9 +1377,10 @@ function ReportPreviewPage({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const scaleShellRef = useRef<HTMLDivElement | null>(null);
   const documentRef = useRef<HTMLDivElement | null>(null);
-  const [downloadType, setDownloadType] = useState<"pdf" | "word" | "excel">("pdf");
+  const [downloadType, setDownloadType] = useState<ReportDownloadType>("pdf");
   const [showPreview, setShowPreview] = useState(false);
   const [exportMessage, setExportMessage] = useState("");
+  const isPhotoDownload = downloadType === "photos";
   const contracts = getSiteContractItems(preview.site);
   const selectedContract = getSiteContractAt(preview.site, preview.contractIndex);
   const selectedContractLabel = getSiteContractLabel(selectedContract, preview.contractIndex);
@@ -1324,7 +1406,7 @@ function ReportPreviewPage({
   }, []);
 
   useEffect(() => {
-    if (!showPreview) {
+    if (!showPreview || isPhotoDownload) {
       return;
     }
 
@@ -1353,7 +1435,25 @@ function ReportPreviewPage({
       resizeObserver.disconnect();
       window.removeEventListener("resize", updatePreviewScale);
     };
-  }, [preview.contractIndex, preview.row.id, showPreview, updatePreviewScale]);
+  }, [isPhotoDownload, preview.contractIndex, preview.row.id, showPreview, updatePreviewScale]);
+
+  const openPreview = () => {
+    if (downloadType === "photos") {
+      const photos = mergePhotoState(preview.row.workDetails?.photos);
+      const hasPhotos = photoUploadItems.some((item) => photos[item.key].length > 0);
+
+      if (!hasPhotos) {
+        setExportMessage(t("reports.noPhotosToDownload"));
+        return;
+      }
+
+      setExportMessage("");
+      setShowPreview(true);
+      return;
+    }
+
+    setShowPreview(true);
+  };
 
   const getReportExportContent = useCallback(() => {
     return (documentRef.current?.innerHTML ?? "").trim();
@@ -1379,6 +1479,21 @@ function ReportPreviewPage({
 
   const downloadReport = async () => {
     try {
+      if (downloadType === "photos") {
+        const didDownload = downloadWorkPhotosZip({
+          archiveName: `${sanitizeFileName(preview.row.site)}-${selectedContractLabel}`,
+          photosValue: preview.row.workDetails?.photos
+        });
+
+        if (!didDownload) {
+          setExportMessage(t("reports.noPhotosToDownload"));
+          return;
+        }
+
+        setExportMessage("");
+        return;
+      }
+
       const content = getReportExportContent();
 
       if (!content) {
@@ -1444,13 +1559,14 @@ function ReportPreviewPage({
             </label>
             <label className="label">
               ประเภทไฟล์
-              <AppSelect className="select" value={downloadType} onChange={(event) => setDownloadType(event.target.value as "pdf" | "word" | "excel")}>
+              <AppSelect className="select" value={downloadType} onChange={(event) => setDownloadType(event.target.value as ReportDownloadType)}>
                 <option value="pdf">PDF</option>
                 <option value="word">Word</option>
                 <option value="excel">Excel</option>
+                <option value="photos">{t("reports.fileTypePhotos")}</option>
               </AppSelect>
             </label>
-            <button className="button subtle" type="button" onClick={printReport}>
+            <button className="button subtle" disabled={isPhotoDownload} type="button" onClick={printReport}>
               <Printer size={16} />
               {t("common.print")}
             </button>
@@ -1458,7 +1574,7 @@ function ReportPreviewPage({
               <Download size={16} />
               {t("common.download")}
             </button>
-            <button className="button primary" type="button" onClick={() => setShowPreview(true)}>
+            <button className="button primary" type="button" onClick={openPreview}>
               <Eye size={16} />
               {t("reports.preview")}
             </button>
@@ -1469,21 +1585,29 @@ function ReportPreviewPage({
 
       <div
         ref={viewportRef}
-        className={showPreview ? "reportPreviewViewport" : "reportDocumentHidden"}
+        className={
+          showPreview
+            ? (isPhotoDownload ? "reportPhotoPreviewViewport" : "reportPreviewViewport")
+            : "reportDocumentHidden"
+        }
         aria-hidden={!showPreview}
       >
-        <div ref={scaleShellRef} className="reportPreviewScaleShell">
-          <div ref={documentRef} className="reportDocumentStack">
-            <ReportDocumentPacket
-              contractIndex={preview.contractIndex}
-              pmJobs={pmJobs}
-              responsibleName={responsibleName}
-              responsibleSignature={responsibleSignature}
-              row={preview.row}
-              site={preview.site}
-            />
+        {showPreview && isPhotoDownload ? (
+          <ReportPhotosPreview workDetails={preview.row.workDetails} />
+        ) : (
+          <div ref={scaleShellRef} className="reportPreviewScaleShell">
+            <div ref={documentRef} className="reportDocumentStack">
+              <ReportDocumentPacket
+                contractIndex={preview.contractIndex}
+                pmJobs={pmJobs}
+                responsibleName={responsibleName}
+                responsibleSignature={responsibleSignature}
+                row={preview.row}
+                site={preview.site}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

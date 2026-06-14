@@ -54,9 +54,11 @@ import {
 } from "@/lib/pm-checklist-data";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import {
+  emptyPmContractChecklistData,
   filterPmJobsByParticipant,
   getContractCount,
   getDateString,
+  getPmContractChecklistData,
   getSiteContractAt,
   getSiteContractItems,
   getSiteContractLabel,
@@ -68,6 +70,7 @@ import {
   getWorkSiteBySiteId,
   getWorkSitesByDate,
   statusMeta,
+  type PmContractChecklistData,
   type PmExpenseDetails,
   type PmJobRecord,
   type PmWorkDetails,
@@ -78,12 +81,17 @@ import { useIsClient } from "@/lib/hooks/use-is-client";
 import { isAllOwners, resolveActiveOwner } from "@/lib/owner-filter";
 import { isDateLikeField } from "@/lib/date-input";
 import { formatDecimalInputValue, isDecimalLikeField } from "@/lib/decimal-input";
+import {
+  mergePhotoState,
+  readPhotoFiles,
+  serializePhotoState,
+  type PhotoCategory,
+  type PhotoState
+} from "@/lib/pm-photos";
 
 type CheckResult = "ok" | "bad";
 type FinalStatus = "normal" | "abnormal";
-type PhotoKey = "device" | "overview" | "issue" | "part";
-
-type PhotoState = Record<PhotoKey, string[]>;
+type PhotoKey = PhotoCategory;
 type PhotoNotes = Partial<Record<PhotoKey, string>>;
 type ExpenseKey = keyof Required<PmExpenseDetails>;
 type SparePart = {
@@ -144,15 +152,6 @@ const expenseFields: { key: ExpenseKey; labelKey: string }[] = [
   { key: "toll", labelKey: "pm.tollExpense" },
   { key: "other", labelKey: "pm.otherExpense" }
 ];
-
-function mergePhotoState(value: PmWorkDetails["photos"] | undefined): PhotoState {
-  return {
-    device: value?.device ?? [],
-    overview: value?.overview ?? [],
-    issue: value?.issue ?? [],
-    part: value?.part ?? []
-  };
-}
 
 function mergePhotoNotes(value: PmWorkDetails["photoNotes"] | undefined): PhotoNotes {
   return {
@@ -229,6 +228,55 @@ function diagCalibrateStatusKey(groupKey: string, setTitle: string, blockIndex: 
 
 function readChecklistConfigForSite(site: SiteRecord, contractIndex = 0): PmChecklistConfig {
   return readSiteContractChecklistConfig(site, contractIndex);
+}
+
+type ContractChecklistDraft = ReturnType<typeof emptyPmContractChecklistData>;
+
+function hydrateChecklistByContract(savedDetails: PmWorkDetails | undefined, contractCount: number) {
+  const result: Record<number, ContractChecklistDraft> = {};
+
+  for (let index = 0; index < contractCount; index += 1) {
+    result[index] = getPmContractChecklistData(savedDetails, index);
+  }
+
+  return result;
+}
+
+function buildChecklistByContractPayload({
+  checklistByContract,
+  configuredGroups,
+  contractCount,
+  lang,
+  selectedContractIndex,
+  site
+}: {
+  checklistByContract: Record<number, ContractChecklistDraft>;
+  configuredGroups: ConfiguredChecklistGroup[];
+  contractCount: number;
+  lang: "th" | "en";
+  selectedContractIndex: number;
+  site: SiteRecord;
+}) {
+  const payload: Record<string, PmContractChecklistData> = {};
+
+  for (let index = 0; index < contractCount; index += 1) {
+    const draft = checklistByContract[index] ?? emptyPmContractChecklistData();
+    const checklistSnapshot = index === selectedContractIndex
+      ? configuredGroups
+      : (draft.checklistSnapshot.length > 0
+        ? draft.checklistSnapshot
+        : buildConfiguredChecklistGroups(readChecklistConfigForSite(site, index), lang));
+
+    payload[String(index)] = {
+      checkNotes: trimRecordValues(draft.checkNotes),
+      checkResults: draft.checkResults,
+      fieldValues: trimRecordValues(draft.fieldValues),
+      radioValues: trimRecordValues(draft.radioValues),
+      checklistSnapshot
+    };
+  }
+
+  return payload;
 }
 
 function getMissingRequiredCount({
@@ -477,9 +525,6 @@ function DetailView({
   const status = statusMeta[site.status];
   const savedDetails = site.workDetails;
   const pmOrderNo = getPmOrderNoFromWorkDetails(savedDetails);
-  const [checkResults, setCheckResults] = useState<Record<string, CheckResult>>(savedDetails?.checkResults ?? {});
-  const [checkNotes, setCheckNotes] = useState<Record<string, string>>(savedDetails?.checkNotes ?? {});
-  const [activeCheckNoteKey, setActiveCheckNoteKey] = useState("");
   const contractCount = getContractCount(site.contractDetails);
   const contractItems = useMemo(() => getSiteContractItems(site), [site]);
   const [selectedContractIndex, setSelectedContractIndex] = useState(() => {
@@ -487,12 +532,21 @@ function DetailView({
     return Math.min(Math.max(savedIndex, 0), Math.max(contractCount - 1, 0));
   });
   const selectedContract = getSiteContractAt(site, selectedContractIndex);
+  const [checklistByContract, setChecklistByContract] = useState<Record<number, ContractChecklistDraft>>(
+    () => hydrateChecklistByContract(savedDetails, contractCount)
+  );
+  const activeChecklist = checklistByContract[selectedContractIndex] ?? emptyPmContractChecklistData();
+  const checkResults = activeChecklist.checkResults;
+  const checkNotes = activeChecklist.checkNotes;
+  const fieldValues = activeChecklist.fieldValues;
+  const radioValues = activeChecklist.radioValues;
+  const [activeCheckNoteKey, setActiveCheckNoteKey] = useState("");
   const [checklistConfig, setChecklistConfig] = useState<PmChecklistConfig>(() => readChecklistConfigForSite(site, selectedContractIndex));
-  const [fieldValues, setFieldValues] = useState<Record<string, string>>(savedDetails?.fieldValues ?? {});
-  const [radioValues, setRadioValues] = useState<Record<string, string>>(savedDetails?.radioValues ?? {});
   const [photos, setPhotos] = useState<PhotoState>(() => mergePhotoState(savedDetails?.photos));
   const [photoNotes, setPhotoNotes] = useState<PhotoNotes>(() => mergePhotoNotes(savedDetails?.photoNotes));
   const [photoPopupOpen, setPhotoPopupOpen] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState("");
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [spareParts, setSpareParts] = useState<SparePart[]>(() => normalizeSpareParts(savedDetails?.spareParts));
   const [expenses, setExpenses] = useState<Required<PmExpenseDetails>>(() => normalizeExpenses(savedDetails?.expenses));
   const [startTime, setStartTime] = useState(savedDetails?.startTime ?? site.startTime ?? site.visitTime);
@@ -559,9 +613,30 @@ function DetailView({
 
   const selectContractIndex = (nextIndex: number) => {
     const boundedIndex = Math.min(Math.max(nextIndex, 0), contractCount - 1);
+
+    if (boundedIndex === selectedContractIndex) {
+      return;
+    }
+
+    setChecklistByContract((current) => ({
+      ...current,
+      [selectedContractIndex]: {
+        ...(current[selectedContractIndex] ?? emptyPmContractChecklistData()),
+        checklistSnapshot: configuredGroups
+      }
+    }));
     setSelectedContractIndex(boundedIndex);
     setChecklistConfig(readChecklistConfigForSite(site, boundedIndex));
   };
+
+  const patchActiveChecklist = useCallback((
+    updater: (current: ContractChecklistDraft) => ContractChecklistDraft
+  ) => {
+    setChecklistByContract((current) => ({
+      ...current,
+      [selectedContractIndex]: updater(current[selectedContractIndex] ?? emptyPmContractChecklistData())
+    }));
+  }, [selectedContractIndex]);
 
   useEffect(() => {
     if (configuredGroups.length > 0 && !configuredGroups.some((item) => item.key === activeTab)) {
@@ -570,43 +645,75 @@ function DetailView({
   }, [activeTab, configuredGroups, setActiveTab]);
 
   const setCheckResult = (item: string, result: CheckResult) => {
-    setCheckResults((current) => {
-      const next = { ...current };
-      if (next[item] === result) {
-        delete next[item];
+    patchActiveChecklist((current) => {
+      const nextResults = { ...current.checkResults };
+
+      if (nextResults[item] === result) {
+        delete nextResults[item];
       } else {
-        next[item] = result;
+        nextResults[item] = result;
       }
-      return next;
+
+      return { ...current, checkResults: nextResults };
     });
   };
   const setCheckNote = (item: string, value: string) => {
-    setCheckNotes((current) => ({
+    patchActiveChecklist((current) => ({
       ...current,
-      [item]: value
+      checkNotes: {
+        ...current.checkNotes,
+        [item]: value
+      }
     }));
   };
   const setFieldValue = (item: string, value: string) => {
-    setFieldValues((current) => ({
+    patchActiveChecklist((current) => ({
       ...current,
-      [item]: value
+      fieldValues: {
+        ...current.fieldValues,
+        [item]: value
+      }
     }));
   };
   const setRadioValue = (item: string, value: string) => {
-    setRadioValues((current) => ({
+    patchActiveChecklist((current) => ({
       ...current,
-      [item]: value
+      radioValues: {
+        ...current.radioValues,
+        [item]: value
+      }
     }));
   };
-  const addPhotoFiles = (key: PhotoKey, fileList: FileList | null) => {
-    const names = Array.from(fileList ?? []).map((file) => file.name);
-    if (names.length === 0) {
+  const addPhotoFiles = async (key: PhotoKey, fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) {
       return;
     }
 
+    setIsUploadingPhotos(true);
+    setPhotoUploadError("");
+
+    try {
+      const nextPhotos = await readPhotoFiles(fileList);
+
+      if (nextPhotos.length === 0) {
+        setPhotoUploadError(lang === "th" ? "ไม่พบไฟล์รูปภาพที่รองรับ" : "No supported image files found.");
+        return;
+      }
+
+      setPhotos((current) => ({
+        ...current,
+        [key]: [...current[key], ...nextPhotos]
+      }));
+    } catch {
+      setPhotoUploadError(lang === "th" ? "อัปโหลดรูปไม่สำเร็จ กรุณาลองใหม่" : "Photo upload failed. Please try again.");
+    } finally {
+      setIsUploadingPhotos(false);
+    }
+  };
+  const removePhoto = (key: PhotoKey, photoId: string) => {
     setPhotos((current) => ({
       ...current,
-      [key]: [...current[key], ...names]
+      [key]: current[key].filter((photo) => photo.id !== photoId)
     }));
   };
   const setPhotoNote = (key: PhotoKey, value: string) => {
@@ -632,43 +739,55 @@ function DetailView({
   const updateExpense = (key: ExpenseKey, value: string) => {
     setExpenses((current) => ({ ...current, [key]: value }));
   };
-  const workDetailsSnapshot = useMemo(() => ({
-    checkNotes: trimRecordValues(checkNotes),
-    checkResults,
-    checklistSnapshot: configuredGroups,
-    contractIndex: selectedContractIndex,
-    customerSignature,
-    expenses: trimExpenses(expenses),
-    fieldValues: trimRecordValues(fieldValues),
-    finalStatus,
-    inspector,
-    inspectorSignature: inspectorSignature || userSignature,
-    ...(pmOrderNo ? { pmOrderNo } : {}),
-    photoNotes: trimPhotoNotes(photoNotes),
-    photos,
-    radioValues: trimRecordValues(radioValues),
-    signerName,
-    spareParts,
-    startTime,
-    endTime,
-    summaryNote
-  }), [
-    checkNotes,
-    checkResults,
+  const workDetailsSnapshot = useMemo(() => {
+    const checklistByContractPayload = buildChecklistByContractPayload({
+      checklistByContract,
+      configuredGroups,
+      contractCount,
+      lang,
+      selectedContractIndex,
+      site
+    });
+    const activeContractData = checklistByContractPayload[String(selectedContractIndex)] ?? emptyPmContractChecklistData();
+
+    return {
+      checkNotes: activeContractData.checkNotes,
+      checkResults: activeContractData.checkResults,
+      checklistByContract: checklistByContractPayload,
+      checklistSnapshot: activeContractData.checklistSnapshot,
+      contractIndex: selectedContractIndex,
+      customerSignature,
+      expenses: trimExpenses(expenses),
+      fieldValues: activeContractData.fieldValues,
+      finalStatus,
+      inspector,
+      inspectorSignature: inspectorSignature || userSignature,
+      ...(pmOrderNo ? { pmOrderNo } : {}),
+      photoNotes: trimPhotoNotes(photoNotes),
+      photos: serializePhotoState(photos),
+      radioValues: activeContractData.radioValues,
+      signerName,
+      spareParts,
+      startTime,
+      endTime,
+      summaryNote
+    };
+  }, [
+    checklistByContract,
     configuredGroups,
-    selectedContractIndex,
+    contractCount,
     customerSignature,
     endTime,
     expenses,
-    fieldValues,
-    finalStatus,
     inspector,
     inspectorSignature,
+    lang,
     photoNotes,
     photos,
     pmOrderNo,
-    radioValues,
+    selectedContractIndex,
     signerName,
+    site,
     spareParts,
     startTime,
     summaryNote,
@@ -858,11 +977,14 @@ function DetailView({
   if (photoPopupOpen) {
     return (
       <PhotoEditorPage
+        isUploading={isUploadingPhotos}
         photoNotes={photoNotes}
         photos={photos}
+        uploadError={photoUploadError}
         onAddPhotoFiles={addPhotoFiles}
         onClose={() => setPhotoPopupOpen(false)}
         onNoteChange={setPhotoNote}
+        onRemovePhoto={removePhoto}
       />
     );
   }
@@ -1135,17 +1257,23 @@ function RequiredLabel({ label, required = true }: { label: string; required?: b
 }
 
 function PhotoEditorPage({
+  isUploading,
   photoNotes,
   photos,
+  uploadError,
   onAddPhotoFiles,
   onClose,
-  onNoteChange
+  onNoteChange,
+  onRemovePhoto
 }: {
+  isUploading: boolean;
   photoNotes: PhotoNotes;
   photos: PhotoState;
-  onAddPhotoFiles: (key: PhotoKey, fileList: FileList | null) => void;
+  uploadError: string;
+  onAddPhotoFiles: (key: PhotoKey, fileList: FileList | null) => Promise<void>;
   onClose: () => void;
   onNoteChange: (key: PhotoKey, value: string) => void;
+  onRemovePhoto: (key: PhotoKey, photoId: string) => void;
 }) {
   const { t } = useUi();
 
@@ -1161,6 +1289,8 @@ function PhotoEditorPage({
       </header>
 
       <div className="photoEditorBody">
+        {uploadError ? <p className="photoUploadError">{uploadError}</p> : null}
+        {isUploading ? <p className="photoUploadStatus">{t("pm.uploadingPhotos")}</p> : null}
         <div className="photoPopupList">
           {photoUploadItems.map((item) => (
             <section className="photoPopupItem" key={item.key}>
@@ -1169,33 +1299,53 @@ function PhotoEditorPage({
                 <span>{photos[item.key].length} {t("common.files")}</span>
               </div>
               <div className="photoPopupButtons">
-                <label className="photoUploadButton">
+                <label className={`photoUploadButton${isUploading ? " isDisabled" : ""}`}>
                   <Upload size={15} />
                   {t("pm.uploadPhoto")}
                   <input
+                    disabled={isUploading}
                     type="file"
                     accept="image/*"
                     multiple
                     onChange={(event) => {
-                      onAddPhotoFiles(item.key, event.target.files);
+                      void onAddPhotoFiles(item.key, event.target.files);
                       event.target.value = "";
                     }}
                   />
                 </label>
-                <label className="photoUploadButton">
+                <label className={`photoUploadButton${isUploading ? " isDisabled" : ""}`}>
                   <Camera size={15} />
                   {t("pm.takePhoto")}
                   <input
+                    disabled={isUploading}
                     type="file"
                     accept="image/*"
                     capture="environment"
                     onChange={(event) => {
-                      onAddPhotoFiles(item.key, event.target.files);
+                      void onAddPhotoFiles(item.key, event.target.files);
                       event.target.value = "";
                     }}
                   />
                 </label>
               </div>
+              {photos[item.key].length > 0 ? (
+                <div className="photoThumbGrid">
+                  {photos[item.key].map((photo) => (
+                    <figure className="photoThumbCard" key={photo.id}>
+                      <img alt={photo.name} src={photo.dataUrl} />
+                      <figcaption>{photo.name}</figcaption>
+                      <button
+                        aria-label={`${t("common.close")} ${photo.name}`}
+                        className="photoThumbRemove"
+                        type="button"
+                        onClick={() => onRemovePhoto(item.key, photo.id)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </figure>
+                  ))}
+                </div>
+              ) : null}
               <label className="label">
                 {t("common.note")}
                 <textarea

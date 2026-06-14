@@ -71,9 +71,24 @@ export type PmExpenseDetails = {
   toll?: string;
 };
 
+export type PmStoredPhoto = {
+  id: string;
+  name: string;
+  dataUrl: string;
+};
+
+export type PmContractChecklistData = {
+  checkNotes?: Record<string, string>;
+  checkResults?: Record<string, CheckResult>;
+  checklistSnapshot?: SavedChecklistGroup[];
+  fieldValues?: Record<string, string>;
+  radioValues?: Record<string, string>;
+};
+
 export type PmWorkDetails = {
   checkNotes?: Record<string, string>;
   checkResults?: Record<string, CheckResult>;
+  checklistByContract?: Record<string, PmContractChecklistData>;
   checklistSnapshot?: SavedChecklistGroup[];
   contractIndex?: number;
   draftStatus?: "draft" | "submitted";
@@ -83,7 +98,7 @@ export type PmWorkDetails = {
   inspector?: string;
   pmOrderNo?: string;
   photoNotes?: Record<string, string>;
-  photos?: Record<string, string[]>;
+  photos?: Record<string, Array<PmStoredPhoto | string>>;
   radioValues?: Record<string, string>;
   savedAt?: string;
   signerName?: string;
@@ -94,6 +109,80 @@ export type PmWorkDetails = {
   endTime?: string;
   summaryNote?: string;
 };
+
+export function emptyPmContractChecklistData(): Required<{
+  checkNotes: Record<string, string>;
+  checkResults: Record<string, CheckResult>;
+  checklistSnapshot: SavedChecklistGroup[];
+  fieldValues: Record<string, string>;
+  radioValues: Record<string, string>;
+}> {
+  return {
+    checkNotes: {},
+    checkResults: {},
+    checklistSnapshot: [],
+    fieldValues: {},
+    radioValues: {}
+  };
+}
+
+export function getPmContractChecklistData(
+  details: PmWorkDetails | undefined | null,
+  contractIndex: number
+): Required<{
+  checkNotes: Record<string, string>;
+  checkResults: Record<string, CheckResult>;
+  checklistSnapshot: SavedChecklistGroup[];
+  fieldValues: Record<string, string>;
+  radioValues: Record<string, string>;
+}> {
+  const stored = details?.checklistByContract?.[String(contractIndex)];
+
+  if (stored) {
+    return {
+      checkNotes: { ...(stored.checkNotes ?? {}) },
+      checkResults: { ...(stored.checkResults ?? {}) },
+      checklistSnapshot: [...(stored.checklistSnapshot ?? [])],
+      fieldValues: { ...(stored.fieldValues ?? {}) },
+      radioValues: { ...(stored.radioValues ?? {}) }
+    };
+  }
+
+  const legacyIndex = details?.contractIndex ?? 0;
+
+  if (contractIndex !== legacyIndex) {
+    return emptyPmContractChecklistData();
+  }
+
+  return {
+    checkNotes: { ...(details?.checkNotes ?? {}) },
+    checkResults: { ...(details?.checkResults ?? {}) },
+    checklistSnapshot: [...(details?.checklistSnapshot ?? [])],
+    fieldValues: { ...(details?.fieldValues ?? {}) },
+    radioValues: { ...(details?.radioValues ?? {}) }
+  };
+}
+
+export function mergeWorkDetailsForContract(
+  details: PmWorkDetails | undefined,
+  contractIndex: number
+): PmWorkDetails | undefined {
+  if (!details) {
+    return details;
+  }
+
+  const contractData = getPmContractChecklistData(details, contractIndex);
+
+  return {
+    ...details,
+    contractIndex,
+    checkNotes: contractData.checkNotes,
+    checkResults: contractData.checkResults,
+    checklistSnapshot: contractData.checklistSnapshot,
+    fieldValues: contractData.fieldValues,
+    radioValues: contractData.radioValues
+  };
+}
 
 export type SiteCatalogRecord = {
   id: string;
@@ -482,10 +571,17 @@ export function buildPmAppData({
 }
 
 function hasSavedWorkDetails(details?: PmWorkDetails | null) {
+  const hasContractChecklist = Object.values(details?.checklistByContract ?? {}).some(
+    (entry) => (entry.checklistSnapshot?.length ?? 0) > 0
+      || Object.keys(entry.fieldValues ?? {}).length > 0
+      || Object.keys(entry.checkResults ?? {}).length > 0
+  );
+
   return Boolean(
     details?.savedAt
     || details?.finalStatus
     || (details?.checklistSnapshot?.length ?? 0) > 0
+    || hasContractChecklist
   );
 }
 

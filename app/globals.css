@@ -463,6 +463,34 @@ a {
   cursor: default;
 }
 
+.timePickerReadOnly .timePickerReadOnlyTrigger {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 40px;
+  cursor: default;
+  user-select: none;
+  pointer-events: none;
+  background-color: var(--field);
+  box-shadow: none;
+}
+
+.timePickerReadOnly .timePickerReadOnlyTrigger:hover,
+.timePickerReadOnly .timePickerReadOnlyTrigger:active,
+.timePickerReadOnly .timePickerReadOnlyTrigger:focus,
+.timePickerReadOnly .timePickerReadOnlyTrigger:focus-visible {
+  border-color: var(--border);
+  background-color: var(--field);
+  box-shadow: none;
+  outline: none;
+}
+
+.timePickerReadOnly .timePickerIcon {
+  color: var(--text-muted);
+}
+
 .timePickerValue {
   min-width: 0;
   flex: 1;
@@ -613,6 +641,15 @@ a {
 .textarea:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.field:read-only,
+.field:read-only:focus {
+  cursor: default;
+  pointer-events: none;
+  border-color: var(--border);
+  box-shadow: none;
+  outline: none;
 }
 
 input[type="date"].field {

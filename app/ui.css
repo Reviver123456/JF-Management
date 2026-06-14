@@ -843,6 +843,19 @@
   .historyPage .row>svg {
     display: none;
   }
+
+  .historyPage .row div {
+    flex-wrap: wrap;
+  }
+
+  .historyPage .row strong {
+    flex: 1 1 100%;
+  }
+
+  .historyPage .row small {
+    gap: 6px 10px;
+    font-size: 11px;
+  }
 }
 
 /* Login */
@@ -1253,6 +1266,72 @@
 .pmWorkPage .historyChecklistDetail {
   display: grid;
   gap: 10px;
+}
+
+.pmWorkPage .historyTabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin-bottom: 14px;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pmWorkPage .historyTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.pmWorkPage .historyTabs .tab,
+.pmWorkPage .historyTabs .activeTab {
+  flex: 0 0 auto;
+  min-width: 88px;
+  white-space: nowrap;
+  padding: 0 14px;
+}
+
+.pmWorkPage .historyPhotoHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 0;
+}
+
+.pmWorkPage .historyPhotoHeader h2 {
+  margin: 0;
+}
+
+.pmWorkPage .historyPhotoHeader .button {
+  flex: 0 0 auto;
+}
+
+.pmWorkPage .historyPhotoTabs {
+  margin-top: 14px;
+}
+
+.pmWorkPage .historyPhotoGroups {
+  display: grid;
+  gap: 18px;
+}
+
+.pmWorkPage .historyPhotoGroup h3 {
+  margin: 0 0 10px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.pmWorkPage .historyPhotoNote {
+  margin: 0 0 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.pmWorkPage .historyPhotoThumb img {
+  cursor: zoom-in;
 }
 
 .pmWorkPage .savedDetailGrid {
@@ -1756,6 +1835,85 @@
   box-shadow: 0 0 0 3px var(--primary-soft);
 }
 
+.pmWorkPage .photoUploadButton.isDisabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.pmWorkPage .photoUploadError,
+.pmWorkPage .photoUploadStatus {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.pmWorkPage .photoUploadError {
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(254, 226, 226, 0.12);
+  color: #fca5a5;
+}
+
+.pmWorkPage .photoUploadStatus {
+  border: 1px solid rgba(47, 125, 246, 0.35);
+  background: rgba(47, 125, 246, 0.12);
+  color: var(--primary-strong);
+}
+
+.pmWorkPage .photoThumbGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 10px;
+}
+
+.pmWorkPage .photoThumbCard {
+  position: relative;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.pmWorkPage .photoThumbCard img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: #0f172a;
+}
+
+.pmWorkPage .photoThumbCard figcaption {
+  padding: 6px 8px;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pmWorkPage .photoThumbRemove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.72);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.pmWorkPage .photoThumbRemove:hover {
+  background: rgba(220, 38, 38, 0.88);
+}
+
 .pmWorkPage .partsList {
   display: grid;
   gap: 10px;
@@ -1939,9 +2097,21 @@
 @media (max-width: 760px) {
 
   .pmWorkPage .toolbar,
-  .pmWorkPage .detailTitle,
+  .pmWorkPage .detailTitle {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
   .pmWorkPage .infoGrid {
     grid-template-columns: 1fr;
+  }
+
+  .pmWorkPage .detailTitle .statusPill {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .pmWorkPage .detailTitle h1 {
+    font-size: 20px;
   }
 
   .pmWorkPage .formGrid {
@@ -1952,8 +2122,21 @@
     grid-column: 1 / -1;
   }
 
-  .pmWorkPage .tabs {
+  .pmWorkPage .tabs:not(.historyTabs) {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .pmWorkPage .savedDetailGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .pmWorkPage .savedDetailGrid div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .pmWorkPage .photoThumbGrid {
+    grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
   }
 
   .pmWorkPage .listRow {
@@ -2130,6 +2313,103 @@
   flex: 1;
   min-height: 0;
   border-radius: var(--radius);
+}
+
+.reportsPage .reportPhotoPreviewViewport {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+}
+
+.reportsPage .reportPhotoPreviewPanel {
+  display: grid;
+  gap: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.reportsPage .reportPhotoTabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+
+.reportsPage .reportPhotoTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.reportsPage .reportPhotoTabs .tab,
+.reportsPage .reportPhotoTabs .activeTab {
+  flex: 0 0 auto;
+  min-width: 88px;
+  white-space: nowrap;
+  padding: 0 14px;
+  height: 31px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.reportsPage .reportPhotoTabs .activeTab {
+  background: var(--field);
+  color: var(--text);
+}
+
+.reportsPage .reportPhotoPreviewNote {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.reportsPage .reportPhotoPreviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.reportsPage .reportPhotoPreviewCard {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  overflow: hidden;
+}
+
+.reportsPage .reportPhotoPreviewCard img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: #0f172a;
+  cursor: zoom-in;
+}
+
+.reportsPage .reportPhotoPreviewCard figcaption {
+  padding: 8px 10px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reportsPage .reportPhotoPreviewEmpty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 24px 12px;
 }
 
 .reportsPage .overlay {

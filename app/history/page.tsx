@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CalendarDays,
+  Camera,
   ChevronRight,
   Clock3,
   ClipboardCheck,
@@ -22,11 +23,17 @@ import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { useUi } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
 import {
-  getContractVisitTotal,
+  getContractCount,
   getUniquePmJobs,
   getWorkSiteByJobId,
+  getSiteContractAt,
+  getSiteContractItems,
+  getSiteContractLabel,
+  getSiteContractVisitTotal,
+  mergeWorkDetailsForContract,
   normalizeOwnerName,
   type PmJobRecord,
+  type PmWorkDetails,
   type ReportRow,
   type SavedChecklistGroup,
   type SiteRecord
@@ -39,8 +46,16 @@ import {
   isAllOwners,
   resolveActiveOwner
 } from "@/lib/owner-filter";
+import type { PmChecklistKey } from "@/lib/pm-checklist-config";
+import { checklistTabs as checklistTabDefs } from "@/lib/pm-checklist-data";
+import { mergePhotoState, type PhotoCategory } from "@/lib/pm-photos";
 
-const checklistTabs = ["SYNAPSE", "Server", "Switch", "Storage", "Environment", "DIAG"] as const;
+const photoUploadItems: { key: PhotoCategory; labelKey: "pm.devicePhoto" | "pm.overviewPhoto" | "pm.issuePhoto" | "pm.partPhoto" }[] = [
+  { key: "device", labelKey: "pm.devicePhoto" },
+  { key: "overview", labelKey: "pm.overviewPhoto" },
+  { key: "issue", labelKey: "pm.issuePhoto" },
+  { key: "part", labelKey: "pm.partPhoto" }
+];
 
 export default function HistoryPage() {
   const { lang, t } = useUi();
@@ -170,12 +185,40 @@ function HistoryDetailView({
   onBack: () => void;
 }) {
   const { lang, t } = useUi();
-  const [activeTab, setActiveTab] = useState<(typeof checklistTabs)[number]>("SYNAPSE");
+  const contractCount = getContractCount(site.contractDetails);
+  const contractItems = useMemo(() => getSiteContractItems(site), [site]);
+  const [selectedContractIndex, setSelectedContractIndex] = useState(() => {
+    const savedIndex = report.workDetails?.contractIndex ?? 0;
+    return Math.min(Math.max(savedIndex, 0), Math.max(contractCount - 1, 0));
+  });
+  const selectedContract = getSiteContractAt(site, selectedContractIndex);
+  const contractWorkDetails = useMemo(
+    () => mergeWorkDetailsForContract(report.workDetails, selectedContractIndex),
+    [report.workDetails, selectedContractIndex]
+  );
+  const [activeTab, setActiveTab] = useState<PmChecklistKey>("synapse");
+  const availableTabs = useMemo(() => {
+    const snapshot = contractWorkDetails?.checklistSnapshot ?? [];
+    const keys = new Set(snapshot.map((item) => item.key));
+    return checklistTabDefs.filter((tab) => keys.has(tab.key));
+  }, [contractWorkDetails?.checklistSnapshot]);
+  const activeTabTitle = availableTabs.find((tab) => tab.key === activeTab)?.title ?? activeTab;
   const statusClass = report.result === "ผิดปกติ" ? "danger" : "success";
-  const visitTotal = getContractVisitTotal(site.contractDetails, site.pmCycle);
+
+  useEffect(() => {
+    if (availableTabs.length === 0) {
+      return;
+    }
+
+    if (!availableTabs.some((tab) => tab.key === activeTab)) {
+      setActiveTab(availableTabs[0].key);
+    }
+  }, [activeTab, availableTabs]);
+  const visitTotal = getSiteContractVisitTotal(site, selectedContractIndex, site.pmCycle);
   const visitRound = getVisitRound(pmJobs, site, report.jobId);
-  const contractStartDate = site.contractDetails?.contractStartDate ?? (site.contractDetails?.contractStartMonth ? `${site.contractDetails.contractStartMonth}-01` : "");
-  const contractEndDate = site.contractDetails?.contractEndDate ?? (site.contractDetails?.contractEndMonth ? `${site.contractDetails.contractEndMonth}-01` : "");
+  const displayPmCycle = selectedContract.pmCycle ?? site.pmCycle;
+  const contractStartDate = selectedContract.contractStartDate ?? "";
+  const contractEndDate = selectedContract.contractEndDate ?? "";
   const finishDate = report.workDetails?.savedAt ? report.workDetails.savedAt.slice(0, 10) : toInputDate(report.date);
 
   return (
@@ -193,13 +236,25 @@ function HistoryDetailView({
 
       <section className="card">
         <h2><Wrench size={17} /> {t("pm.siteInfo")}</h2>
+        <label className="label contractSelectField">
+          {t("pm.selectContract")}
+          <AppSelect
+            className="select"
+            value={String(selectedContractIndex)}
+            onChange={(event) => setSelectedContractIndex(Number(event.target.value))}
+          >
+            {contractItems.map((contract, index) => (
+              <option key={index} value={index}>{getSiteContractLabel(contract, index)}</option>
+            ))}
+          </AppSelect>
+        </label>
         <div className="infoGrid">
           <Info label={t("common.customer")} value={site.customer} />
           <Info label={t("pm.phoneShort")} value={site.phone} />
           <Info label={t("common.province")} value={site.province} />
           <Info label={t("pm.region")} value={site.region} />
           <Info label={t("common.owner")} value={report.inspector} />
-          <Info label={t("pm.pmCycle")} value={localizeLabel(site.pmCycle, lang)} />
+          <Info label={t("pm.pmCycle")} value={localizeLabel(displayPmCycle, lang)} />
           <Info label={t("history.visitRound")} value={`${visitRound}/${visitTotal || "-"}`} />
           <Info label={t("fields.contractStartDate")} value={formatInputDate(contractStartDate)} />
           <Info label={t("fields.contractEndDate")} value={formatInputDate(contractEndDate)} />
@@ -217,14 +272,14 @@ function HistoryDetailView({
             {t("history.finishDate")}
             <input className="field" type="date" readOnly defaultValue={finishDate} />
           </label>
-          <label className="label">
+          <div className="label">
             {t("fields.startTime")}
             <TimePicker readOnly value={site.startTime ?? site.visitTime ?? ""} />
-          </label>
-          <label className="label">
+          </div>
+          <div className="label">
             {t("fields.endTime")}
             <TimePicker readOnly value={site.endTime ?? ""} />
-          </label>
+          </div>
           <label className="label">
             {t("common.inspector")}
             <input className="field" readOnly defaultValue={report.inspector} />
@@ -232,27 +287,31 @@ function HistoryDetailView({
         </div>
       </section>
 
-      <section className="card">
-        <h2><ClipboardCheck size={17} /> {t("pm.checklist")}</h2>
-        <div className="tabs">
-          {checklistTabs.map((tab) => (
-            <button
-              className={tab === activeTab ? "activeTab" : "tab"}
-              key={tab}
-              type="button"
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
-        <div className="templateList">
-          <section className="templateSet">
-            <h3 className="checkSectionTitle">{activeTab}</h3>
-            <HistoryChecklistDetails activeTab={activeTab} report={report} />
-          </section>
-        </div>
-      </section>
+      {availableTabs.length > 0 ? (
+        <section className="card">
+          <h2><ClipboardCheck size={17} /> {t("pm.checklist")}</h2>
+          <div className="tabs historyTabs">
+            {availableTabs.map((tab) => (
+              <button
+                className={tab.key === activeTab ? "activeTab" : "tab"}
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+              >
+                {tab.title}
+              </button>
+            ))}
+          </div>
+          <div className="templateList">
+            <section className="templateSet">
+              <h3 className="checkSectionTitle">{activeTabTitle}</h3>
+              <HistoryChecklistDetails activeTab={activeTab} workDetails={contractWorkDetails} report={report} />
+            </section>
+          </div>
+        </section>
+      ) : null}
+
+      <HistoryPhotosSection report={report} />
 
       <div className="stickyActions">
         <button className="button ghost" type="button" onClick={onBack}>{t("common.back")}</button>
@@ -274,16 +333,104 @@ function Info({ label, value }: { label: string; value: string }) {
   );
 }
 
+function HistoryPhotosSection({ report }: { report: ReportRow }) {
+  const { t } = useUi();
+  const [showPhotos, setShowPhotos] = useState(false);
+  const photos = mergePhotoState(report.workDetails?.photos);
+  const photoNotes = report.workDetails?.photoNotes ?? {};
+  const categoriesWithContent = photoUploadItems.filter(
+    (item) => photos[item.key].length > 0 || Boolean(photoNotes[item.key]?.trim())
+  );
+  const [activePhotoCategory, setActivePhotoCategory] = useState<PhotoCategory>(
+    categoriesWithContent[0]?.key ?? "device"
+  );
+  const totalPhotoCount = photoUploadItems.reduce((sum, item) => sum + photos[item.key].length, 0);
+  const activePhotoItem = categoriesWithContent.find((item) => item.key === activePhotoCategory)
+    ?? categoriesWithContent[0];
+
+  useEffect(() => {
+    if (categoriesWithContent.length === 0) {
+      return;
+    }
+
+    if (!categoriesWithContent.some((item) => item.key === activePhotoCategory)) {
+      setActivePhotoCategory(categoriesWithContent[0].key);
+    }
+  }, [activePhotoCategory, categoriesWithContent]);
+
+  if (categoriesWithContent.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="card">
+      <div className="historyPhotoHeader">
+        <h2><Camera size={17} /> {t("pm.photos")}</h2>
+        <button
+          className="button subtle"
+          type="button"
+          onClick={() => setShowPhotos((current) => !current)}
+        >
+          <Camera size={16} />
+          {showPhotos ? t("history.hidePhotos") : t("history.showPhotos")}
+          {totalPhotoCount > 0 ? ` (${totalPhotoCount})` : ""}
+        </button>
+      </div>
+
+      {showPhotos ? (
+        <>
+          <div className="tabs historyTabs historyPhotoTabs">
+            {categoriesWithContent.map((item) => (
+              <button
+                className={item.key === activePhotoCategory ? "activeTab" : "tab"}
+                key={item.key}
+                type="button"
+                onClick={() => setActivePhotoCategory(item.key)}
+              >
+                {t(item.labelKey)}
+                {photos[item.key].length > 0 ? ` (${photos[item.key].length})` : ""}
+              </button>
+            ))}
+          </div>
+
+          {activePhotoItem ? (
+            <div className="historyPhotoGroups">
+              <div className="historyPhotoGroup">
+                {photoNotes[activePhotoItem.key]?.trim() ? (
+                  <p className="historyPhotoNote">{photoNotes[activePhotoItem.key]}</p>
+                ) : null}
+                {photos[activePhotoItem.key].length > 0 ? (
+                  <div className="photoThumbGrid">
+                    {photos[activePhotoItem.key].map((photo) => (
+                      <figure className="photoThumbCard historyPhotoThumb" key={photo.id}>
+                        <img alt={photo.name} src={photo.dataUrl} />
+                        <figcaption>{photo.name}</figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="emptyChecklist">{t("history.noPhotos")}</p>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </section>
+  );
+}
+
 function HistoryChecklistDetails({
   activeTab,
-  report
+  report,
+  workDetails
 }: {
-  activeTab: (typeof checklistTabs)[number];
+  activeTab: PmChecklistKey;
   report: ReportRow;
+  workDetails?: PmWorkDetails;
 }) {
   const { lang, t } = useUi();
-  const groupKey = toChecklistGroupKey(activeTab);
-  const group = report.workDetails?.checklistSnapshot?.find((item) => item.key === groupKey);
+  const group = workDetails?.checklistSnapshot?.find((item) => item.key === activeTab);
 
   if (!group) {
     return <p className="emptyChecklist">{t("reports.resultPrefix")}: {localizeLabel(report.result, lang)}</p>;
@@ -302,6 +449,7 @@ function HistoryChecklistDetails({
               group={group}
               report={report}
               setTitle={set.title}
+              workDetails={workDetails}
             />
           ))}
         </section>
@@ -315,16 +463,18 @@ function HistoryChecklistBlock({
   blockIndex,
   group,
   report,
-  setTitle
+  setTitle,
+  workDetails
 }: {
   block: SavedChecklistGroup["sets"][number]["blocks"][number];
   blockIndex: number;
   group: SavedChecklistGroup;
   report: ReportRow;
   setTitle: string;
+  workDetails?: PmWorkDetails;
 }) {
   const { lang } = useUi();
-  const details = report.workDetails;
+  const details = workDetails;
   const resultPrefix = `${group.key}:${setTitle}:${blockIndex}`;
 
   if (block.type === "fields") {
@@ -427,10 +577,6 @@ function SavedChecklistRow({
       {note ? <p>{t("common.note")}: {note}</p> : null}
     </div>
   );
-}
-
-function toChecklistGroupKey(tab: (typeof checklistTabs)[number]) {
-  return tab.toLowerCase();
 }
 
 function historyFieldKey(groupKey: string, setTitle: string, blockIndex: number, label: string) {

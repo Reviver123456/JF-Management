@@ -209,7 +209,7 @@ export function TimePicker({
   if (readOnly) {
     return (
       <div className={`timePicker timePickerReadOnly ${className}`.trim()}>
-        <div className="timePickerTrigger select field">
+        <div className="timePickerReadOnlyTrigger field">
           <span className={`timePickerValue${hasValue ? "" : " isPlaceholder"}`}>{displayValue}</span>
           <Clock3 aria-hidden="true" className="timePickerIcon" size={16} />
         </div>

@@ -236,6 +236,7 @@ const dictionaries: Record<Lang, Dictionary> = {
       fail: "ไม่ผ่าน",
       addPhoto: "เพิ่มภาพถ่าย",
       uploadPhoto: "อัปโหลดรูปภาพ",
+      uploadingPhotos: "กำลังเตรียมและบันทึกรูปภาพ...",
       takePhoto: "ถ่ายภาพสด",
       devicePhoto: "รูปอุปกรณ์",
       overviewPhoto: "รูปภาพรวม",
@@ -339,7 +340,10 @@ const dictionaries: Record<Lang, Dictionary> = {
       editData: "แก้ไขข้อมูล",
       finishDate: "วันที่เสร็จ",
       startDate: "วันที่เริ่ม",
-      visitRound: "ครั้งที่เข้า"
+      visitRound: "ครั้งที่เข้า",
+      showPhotos: "แสดงภาพ",
+      hidePhotos: "ซ่อนภาพ",
+      noPhotos: "ไม่มีรูปภาพที่บันทึกไว้"
     },
     reports: {
       title: "รายงาน",
@@ -358,6 +362,8 @@ const dictionaries: Record<Lang, Dictionary> = {
       scheduleSummary: "รายงานสรุปแผนงานที่เข้า",
       personalSummary: "รายงานสรุปส่วนบุคคล",
       preview: "พรีวิว",
+      fileTypePhotos: "ภาพถ่าย",
+      noPhotosToDownload: "ไม่พบภาพถ่ายที่บันทึกไว้สำหรับรายงานนี้",
       chooseReport: "เลือกรายการประวัติเพื่อแก้ไขและพรีวิวเอกสาร",
       visitMonth: "เดือนที่เข้า",
       followers: "ผู้ติดตาม",
@@ -620,6 +626,7 @@ const dictionaries: Record<Lang, Dictionary> = {
       fail: "Fail",
       addPhoto: "Add photo",
       uploadPhoto: "Upload image",
+      uploadingPhotos: "Preparing and saving photos...",
       takePhoto: "Take live photo",
       devicePhoto: "Device photo",
       overviewPhoto: "Overview photo",
@@ -723,7 +730,10 @@ const dictionaries: Record<Lang, Dictionary> = {
       editData: "Edit details",
       finishDate: "Finish date",
       startDate: "Start date",
-      visitRound: "Visit round"
+      visitRound: "Visit round",
+      showPhotos: "Show photos",
+      hidePhotos: "Hide photos",
+      noPhotos: "No saved photos"
     },
     reports: {
       title: "Reports",
@@ -742,6 +752,8 @@ const dictionaries: Record<Lang, Dictionary> = {
       scheduleSummary: "Schedule visit summary",
       personalSummary: "Personal summary",
       preview: "Preview",
+      fileTypePhotos: "Photos",
+      noPhotosToDownload: "No saved photos found for this report",
       chooseReport: "Select a history row to edit and preview the document",
       visitMonth: "Visit month",
       followers: "Followers",
