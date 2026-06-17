@@ -1,4 +1,4 @@
-import { buildPmAppData, type PmJobRecord, type PmWorkDetails, type SiteCatalogRecord, type SiteContractDetails, type SiteRecord } from "@/lib/pm-data";
+import { buildPmAppData, formatVisitTime, type PmJobRecord, type PmWorkDetails, type SiteCatalogRecord, type SiteContractDetails, type SiteRecord } from "@/lib/pm-data";
 import { createClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/database.types";
 
@@ -8,7 +8,17 @@ type PmJobWithSiteRow = PmJobRow & { sites: SiteRow | null };
 type WorkResult = NonNullable<PmJobRecord["result"]>;
 
 function toWorkDetails(value: Json | undefined): PmWorkDetails | undefined {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as PmWorkDetails : undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const details = value as PmWorkDetails;
+
+  return {
+    ...details,
+    startTime: details.startTime ? formatVisitTime(details.startTime) : details.startTime,
+    endTime: details.endTime ? formatVisitTime(details.endTime) : details.endTime
+  };
 }
 
 function toContractDetails(value: Json | undefined): SiteContractDetails | undefined {
@@ -44,10 +54,10 @@ function toPmJobRecord(row: PmJobRow): PmJobRecord {
     status: row.status,
     pmCycle: row.pm_cycle,
     visitDate: row.visit_date,
-    visitTime: row.visit_time,
+    visitTime: formatVisitTime(row.visit_time),
     owner: row.owner,
-    startTime: row.start_time ?? undefined,
-    endTime: row.end_time ?? undefined,
+    startTime: formatVisitTime(row.start_time) || undefined,
+    endTime: formatVisitTime(row.end_time) || undefined,
     workDetails: toWorkDetails(row.work_details),
     result: toWorkResult(row.result)
   };
@@ -66,10 +76,10 @@ function toSiteRecord(row: PmJobWithSiteRow): SiteRecord | null {
     status: row.status,
     pmCycle: row.pm_cycle,
     visitDate: row.visit_date,
-    visitTime: row.visit_time,
+    visitTime: formatVisitTime(row.visit_time),
     owner: site.owner,
-    startTime: row.start_time ?? undefined,
-    endTime: row.end_time ?? undefined,
+    startTime: formatVisitTime(row.start_time) || undefined,
+    endTime: formatVisitTime(row.end_time) || undefined,
     workDetails: toWorkDetails(row.work_details),
     result: toWorkResult(row.result)
   };

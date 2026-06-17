@@ -9,6 +9,7 @@ export type PmChecklistConfig = {
   customItemsBySection: Partial<Record<PmChecklistKey, Record<string, string[]>>>;
   diagMonitorCounts: Record<number, 1 | 2>;
   itemLabelsBySection: Partial<Record<PmChecklistKey, Record<string, Record<string, string>>>>;
+  removedDefaultItemsBySection: Partial<Record<PmChecklistKey, Record<string, string[]>>>;
   selectedTabs: PmChecklistKey[];
   setCounts: Record<PmChecklistKey, number>;
   selectedItems: Partial<Record<PmChecklistKey, string[]>>;
@@ -21,6 +22,7 @@ export const defaultPmChecklistConfig: PmChecklistConfig = {
   customItemsBySection: {},
   diagMonitorCounts: {},
   itemLabelsBySection: {},
+  removedDefaultItemsBySection: {},
   selectedTabs: [...pmChecklistKeys],
   setCounts: {
     synapse: 1,
@@ -101,6 +103,25 @@ function normalizeConfig(value: Partial<PmChecklistConfig> | undefined): PmCheck
 
     return items;
   }, {} as Partial<Record<PmChecklistKey, Record<string, Record<string, string>>>>);
+  const removedDefaultItemsBySection = pmChecklistKeys.reduce((items, key) => {
+    const sections = value?.removedDefaultItemsBySection?.[key];
+
+    if (sections && typeof sections === "object" && !Array.isArray(sections)) {
+      const normalizedSections = Object.entries(sections).reduce((sectionItems, [sectionId, currentItems]) => {
+        if (Array.isArray(currentItems)) {
+          sectionItems[sectionId] = [...new Set(currentItems.filter((item): item is string => typeof item === "string" && item.trim().length > 0))];
+        }
+
+        return sectionItems;
+      }, {} as Record<string, string[]>);
+
+      if (Object.keys(normalizedSections).length > 0) {
+        items[key] = normalizedSections;
+      }
+    }
+
+    return items;
+  }, {} as Partial<Record<PmChecklistKey, Record<string, string[]>>>);
   const diagMonitorCounts = Object.entries(value?.diagMonitorCounts ?? {}).reduce<Record<number, 1 | 2>>((counts, [setId, count]) => {
     const numericSetId = Number(setId);
 
@@ -116,6 +137,7 @@ function normalizeConfig(value: Partial<PmChecklistConfig> | undefined): PmCheck
     customItemsBySection,
     diagMonitorCounts,
     itemLabelsBySection,
+    removedDefaultItemsBySection,
     selectedTabs,
     setCounts: pmChecklistKeys.reduce((counts, key) => {
       const count = value?.setCounts?.[key];

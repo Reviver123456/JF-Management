@@ -153,7 +153,10 @@ const emptySite: SiteCatalogRecord = {
 
 function resolveSelectedChecklistItems(config: PmChecklistConfig): Record<InspectionTab, string[]> {
   return inspectionTabs.reduce((items, tab) => {
-    const defaultItems = checklistItemsByInspectionTab[tab.id];
+    const defaultItems = checklistItemsByInspectionTab[tab.id].filter((item) => {
+      const removedItems = Object.values(config.removedDefaultItemsBySection[tab.id] ?? {}).flat();
+      return !removedItems.includes(item);
+    });
     const sectionItems = Object.values(config.customItemsBySection[tab.id] ?? {}).flat();
     const legacyItems = config.customItems[tab.id] ?? [];
     const allItems = [...defaultItems, ...sectionItems, ...legacyItems];
@@ -231,6 +234,7 @@ function buildChecklistConfig({
   diagMonitorCounts,
   inspectionSetCounts,
   itemLabelsBySection,
+  removedDefaultItemsBySection,
   selectedChecklistItems,
   selectedInspectionTabs
 }: {
@@ -238,6 +242,7 @@ function buildChecklistConfig({
   diagMonitorCounts: PmChecklistConfig["diagMonitorCounts"];
   inspectionSetCounts: PmChecklistConfig["setCounts"];
   itemLabelsBySection: PmChecklistConfig["itemLabelsBySection"];
+  removedDefaultItemsBySection: PmChecklistConfig["removedDefaultItemsBySection"];
   selectedChecklistItems: PmChecklistConfig["selectedItems"];
   selectedInspectionTabs: PmChecklistConfig["selectedTabs"];
 }) {
@@ -246,6 +251,7 @@ function buildChecklistConfig({
     customItemsBySection: customChecklistItemsBySection,
     diagMonitorCounts,
     itemLabelsBySection,
+    removedDefaultItemsBySection,
     selectedItems: selectedChecklistItems,
     selectedTabs: selectedInspectionTabs,
     setCounts: inspectionSetCounts
@@ -532,6 +538,7 @@ function SiteModal({
   const [customChecklistItemsBySection, setCustomChecklistItemsBySection] = useState(() => readCustomItemsBySection(initialChecklistConfig));
   const [diagMonitorCounts, setDiagMonitorCounts] = useState(() => initialChecklistConfig.diagMonitorCounts);
   const [itemLabelsBySection, setItemLabelsBySection] = useState(() => initialChecklistConfig.itemLabelsBySection);
+  const [removedDefaultItemsBySection, setRemovedDefaultItemsBySection] = useState(() => initialChecklistConfig.removedDefaultItemsBySection);
   const title = mode === "add" ? t("sites.addModalTitle") : t("sites.editModalTitle");
   const contractCount = getContractCount(contractDetails);
   const contractItems = useMemo(() => normalizeContractItems(contractNumber, contractDetails), [contractDetails, contractNumber]);
@@ -549,6 +556,7 @@ function SiteModal({
     setCustomChecklistItemsBySection(readCustomItemsBySection(normalizedConfig));
     setDiagMonitorCounts(normalizedConfig.diagMonitorCounts);
     setItemLabelsBySection(normalizedConfig.itemLabelsBySection);
+    setRemovedDefaultItemsBySection(normalizedConfig.removedDefaultItemsBySection);
   }, []);
 
   const getCurrentChecklistConfig = useCallback(() => (
@@ -557,10 +565,11 @@ function SiteModal({
       diagMonitorCounts,
       inspectionSetCounts,
       itemLabelsBySection,
+      removedDefaultItemsBySection,
       selectedChecklistItems,
       selectedInspectionTabs
     })
-  ), [customChecklistItemsBySection, diagMonitorCounts, inspectionSetCounts, itemLabelsBySection, selectedChecklistItems, selectedInspectionTabs]);
+  ), [customChecklistItemsBySection, diagMonitorCounts, inspectionSetCounts, itemLabelsBySection, removedDefaultItemsBySection, selectedChecklistItems, selectedInspectionTabs]);
 
   const updateContractCount = useCallback((count: number) => {
     const nextCount = Math.min(6, Math.max(1, count));
@@ -749,6 +758,47 @@ function SiteModal({
     });
   }, []);
 
+  const removeDefaultChecklistItem = useCallback((tabId: InspectionTab, sectionId: string, item: string) => {
+    setItemLabelsBySection((current) => {
+      const currentSections = current[tabId] ?? {};
+      const currentLabels = { ...(currentSections[sectionId] ?? {}) };
+
+      if (item in currentLabels) {
+        delete currentLabels[item];
+      }
+
+      return {
+        ...current,
+        [tabId]: {
+          ...currentSections,
+          [sectionId]: currentLabels
+        }
+      };
+    });
+
+    setRemovedDefaultItemsBySection((current) => {
+      const currentSections = current[tabId] ?? {};
+      const currentItems = currentSections[sectionId] ?? [];
+
+      if (currentItems.includes(item)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [tabId]: {
+          ...currentSections,
+          [sectionId]: [...currentItems, item]
+        }
+      };
+    });
+
+    setSelectedChecklistItems((current) => ({
+      ...current,
+      [tabId]: (current[tabId] ?? []).filter((currentItem) => currentItem !== item)
+    }));
+  }, []);
+
   const updateDiagMonitorCount = useCallback((setId: number, count: 1 | 2) => {
     setDiagMonitorCounts((current) => ({
       ...current,
@@ -879,21 +929,21 @@ function SiteModal({
           />
         );
       case "synapse":
-        return <SynapseTab customItemsBySection={customChecklistItemsBySection.synapse ?? {}} itemLabelsBySection={itemLabelsBySection.synapse ?? {}} setCount={inspectionSetCounts.synapse} selectedItems={selectedChecklistItems.synapse} onToggleItem={(item, checked) => toggleChecklistItem("synapse", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("synapse", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("synapse", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("synapse", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("synapse", sectionId, item, nextItem)} onAddSet={() => addInspectionSet("synapse")} />;
+        return <SynapseTab customItemsBySection={customChecklistItemsBySection.synapse ?? {}} itemLabelsBySection={itemLabelsBySection.synapse ?? {}} removedDefaultItemsBySection={removedDefaultItemsBySection.synapse ?? {}} setCount={inspectionSetCounts.synapse} selectedItems={selectedChecklistItems.synapse} onToggleItem={(item, checked) => toggleChecklistItem("synapse", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("synapse", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("synapse", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("synapse", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("synapse", sectionId, item, nextItem)} onRemoveDefaultItem={(sectionId, item) => removeDefaultChecklistItem("synapse", sectionId, item)} onAddSet={() => addInspectionSet("synapse")} />;
       case "server":
-        return <DeviceTab title="SERVER" sectionId="serverChecklist" fields={["Location", "Manufacturer", "Host Name", "Model", "S/N or S/T", "IP Address", "ESX Version", "MT"]} checklistTitle="SERVER CHECKLIST" checklist={serverChecklist} addLabel={t("sites.addDeviceSet").replace("{device}", "Server")} customItemsBySection={customChecklistItemsBySection.server ?? {}} itemLabelsBySection={itemLabelsBySection.server ?? {}} setCount={inspectionSetCounts.server} selectedItems={selectedChecklistItems.server} onToggleItem={(item, checked) => toggleChecklistItem("server", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("server", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("server", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("server", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("server", sectionId, item, nextItem)} onAddSet={() => addInspectionSet("server")} />;
+        return <DeviceTab title="SERVER" sectionId="serverChecklist" fields={["Location", "Manufacturer", "Host Name", "Model", "S/N or S/T", "IP Address", "ESX Version", "MT"]} checklistTitle="SERVER CHECKLIST" checklist={serverChecklist} addLabel={t("sites.addDeviceSet").replace("{device}", "Server")} customItemsBySection={customChecklistItemsBySection.server ?? {}} itemLabelsBySection={itemLabelsBySection.server ?? {}} removedDefaultItemsBySection={removedDefaultItemsBySection.server ?? {}} setCount={inspectionSetCounts.server} selectedItems={selectedChecklistItems.server} onToggleItem={(item, checked) => toggleChecklistItem("server", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("server", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("server", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("server", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("server", sectionId, item, nextItem)} onRemoveDefaultItem={(sectionId, item) => removeDefaultChecklistItem("server", sectionId, item)} onAddSet={() => addInspectionSet("server")} />;
       case "switch":
-        return <DeviceTab title="SWITCH" sectionId="switchChecklist" fields={["Customer Name", "Location", "Brand", "Model", "S/N", "Host Name", "IP Address"]} checklistTitle="SWITCH CHECKLIST" checklist={switchChecklist} addLabel={t("sites.addDeviceSet").replace("{device}", "Switch")} customItemsBySection={customChecklistItemsBySection.switch ?? {}} itemLabelsBySection={itemLabelsBySection.switch ?? {}} setCount={inspectionSetCounts.switch} selectedItems={selectedChecklistItems.switch} onToggleItem={(item, checked) => toggleChecklistItem("switch", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("switch", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("switch", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("switch", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("switch", sectionId, item, nextItem)} onAddSet={() => addInspectionSet("switch")} />;
+        return <DeviceTab title="SWITCH" sectionId="switchChecklist" fields={["Customer Name", "Location", "Brand", "Model", "S/N", "Host Name", "IP Address"]} checklistTitle="SWITCH CHECKLIST" checklist={switchChecklist} addLabel={t("sites.addDeviceSet").replace("{device}", "Switch")} customItemsBySection={customChecklistItemsBySection.switch ?? {}} itemLabelsBySection={itemLabelsBySection.switch ?? {}} removedDefaultItemsBySection={removedDefaultItemsBySection.switch ?? {}} setCount={inspectionSetCounts.switch} selectedItems={selectedChecklistItems.switch} onToggleItem={(item, checked) => toggleChecklistItem("switch", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("switch", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("switch", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("switch", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("switch", sectionId, item, nextItem)} onRemoveDefaultItem={(sectionId, item) => removeDefaultChecklistItem("switch", sectionId, item)} onAddSet={() => addInspectionSet("switch")} />;
       case "storage":
-        return <DeviceTab title="STORAGE" sectionId="storageChecklist" fields={["Customer Name", "Location", "Model", "Manufacturer", "S/N or S/T", "MT"]} checklistTitle="STORAGE CHECKLIST" checklist={storageChecklist} addLabel={t("sites.addDeviceSet").replace("{device}", "Storage")} customItemsBySection={customChecklistItemsBySection.storage ?? {}} itemLabelsBySection={itemLabelsBySection.storage ?? {}} setCount={inspectionSetCounts.storage} selectedItems={selectedChecklistItems.storage} onToggleItem={(item, checked) => toggleChecklistItem("storage", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("storage", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("storage", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("storage", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("storage", sectionId, item, nextItem)} onAddSet={() => addInspectionSet("storage")} />;
+        return <DeviceTab title="STORAGE" sectionId="storageChecklist" fields={["Customer Name", "Location", "Model", "Manufacturer", "S/N or S/T", "MT"]} checklistTitle="STORAGE CHECKLIST" checklist={storageChecklist} addLabel={t("sites.addDeviceSet").replace("{device}", "Storage")} customItemsBySection={customChecklistItemsBySection.storage ?? {}} itemLabelsBySection={itemLabelsBySection.storage ?? {}} removedDefaultItemsBySection={removedDefaultItemsBySection.storage ?? {}} setCount={inspectionSetCounts.storage} selectedItems={selectedChecklistItems.storage} onToggleItem={(item, checked) => toggleChecklistItem("storage", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("storage", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("storage", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("storage", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("storage", sectionId, item, nextItem)} onRemoveDefaultItem={(sectionId, item) => removeDefaultChecklistItem("storage", sectionId, item)} onAddSet={() => addInspectionSet("storage")} />;
       case "environment":
-        return <EnvironmentTab customItemsBySection={customChecklistItemsBySection.environment ?? {}} itemLabelsBySection={itemLabelsBySection.environment ?? {}} setCount={inspectionSetCounts.environment} selectedItems={selectedChecklistItems.environment} onToggleItem={(item, checked) => toggleChecklistItem("environment", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("environment", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("environment", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("environment", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("environment", sectionId, item, nextItem)} onAddSet={() => addInspectionSet("environment")} />;
+        return <EnvironmentTab customItemsBySection={customChecklistItemsBySection.environment ?? {}} itemLabelsBySection={itemLabelsBySection.environment ?? {}} removedDefaultItemsBySection={removedDefaultItemsBySection.environment ?? {}} setCount={inspectionSetCounts.environment} selectedItems={selectedChecklistItems.environment} onToggleItem={(item, checked) => toggleChecklistItem("environment", item, checked)} onAddCustomItem={(sectionId, item) => addCustomChecklistItem("environment", sectionId, item)} onRemoveCustomItem={(sectionId, item) => removeCustomChecklistItem("environment", sectionId, item)} onUpdateCustomItem={(sectionId, item, nextItem) => updateCustomChecklistItem("environment", sectionId, item, nextItem)} onUpdateDefaultItem={(sectionId, item, nextItem) => updateDefaultChecklistItem("environment", sectionId, item, nextItem)} onRemoveDefaultItem={(sectionId, item) => removeDefaultChecklistItem("environment", sectionId, item)} onAddSet={() => addInspectionSet("environment")} />;
       case "diag":
         return <DiagTab monitorCounts={diagMonitorCounts} setCount={inspectionSetCounts.diag} onAddSet={() => addInspectionSet("diag")} onMonitorCountChange={updateDiagMonitorCount} />;
       default:
         return null;
     }
-  }, [activeTab, addCustomChecklistItem, addInspectionSet, contractCount, customChecklistItemsBySection, diagMonitorCounts, inspectionSetCounts, itemLabelsBySection, regions, removeCustomChecklistItem, selectContractIndex, selectedChecklistItems, selectedContract, selectedContractIndex, selectedInspectionTabs, selectedOwner, site, systemUsers, t, toggleChecklistItem, toggleInspectionTab, updateContractCount, updateCustomChecklistItem, updateDefaultChecklistItem, updateDiagMonitorCount, updateSelectedContract]);
+  }, [activeTab, addCustomChecklistItem, addInspectionSet, contractCount, customChecklistItemsBySection, diagMonitorCounts, inspectionSetCounts, itemLabelsBySection, regions, removeCustomChecklistItem, removeDefaultChecklistItem, removedDefaultItemsBySection, selectContractIndex, selectedChecklistItems, selectedContract, selectedContractIndex, selectedInspectionTabs, selectedOwner, site, systemUsers, t, toggleChecklistItem, toggleInspectionTab, updateContractCount, updateCustomChecklistItem, updateDefaultChecklistItem, updateDiagMonitorCount, updateSelectedContract]);
 
   return (
     <div className="siteEditorPage">
@@ -981,6 +1031,82 @@ function useIsClient() {
     () => () => {},
     () => true,
     () => false
+  );
+}
+
+function ChecklistItemConfirmPopup({
+  action,
+  itemLabel,
+  onCancel,
+  onConfirm
+}: {
+  action: "edit" | "delete" | null;
+  itemLabel: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const { t } = useUi();
+  const isClient = useIsClient();
+  useBodyScrollLock(Boolean(action));
+
+  if (!action || !isClient) {
+    return null;
+  }
+
+  const title = action === "edit"
+    ? t("sites.confirmEditChecklistTitle")
+    : t("sites.confirmDeleteChecklistTitle");
+  const message = (action === "edit"
+    ? t("sites.confirmEditChecklistMessage")
+    : t("sites.confirmDeleteChecklistMessage")).replace("{item}", itemLabel);
+  const confirmLabel = action === "edit"
+    ? t("sites.saveChecklistEdit")
+    : t("sites.deleteChecklistItem");
+
+  return createPortal(
+    <div aria-labelledby="checklist-confirm-title" aria-modal="true" className="siteDeleteConfirmOverlay" role="dialog">
+      <button
+        aria-label={t("common.cancel")}
+        className="siteDeleteConfirmBackdrop"
+        type="button"
+        onClick={onCancel}
+      />
+      <div className="siteDeleteConfirmDialog">
+        <header className="siteDeleteConfirmHeader">
+          <div>
+            <h3 id="checklist-confirm-title">{title}</h3>
+            {itemLabel ? <p className="siteDeleteConfirmSubtitle">{itemLabel}</p> : null}
+          </div>
+          <button
+            aria-label={t("common.cancel")}
+            className="siteDeleteConfirmClose"
+            type="button"
+            onClick={onCancel}
+          >
+            <X size={16} />
+          </button>
+        </header>
+        <div className="siteDeleteConfirmBody">
+          <p className="siteDeleteConfirmMessage">{message}</p>
+        </div>
+        <footer className="siteDeleteConfirmFooter">
+          <div className="siteDeleteConfirmFooterActions">
+            <button className="button ghost" type="button" onClick={onCancel}>
+              {t("common.cancel")}
+            </button>
+          </div>
+          <button
+            className={action === "delete" ? "button danger" : "button primary"}
+            type="button"
+            onClick={onConfirm}
+          >
+            {action === "delete" ? <Trash2 size={16} /> : action === "edit" ? <Check size={16} /> : null}
+            {confirmLabel}
+          </button>
+        </footer>
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1281,6 +1407,7 @@ function ContractTab({
 function SynapseTab({
   customItemsBySection,
   itemLabelsBySection,
+  removedDefaultItemsBySection,
   setCount,
   selectedItems,
   onToggleItem,
@@ -1288,10 +1415,12 @@ function SynapseTab({
   onRemoveCustomItem,
   onUpdateCustomItem,
   onUpdateDefaultItem,
+  onRemoveDefaultItem,
   onAddSet
 }: {
   customItemsBySection: Record<string, string[]>;
   itemLabelsBySection: Record<string, Record<string, string>>;
+  removedDefaultItemsBySection: Record<string, string[]>;
   setCount: number;
   selectedItems: string[];
   onToggleItem: (item: string, checked: boolean) => void;
@@ -1299,6 +1428,7 @@ function SynapseTab({
   onRemoveCustomItem: (sectionId: string, item: string) => void;
   onUpdateCustomItem: (sectionId: string, item: string, nextItem: string) => void;
   onUpdateDefaultItem: (sectionId: string, item: string, nextItem: string) => void;
+  onRemoveDefaultItem: (sectionId: string, item: string) => void;
   onAddSet: () => void;
 }) {
   const { t } = useUi();
@@ -1306,7 +1436,7 @@ function SynapseTab({
   return (
     <div className="tabPane">
       {Array.from({ length: setCount }, (_, index) => index + 1).map((setId) => (
-        <SynapseSetPanel key={setId} customItemsBySection={customItemsBySection} itemLabelsBySection={itemLabelsBySection} setId={setId} selectedItems={selectedItems} onAddCustomItem={onAddCustomItem} onRemoveCustomItem={onRemoveCustomItem} onUpdateCustomItem={onUpdateCustomItem} onUpdateDefaultItem={onUpdateDefaultItem} onToggleItem={onToggleItem} />
+        <SynapseSetPanel key={setId} customItemsBySection={customItemsBySection} itemLabelsBySection={itemLabelsBySection} removedDefaultItemsBySection={removedDefaultItemsBySection} setId={setId} selectedItems={selectedItems} onAddCustomItem={onAddCustomItem} onRemoveCustomItem={onRemoveCustomItem} onUpdateCustomItem={onUpdateCustomItem} onUpdateDefaultItem={onUpdateDefaultItem} onRemoveDefaultItem={onRemoveDefaultItem} onToggleItem={onToggleItem} />
       ))}
       <button className="addLineButton" type="button" onClick={onAddSet}>
         <Plus size={15} />
@@ -1319,22 +1449,26 @@ function SynapseTab({
 function SynapseSetPanel({
   customItemsBySection,
   itemLabelsBySection,
+  removedDefaultItemsBySection,
   setId,
   selectedItems,
   onAddCustomItem,
   onRemoveCustomItem,
   onUpdateCustomItem,
   onUpdateDefaultItem,
+  onRemoveDefaultItem,
   onToggleItem
 }: {
   customItemsBySection: Record<string, string[]>;
   itemLabelsBySection: Record<string, Record<string, string>>;
+  removedDefaultItemsBySection: Record<string, string[]>;
   setId: number;
   selectedItems: string[];
   onAddCustomItem: (sectionId: string, item: string) => void;
   onRemoveCustomItem: (sectionId: string, item: string) => void;
   onUpdateCustomItem: (sectionId: string, item: string, nextItem: string) => void;
   onUpdateDefaultItem: (sectionId: string, item: string, nextItem: string) => void;
+  onRemoveDefaultItem: (sectionId: string, item: string) => void;
   onToggleItem: (item: string, checked: boolean) => void;
 }) {
   return (
@@ -1360,8 +1494,8 @@ function SynapseSetPanel({
         </div>
       </section>
 
-      <ChecklistSection customItems={customItemsBySection.synapseSystem ?? []} itemLabels={itemLabelsBySection.synapseSystem ?? {}} title={`SYNAPSE SYSTEM CHECKLIST #${setId}`} items={synapseSystem} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("synapseSystem", item)} onRemoveItem={(item) => onRemoveCustomItem("synapseSystem", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("synapseSystem", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("synapseSystem", item, nextItem)} onToggleItem={onToggleItem} />
-      <ChecklistSection customItems={customItemsBySection.configurationBackup ?? []} itemLabels={itemLabelsBySection.configurationBackup ?? {}} title={`CONFIGURATION BACKUP CHECKLIST #${setId}`} items={configurationBackup} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("configurationBackup", item)} onRemoveItem={(item) => onRemoveCustomItem("configurationBackup", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("configurationBackup", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("configurationBackup", item, nextItem)} onToggleItem={onToggleItem} />
+      <ChecklistSection customItems={customItemsBySection.synapseSystem ?? []} itemLabels={itemLabelsBySection.synapseSystem ?? {}} removedDefaultItems={removedDefaultItemsBySection.synapseSystem ?? []} title={`SYNAPSE SYSTEM CHECKLIST #${setId}`} items={synapseSystem} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("synapseSystem", item)} onRemoveItem={(item) => onRemoveCustomItem("synapseSystem", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("synapseSystem", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("synapseSystem", item, nextItem)} onRemoveDefaultItem={(item) => onRemoveDefaultItem("synapseSystem", item)} onToggleItem={onToggleItem} />
+      <ChecklistSection customItems={customItemsBySection.configurationBackup ?? []} itemLabels={itemLabelsBySection.configurationBackup ?? {}} removedDefaultItems={removedDefaultItemsBySection.configurationBackup ?? []} title={`CONFIGURATION BACKUP CHECKLIST #${setId}`} items={configurationBackup} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("configurationBackup", item)} onRemoveItem={(item) => onRemoveCustomItem("configurationBackup", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("configurationBackup", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("configurationBackup", item, nextItem)} onRemoveDefaultItem={(item) => onRemoveDefaultItem("configurationBackup", item)} onToggleItem={onToggleItem} />
       <Field label="Configuration Backup Path" placeholder="Configuration Backup Path" />
 
       <section className="sectionCard">
@@ -1385,6 +1519,7 @@ function DeviceTab({
   addLabel,
   customItemsBySection,
   itemLabelsBySection,
+  removedDefaultItemsBySection,
   setCount,
   selectedItems,
   onToggleItem,
@@ -1392,6 +1527,7 @@ function DeviceTab({
   onRemoveCustomItem,
   onUpdateCustomItem,
   onUpdateDefaultItem,
+  onRemoveDefaultItem,
   onAddSet
 }: {
   title: string;
@@ -1402,6 +1538,7 @@ function DeviceTab({
   addLabel: string;
   customItemsBySection: Record<string, string[]>;
   itemLabelsBySection: Record<string, Record<string, string>>;
+  removedDefaultItemsBySection: Record<string, string[]>;
   setCount: number;
   selectedItems: string[];
   onToggleItem: (item: string, checked: boolean) => void;
@@ -1409,6 +1546,7 @@ function DeviceTab({
   onRemoveCustomItem: (sectionId: string, item: string) => void;
   onUpdateCustomItem: (sectionId: string, item: string, nextItem: string) => void;
   onUpdateDefaultItem: (sectionId: string, item: string, nextItem: string) => void;
+  onRemoveDefaultItem: (sectionId: string, item: string) => void;
   onAddSet: () => void;
 }) {
   return (
@@ -1421,7 +1559,7 @@ function DeviceTab({
               <Field key={field} label={field} placeholder={field} />
             ))}
           </div>
-          <ChecklistSection customItems={customItemsBySection[sectionId] ?? []} itemLabels={itemLabelsBySection[sectionId] ?? {}} title={`${checklistTitle} #${setId}`} items={checklist} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem(sectionId, item)} onRemoveItem={(item) => onRemoveCustomItem(sectionId, item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem(sectionId, item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem(sectionId, item, nextItem)} onToggleItem={onToggleItem} />
+          <ChecklistSection customItems={customItemsBySection[sectionId] ?? []} itemLabels={itemLabelsBySection[sectionId] ?? {}} removedDefaultItems={removedDefaultItemsBySection[sectionId] ?? []} title={`${checklistTitle} #${setId}`} items={checklist} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem(sectionId, item)} onRemoveItem={(item) => onRemoveCustomItem(sectionId, item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem(sectionId, item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem(sectionId, item, nextItem)} onRemoveDefaultItem={(item) => onRemoveDefaultItem(sectionId, item)} onToggleItem={onToggleItem} />
         </section>
       ))}
       <button className="addLineButton" type="button" onClick={onAddSet}>
@@ -1435,6 +1573,7 @@ function DeviceTab({
 function EnvironmentTab({
   customItemsBySection,
   itemLabelsBySection,
+  removedDefaultItemsBySection,
   setCount,
   selectedItems,
   onToggleItem,
@@ -1442,10 +1581,12 @@ function EnvironmentTab({
   onRemoveCustomItem,
   onUpdateCustomItem,
   onUpdateDefaultItem,
+  onRemoveDefaultItem,
   onAddSet
 }: {
   customItemsBySection: Record<string, string[]>;
   itemLabelsBySection: Record<string, Record<string, string>>;
+  removedDefaultItemsBySection: Record<string, string[]>;
   setCount: number;
   selectedItems: string[];
   onToggleItem: (item: string, checked: boolean) => void;
@@ -1453,6 +1594,7 @@ function EnvironmentTab({
   onRemoveCustomItem: (sectionId: string, item: string) => void;
   onUpdateCustomItem: (sectionId: string, item: string, nextItem: string) => void;
   onUpdateDefaultItem: (sectionId: string, item: string, nextItem: string) => void;
+  onRemoveDefaultItem: (sectionId: string, item: string) => void;
   onAddSet: () => void;
 }) {
   const { t } = useUi();
@@ -1460,7 +1602,7 @@ function EnvironmentTab({
   return (
     <div className="tabPane">
       {Array.from({ length: setCount }, (_, index) => index + 1).map((setId) => (
-        <EnvironmentSetPanel key={setId} customItemsBySection={customItemsBySection} itemLabelsBySection={itemLabelsBySection} setId={setId} selectedItems={selectedItems} onAddCustomItem={onAddCustomItem} onRemoveCustomItem={onRemoveCustomItem} onUpdateCustomItem={onUpdateCustomItem} onUpdateDefaultItem={onUpdateDefaultItem} onToggleItem={onToggleItem} />
+        <EnvironmentSetPanel key={setId} customItemsBySection={customItemsBySection} itemLabelsBySection={itemLabelsBySection} removedDefaultItemsBySection={removedDefaultItemsBySection} setId={setId} selectedItems={selectedItems} onAddCustomItem={onAddCustomItem} onRemoveCustomItem={onRemoveCustomItem} onUpdateCustomItem={onUpdateCustomItem} onUpdateDefaultItem={onUpdateDefaultItem} onRemoveDefaultItem={onRemoveDefaultItem} onToggleItem={onToggleItem} />
       ))}
       <button className="addLineButton" type="button" onClick={onAddSet}>
         <Plus size={15} />
@@ -1473,22 +1615,26 @@ function EnvironmentTab({
 function EnvironmentSetPanel({
   customItemsBySection,
   itemLabelsBySection,
+  removedDefaultItemsBySection,
   setId,
   selectedItems,
   onAddCustomItem,
   onRemoveCustomItem,
   onUpdateCustomItem,
   onUpdateDefaultItem,
+  onRemoveDefaultItem,
   onToggleItem
 }: {
   customItemsBySection: Record<string, string[]>;
   itemLabelsBySection: Record<string, Record<string, string>>;
+  removedDefaultItemsBySection: Record<string, string[]>;
   setId: number;
   selectedItems: string[];
   onAddCustomItem: (sectionId: string, item: string) => void;
   onRemoveCustomItem: (sectionId: string, item: string) => void;
   onUpdateCustomItem: (sectionId: string, item: string, nextItem: string) => void;
   onUpdateDefaultItem: (sectionId: string, item: string, nextItem: string) => void;
+  onRemoveDefaultItem: (sectionId: string, item: string) => void;
   onToggleItem: (item: string, checked: boolean) => void;
 }) {
   const { t } = useUi();
@@ -1502,9 +1648,9 @@ function EnvironmentSetPanel({
           <Field label="Location" placeholder="Location" />
         </div>
       </section>
-      <ChecklistSection customItems={customItemsBySection.environmentMain ?? []} itemLabels={itemLabelsBySection.environmentMain ?? {}} title={`${t("sites.environmentChecklist")} #${setId}`} items={environmentMain} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("environmentMain", item)} onRemoveItem={(item) => onRemoveCustomItem("environmentMain", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("environmentMain", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("environmentMain", item, nextItem)} onToggleItem={onToggleItem} />
-      <ChecklistSection customItems={customItemsBySection.environmentPower ?? []} itemLabels={itemLabelsBySection.environmentPower ?? {}} title={`${t("sites.cablingPowerChecklist")} #${setId}`} items={environmentPower} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("environmentPower", item)} onRemoveItem={(item) => onRemoveCustomItem("environmentPower", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("environmentPower", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("environmentPower", item, nextItem)} onToggleItem={onToggleItem} />
-      <ChecklistSection customItems={customItemsBySection.environmentSecurity ?? []} itemLabels={itemLabelsBySection.environmentSecurity ?? {}} title={`SECURITY CHECKLIST #${setId}`} items={environmentSecurity} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("environmentSecurity", item)} onRemoveItem={(item) => onRemoveCustomItem("environmentSecurity", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("environmentSecurity", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("environmentSecurity", item, nextItem)} onToggleItem={onToggleItem} />
+      <ChecklistSection customItems={customItemsBySection.environmentMain ?? []} itemLabels={itemLabelsBySection.environmentMain ?? {}} removedDefaultItems={removedDefaultItemsBySection.environmentMain ?? []} title={`${t("sites.environmentChecklist")} #${setId}`} items={environmentMain} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("environmentMain", item)} onRemoveItem={(item) => onRemoveCustomItem("environmentMain", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("environmentMain", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("environmentMain", item, nextItem)} onRemoveDefaultItem={(item) => onRemoveDefaultItem("environmentMain", item)} onToggleItem={onToggleItem} />
+      <ChecklistSection customItems={customItemsBySection.environmentPower ?? []} itemLabels={itemLabelsBySection.environmentPower ?? {}} removedDefaultItems={removedDefaultItemsBySection.environmentPower ?? []} title={`${t("sites.cablingPowerChecklist")} #${setId}`} items={environmentPower} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("environmentPower", item)} onRemoveItem={(item) => onRemoveCustomItem("environmentPower", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("environmentPower", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("environmentPower", item, nextItem)} onRemoveDefaultItem={(item) => onRemoveDefaultItem("environmentPower", item)} onToggleItem={onToggleItem} />
+      <ChecklistSection customItems={customItemsBySection.environmentSecurity ?? []} itemLabels={itemLabelsBySection.environmentSecurity ?? {}} removedDefaultItems={removedDefaultItemsBySection.environmentSecurity ?? []} title={`SECURITY CHECKLIST #${setId}`} items={environmentSecurity} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("environmentSecurity", item)} onRemoveItem={(item) => onRemoveCustomItem("environmentSecurity", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("environmentSecurity", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("environmentSecurity", item, nextItem)} onRemoveDefaultItem={(item) => onRemoveDefaultItem("environmentSecurity", item)} onToggleItem={onToggleItem} />
     </>
   );
 }
@@ -1728,6 +1874,7 @@ function Field({
 function ChecklistSection({
   customItems = [],
   itemLabels = {},
+  removedDefaultItems = [],
   title,
   items,
   selectedItems,
@@ -1735,10 +1882,12 @@ function ChecklistSection({
   onRemoveItem,
   onUpdateItem,
   onUpdateDefaultItem,
+  onRemoveDefaultItem,
   onToggleItem
 }: {
   customItems?: string[];
   itemLabels?: Record<string, string>;
+  removedDefaultItems?: string[];
   title: string;
   items: string[];
   selectedItems?: string[];
@@ -1746,6 +1895,7 @@ function ChecklistSection({
   onRemoveItem?: (item: string) => void;
   onUpdateItem?: (item: string, nextItem: string) => void;
   onUpdateDefaultItem?: (item: string, nextItem: string) => void;
+  onRemoveDefaultItem?: (item: string) => void;
   onToggleItem?: (item: string, checked: boolean) => void;
 }) {
   const { lang, t } = useUi();
@@ -1753,8 +1903,11 @@ function ChecklistSection({
   const [newItem, setNewItem] = useState("");
   const [editingItem, setEditingItem] = useState("");
   const [editingValue, setEditingValue] = useState("");
-  const allDisplayItems = [...items.map((item) => itemLabels[item] ?? item), ...customItems];
+  const [confirmAction, setConfirmAction] = useState<"edit" | "delete" | null>(null);
+  const visibleItems = items.filter((item) => !removedDefaultItems.includes(item));
+  const allDisplayItems = [...visibleItems.map((item) => itemLabels[item] ?? item), ...customItems];
   const isDefaultEditingItem = items.includes(editingItem);
+  const editingItemLabel = editingItem ? (itemLabels[editingItem] ?? editingItem) : "";
   const addItem = () => {
     const trimmedItem = newItem.trim();
 
@@ -1799,18 +1952,55 @@ function ChecklistSection({
     }
 
     if (isDefaultEditingItem) {
-      setEditingItem("");
-      setEditingValue("");
+      onRemoveDefaultItem?.(editingItem);
+    } else {
+      onRemoveItem?.(editingItem);
+    }
+
+    setEditingItem("");
+    setEditingValue("");
+  };
+  const canSaveEdit = () => {
+    const trimmedItem = editingValue.trim();
+
+    return Boolean(
+      editingItem
+      && trimmedItem
+      && (trimmedItem === (itemLabels[editingItem] ?? editingItem) || !allDisplayItems.includes(trimmedItem))
+    );
+  };
+  const requestEditConfirm = () => {
+    if (!canSaveEdit()) {
       return;
     }
 
-    onRemoveItem?.(editingItem);
-    setEditingItem("");
-    setEditingValue("");
+    setConfirmAction("edit");
+  };
+  const requestDeleteConfirm = () => {
+    if (!editingItem) {
+      return;
+    }
+
+    setConfirmAction("delete");
+  };
+  const handleConfirmAction = () => {
+    if (confirmAction === "edit") {
+      confirmEdit();
+    } else if (confirmAction === "delete") {
+      deleteEditingItem();
+    }
+
+    setConfirmAction(null);
   };
 
   return (
     <section className="sectionCard">
+      <ChecklistItemConfirmPopup
+        action={confirmAction}
+        itemLabel={editingItemLabel}
+        onCancel={() => setConfirmAction(null)}
+        onConfirm={handleConfirmAction}
+      />
       <div className="checklistHeader">
         <h3>{localizeLabel(title, lang)}</h3>
         {onAddItem ? (
@@ -1837,7 +2027,7 @@ function ChecklistSection({
         </div>
       ) : null}
       <div className="checkList">
-        {items.map((item) => (
+        {visibleItems.map((item) => (
           <div className="checkItemWithAction" key={item}>
             {editingItem === item ? (
               <div className="checkItemEditRow">
@@ -1848,15 +2038,15 @@ function ChecklistSection({
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();
-                      confirmEdit();
+                      requestEditConfirm();
                     }
                   }}
                 />
-                <button className="iconButton confirmChecklistButton" type="button" onClick={confirmEdit} aria-label={`${t("sites.confirmChecklistItem")} ${itemLabels[item] ?? item}`}>
+                <button className="iconButton confirmChecklistButton" type="button" onClick={requestEditConfirm} aria-label={`${t("sites.confirmChecklistItem")} ${itemLabels[item] ?? item}`}>
                   <Check size={14} />
                 </button>
-                <button className="iconButton deleteChecklistButton" type="button" onClick={deleteEditingItem} aria-label={`${t("common.cancel")} ${itemLabels[item] ?? item}`}>
-                  <X size={14} />
+                <button className="iconButton deleteChecklistButton" type="button" onClick={requestDeleteConfirm} aria-label={`${t("sites.deleteChecklistItem")} ${itemLabels[item] ?? item}`}>
+                  <Trash2 size={14} />
                 </button>
               </div>
             ) : (
@@ -1886,15 +2076,15 @@ function ChecklistSection({
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();
-                      confirmEdit();
+                      requestEditConfirm();
                     }
                   }}
                 />
-                <button className="iconButton confirmChecklistButton" type="button" onClick={confirmEdit} aria-label={`${t("sites.confirmChecklistItem")} ${item}`}>
+                <button className="iconButton confirmChecklistButton" type="button" onClick={requestEditConfirm} aria-label={`${t("sites.confirmChecklistItem")} ${item}`}>
                   <Check size={14} />
                 </button>
-                <button className="iconButton deleteChecklistButton" type="button" onClick={deleteEditingItem} aria-label={`${t("sites.deleteChecklistItem")} ${item}`}>
-                  <X size={14} />
+                <button className="iconButton deleteChecklistButton" type="button" onClick={requestDeleteConfirm} aria-label={`${t("sites.deleteChecklistItem")} ${item}`}>
+                  <Trash2 size={14} />
                 </button>
               </div>
             ) : (

@@ -23,6 +23,7 @@ import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { useUi } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
 import {
+  formatVisitTime,
   getContractCount,
   getUniquePmJobs,
   getWorkSiteByJobId,
@@ -79,8 +80,8 @@ export default function HistoryPage() {
     [data.owners, reportRows, userName]
   );
   const activeSite = activeReport
-    ? data.sites.find((site) => site.id === activeReport.siteId && site.visitDate === toInputDate(activeReport.date))
-      ?? getWorkSiteByJobId(data.sites, activeReport.jobId)
+    ? getWorkSiteByJobId(data.sites, activeReport.jobId)
+      ?? data.sites.find((site) => site.id === activeReport.siteId && site.visitDate === toInputDate(activeReport.date))
     : null;
 
   const filteredRows = reportRows.filter((row) => {
@@ -220,6 +221,22 @@ function HistoryDetailView({
   const contractStartDate = selectedContract.contractStartDate ?? "";
   const contractEndDate = selectedContract.contractEndDate ?? "";
   const finishDate = report.workDetails?.savedAt ? report.workDetails.savedAt.slice(0, 10) : toInputDate(report.date);
+  const activeJob = pmJobs.find((job) => job.id === report.jobId);
+  const displayStartTime = formatVisitTime(
+    report.workDetails?.startTime
+    ?? report.startTime
+    ?? activeJob?.workDetails?.startTime
+    ?? activeJob?.startTime
+    ?? site.startTime
+    ?? site.visitTime
+  );
+  const displayEndTime = formatVisitTime(
+    report.workDetails?.endTime
+    ?? report.endTime
+    ?? activeJob?.workDetails?.endTime
+    ?? activeJob?.endTime
+    ?? site.endTime
+  );
 
   return (
     <div className="detailPage">
@@ -274,11 +291,11 @@ function HistoryDetailView({
           </label>
           <div className="label">
             {t("fields.startTime")}
-            <TimePicker readOnly value={site.startTime ?? site.visitTime ?? ""} />
+            <TimePicker readOnly value={displayStartTime} />
           </div>
           <div className="label">
             {t("fields.endTime")}
-            <TimePicker readOnly value={site.endTime ?? ""} />
+            <TimePicker readOnly value={displayEndTime} />
           </div>
           <label className="label">
             {t("common.inspector")}

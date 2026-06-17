@@ -585,6 +585,14 @@ function hasSavedWorkDetails(details?: PmWorkDetails | null) {
   );
 }
 
+function readReportStartTime(job: PmJobRecord) {
+  return formatVisitTime(job.workDetails?.startTime ?? job.startTime ?? job.visitTime);
+}
+
+function readReportEndTime(job: PmJobRecord) {
+  return formatVisitTime(job.workDetails?.endTime ?? job.endTime ?? "");
+}
+
 function buildReportRows(pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecord[]) {
   const siteById = new Map(siteCatalog.map((site) => [site.id, site]));
   const reportRows = new Map<string, ReportRow>();
@@ -612,8 +620,8 @@ function buildReportRows(pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecord[]
           date: formatReportDate(job.visitDate),
           inspector: job.owner,
           province: site.province,
-          startTime: job.startTime ?? job.visitTime,
-          endTime: job.endTime ?? "",
+          startTime: readReportStartTime(job),
+          endTime: readReportEndTime(job),
           workDetails: job.workDetails,
           result
         });
@@ -628,12 +636,13 @@ function buildReportRows(pmJobs: PmJobRecord[], siteCatalog: SiteCatalogRecord[]
         currentRow.result = result;
       }
 
-      currentRow.startTime = currentRow.startTime || job.startTime || job.visitTime;
-      currentRow.endTime = currentRow.endTime || job.endTime || "";
-
-      if (hasSavedWorkDetails(job.workDetails) && !hasSavedWorkDetails(currentRow.workDetails)) {
+      if (hasSavedWorkDetails(job.workDetails)) {
+        currentRow.startTime = readReportStartTime(job);
+        currentRow.endTime = readReportEndTime(job);
         currentRow.workDetails = job.workDetails;
       } else {
+        currentRow.startTime = currentRow.startTime || readReportStartTime(job);
+        currentRow.endTime = currentRow.endTime || readReportEndTime(job);
         currentRow.workDetails = currentRow.workDetails ?? job.workDetails;
       }
     });

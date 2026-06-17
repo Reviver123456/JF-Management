@@ -1819,9 +1819,11 @@ function buildConfiguredChecklistGroups(config: PmChecklistConfig, lang: Lang): 
 function getSelectedItems(config: PmChecklistConfig, key: PmChecklistKey, sectionId: string, items: string[], includeLegacyCustomItems = false) {
   const selectedItems = config.selectedItems[key];
   const itemLabels = config.itemLabelsBySection[key]?.[sectionId] ?? {};
+  const removedDefaultItems = config.removedDefaultItemsBySection[key]?.[sectionId] ?? [];
+  const activeDefaultItems = items.filter((item) => !removedDefaultItems.includes(item));
   const configuredItems = (selectedItems
-    ? items.filter((item) => selectedItems.includes(item) || selectedItems.includes(itemLabels[item] ?? item))
-    : items
+    ? activeDefaultItems.filter((item) => selectedItems.includes(item) || selectedItems.includes(itemLabels[item] ?? item))
+    : activeDefaultItems
   ).map((item) => itemLabels[item] ?? item);
   const sectionCustomItems = config.customItemsBySection[key]?.[sectionId] ?? [];
   const customItems = selectedItems ? sectionCustomItems.filter((item) => selectedItems.includes(item)) : sectionCustomItems;
