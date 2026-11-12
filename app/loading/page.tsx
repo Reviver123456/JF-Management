@@ -6,10 +6,11 @@ import { AppLoadingScreen } from "@/components/AppLoadingScreen";
 import { clearAppBrowserCache, isBrowserStorageQuotaError } from "@/lib/auth/clear-app-cache";
 import { bootstrapAppData } from "@/lib/bootstrap-app-data";
 import { useUi } from "@/lib/i18n";
+import { getSupabaseConfigMessage, hasSupabaseConfig } from "@/lib/supabase/env";
 
 export default function LoadingPage() {
   const router = useRouter();
-  const { t } = useUi();
+  const { lang, t } = useUi();
   const [progress, setProgress] = useState(4);
   const [error, setError] = useState("");
   const startedRef = useRef(false);
@@ -22,8 +23,14 @@ export default function LoadingPage() {
     const startedAt = Date.now();
 
     try {
+      if (!hasSupabaseConfig()) {
+        setError(getSupabaseConfigMessage(lang));
+        setProgress(0);
+        return;
+      }
+
       if (options?.clearStorage) {
-        await clearAppBrowserCache({ includeLocalStorage: true });
+        await clearAppBrowserCache({ includeLocalStorage: true, preserveAuth: true });
         clearedStorageRef.current = true;
       }
 
@@ -43,15 +50,20 @@ export default function LoadingPage() {
 
       if (isBrowserStorageQuotaError(bootstrapError) && !clearedStorageRef.current) {
         clearedStorageRef.current = true;
-        await clearAppBrowserCache({ includeLocalStorage: true });
+        await clearAppBrowserCache({ includeLocalStorage: true, preserveAuth: true });
         await runBootstrap();
+        return;
+      }
+
+      if (/auth session missing/i.test(message)) {
+        router.replace("/login");
         return;
       }
 
       setError(message);
       setProgress(0);
     }
-  }, [router, t]);
+  }, [lang, router, t]);
 
   useEffect(() => {
     if (startedRef.current) {
@@ -61,8 +73,7 @@ export default function LoadingPage() {
     startedRef.current = true;
 
     void (async () => {
-      await clearAppBrowserCache({ includeLocalStorage: true });
-      clearedStorageRef.current = true;
+      await clearAppBrowserCache({ includeLocalStorage: "heavy", preserveAuth: true });
       await runBootstrap();
     })();
   }, [runBootstrap]);

@@ -10,6 +10,7 @@ import { readRememberedLogin, writeRememberedLogin } from "@/lib/auth/remember-l
 import { useUi } from "@/lib/i18n";
 import { usePageEnterProps } from "@/components/PageEnterTransition";
 import { createClient } from "@/lib/supabase/client";
+import { getSupabaseConfigMessage, hasSupabaseConfig } from "@/lib/supabase/env";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,8 +23,16 @@ export default function LoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rememberPassword, setRememberPassword] = useState(false);
   const pageEnterProps = usePageEnterProps("loginPage", "login");
+  const supabaseReady = hasSupabaseConfig();
+  const configErrorMessage = getSupabaseConfigMessage(lang);
 
   useEffect(() => {
+    if (!supabaseReady) {
+      setMessageTone("error");
+      setMessage(configErrorMessage);
+      return;
+    }
+
     let isCurrent = true;
 
     async function prepareLoginPage() {
@@ -46,9 +55,15 @@ export default function LoginPage() {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [configErrorMessage, supabaseReady]);
 
   const signIn = async () => {
+    if (!supabaseReady) {
+      setMessageTone("error");
+      setMessage(configErrorMessage);
+      return;
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!normalizedEmail || password.length < 8) {
@@ -100,6 +115,12 @@ export default function LoginPage() {
     router.refresh();
   };
   const sendPasswordReset = async () => {
+    if (!supabaseReady) {
+      setMessageTone("error");
+      setMessage(configErrorMessage);
+      return;
+    }
+
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!normalizedEmail) {
@@ -204,7 +225,7 @@ export default function LoginPage() {
               </label>
             </>
           )}
-          <button className="button primary" type="submit" disabled={isSubmitting}>
+          <button className="button primary" type="submit" disabled={isSubmitting || !supabaseReady}>
             {resetMode ? "ส่งลิงก์รหัสผ่าน" : t("login.signIn")}
           </button>
           {!resetMode && messageTone === "error" && message ? (

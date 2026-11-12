@@ -39,14 +39,29 @@ export function clearHeavyLocalStorage() {
   }
 }
 
-export function clearLocalStoragePreservingPreferences() {
+function shouldPreserveLocalStorageKey(key: string, preserveAuth: boolean) {
+  if (preservedLocalStorageKeys.has(key)) {
+    return true;
+  }
+
+  return preserveAuth && key.startsWith("sb-");
+}
+
+export function clearLocalStoragePreservingPreferences(options?: { preserveAuth?: boolean }) {
   if (typeof window === "undefined") {
     return;
   }
 
+  const preserveAuth = options?.preserveAuth ?? false;
   const preserved = new Map<string, string>();
 
-  for (const key of preservedLocalStorageKeys) {
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+
+    if (!key || !shouldPreserveLocalStorageKey(key, preserveAuth)) {
+      continue;
+    }
+
     const value = window.localStorage.getItem(key);
 
     if (value !== null) {
@@ -110,16 +125,21 @@ export function clearSessionStorage() {
 
 export type ClearAppBrowserCacheOptions = {
   includeLocalStorage?: boolean | "heavy";
+  /** Keep Supabase auth cookies and `sb-*` localStorage entries (use while bootstrapping). */
+  preserveAuth?: boolean;
 };
 
 export async function clearAppBrowserCache(options?: ClearAppBrowserCacheOptions) {
-  clearSupabaseAuthCookies();
+  if (!options?.preserveAuth) {
+    clearSupabaseAuthCookies();
+  }
+
   clearSessionStorage();
 
   if (options?.includeLocalStorage === "heavy") {
     clearHeavyLocalStorage();
   } else if (options?.includeLocalStorage) {
-    clearLocalStoragePreservingPreferences();
+    clearLocalStoragePreservingPreferences({ preserveAuth: options.preserveAuth });
   }
 
   await clearBrowserCaches();
