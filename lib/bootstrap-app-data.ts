@@ -1,6 +1,7 @@
 import { cachePmData, cacheUserProfile, markBootstrapComplete } from "@/lib/app-bootstrap-cache";
 import { ensureClientSession } from "@/lib/auth/ensure-client-session";
-import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
+import { clearHeavyLocalStorage, isBrowserStorageQuotaError } from "@/lib/auth/clear-app-cache";
+import { readUserSignatureLocal, writeUserSignatureLocal } from "@/lib/auth/signature-local-storage";
 import type { PmAppData } from "@/lib/pm-data";
 import { createClient } from "@/lib/supabase/client";
 
@@ -16,11 +17,24 @@ function resolveUserName(metadata: Record<string, unknown>, email: string) {
 
 export async function bootstrapAppData(onProgress?: (value: number) => void) {
   onProgress?.(10);
+  clearHeavyLocalStorage();
 
   const supabase = createClient();
 
   onProgress?.(18);
-  const user = await ensureClientSession(supabase);
+
+  let user;
+
+  try {
+    user = await ensureClientSession(supabase);
+  } catch (error) {
+    if (isBrowserStorageQuotaError(error)) {
+      clearHeavyLocalStorage();
+      user = await ensureClientSession(supabase, 4);
+    } else {
+      throw error;
+    }
+  }
 
   onProgress?.(32);
 
@@ -41,7 +55,7 @@ export async function bootstrapAppData(onProgress?: (value: number) => void) {
     throw new Error("Cannot verify signed-in user.");
   }
   const metadata = user.user_metadata ?? {};
-  const localSignature = window.localStorage.getItem(getUserSignatureStorageKey(userEmail)) ?? "";
+  const localSignature = readUserSignatureLocal(userEmail);
   let signature = localSignature;
 
   try {
@@ -50,7 +64,7 @@ export async function bootstrapAppData(onProgress?: (value: number) => void) {
 
     if (signatureResponse.ok && signaturePayload.signature) {
       signature = signaturePayload.signature;
-      window.localStorage.setItem(getUserSignatureStorageKey(userEmail), signature);
+      writeUserSignatureLocal(userEmail, signature);
     }
   } catch {
     // Keep local signature fallback when profile API is unavailable.

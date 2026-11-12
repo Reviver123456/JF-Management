@@ -1,3 +1,4 @@
+import { safeSessionSetItem } from "@/lib/browser-storage";
 import type { PmAppData } from "@/lib/pm-data";
 
 const PM_DATA_CACHE_KEY = "jf-pm-data-cache";
@@ -10,12 +11,15 @@ export type CachedUserProfile = {
   userName: string;
 };
 
+let memoryPmData: PmAppData | null = null;
+let memoryUserProfile: CachedUserProfile | null = null;
+
 export function markBootstrapComplete() {
   if (typeof window === "undefined") {
     return;
   }
 
-  window.sessionStorage.setItem(BOOTSTRAP_FLAG_KEY, "1");
+  safeSessionSetItem(BOOTSTRAP_FLAG_KEY, "1", 32);
 }
 
 export function consumeBootstrapComplete() {
@@ -33,42 +37,63 @@ export function consumeBootstrapComplete() {
 }
 
 export function cachePmData(data: PmAppData) {
+  memoryPmData = data;
+
   if (typeof window === "undefined") {
     return;
   }
 
-  window.sessionStorage.setItem(PM_DATA_CACHE_KEY, JSON.stringify(data));
+  safeSessionSetItem(PM_DATA_CACHE_KEY, JSON.stringify(data));
 }
 
 export function readCachedPmData(): PmAppData | null {
+  if (memoryPmData) {
+    return memoryPmData;
+  }
+
   if (typeof window === "undefined") {
     return null;
   }
 
   try {
     const raw = window.sessionStorage.getItem(PM_DATA_CACHE_KEY);
-    return raw ? JSON.parse(raw) as PmAppData : null;
+    const parsed = raw ? JSON.parse(raw) as PmAppData : null;
+    memoryPmData = parsed;
+    return parsed;
   } catch {
     return null;
   }
 }
 
 export function cacheUserProfile(profile: CachedUserProfile) {
+  memoryUserProfile = profile;
+
   if (typeof window === "undefined") {
     return;
   }
 
-  window.sessionStorage.setItem(USER_CACHE_KEY, JSON.stringify(profile));
+  const sessionProfile: CachedUserProfile = {
+    ...profile,
+    signature: profile.signature.length > 8_000 ? "" : profile.signature
+  };
+
+  safeSessionSetItem(USER_CACHE_KEY, JSON.stringify(sessionProfile), 64_000);
 }
 
 export function readCachedUserProfile(): CachedUserProfile | null {
+  if (memoryUserProfile) {
+    return memoryUserProfile;
+  }
+
   if (typeof window === "undefined") {
     return null;
   }
 
   try {
     const raw = window.sessionStorage.getItem(USER_CACHE_KEY);
-    return raw ? JSON.parse(raw) as CachedUserProfile : null;
+    const parsed = raw ? JSON.parse(raw) as CachedUserProfile : null;
+    memoryUserProfile = parsed;
+    return parsed;
   } catch {
     return null;
   }

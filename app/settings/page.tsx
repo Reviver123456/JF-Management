@@ -7,6 +7,7 @@ import { FeedbackPopups } from "@/components/AppPopup";
 import { PwaInstallGuidePage } from "@/components/PwaInstallGuideModal";
 import { PwaInstallSection } from "@/components/PwaInstallSection";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
+import { readUserSignatureLocal, writeUserSignatureLocal } from "@/lib/auth/signature-local-storage";
 import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
@@ -290,7 +291,7 @@ function SignatureEditorPage({ email, onClose }: { email: string; onClose: () =>
       context.lineCap = "round";
       context.lineJoin = "round";
 
-      const savedSignature = window.localStorage.getItem(getUserSignatureStorageKey(email));
+      const savedSignature = readUserSignatureLocal(email);
       let signature = savedSignature ?? "";
 
       try {
@@ -340,7 +341,7 @@ function SignatureEditorPage({ email, onClose }: { email: string; onClose: () =>
       return;
     }
 
-    window.localStorage.setItem(getUserSignatureStorageKey(email), signature);
+    writeUserSignatureLocal(email, signature);
     setSignatureRevision((current) => current + 1);
   };
 

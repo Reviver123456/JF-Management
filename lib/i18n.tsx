@@ -159,6 +159,7 @@ const dictionaries: Record<Lang, Dictionary> = {
     bootstrap: {
       loading: "กำลังเตรียมข้อมูลระบบ",
       error: "ไม่สามารถโหลดข้อมูลได้ กรุณาลองใหม่",
+      quota: "พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม ระบบกำลังล้าง cache อัตโนมัติ — กดลองใหม่ถ้ายังไม่เข้าได้",
       retry: "ลองใหม่"
     },
     pagination: {
@@ -557,6 +558,7 @@ const dictionaries: Record<Lang, Dictionary> = {
     bootstrap: {
       loading: "Preparing your workspace",
       error: "Unable to load data. Please try again.",
+      quota: "Browser storage is full. Cache was cleared automatically — tap Retry if you still cannot continue.",
       retry: "Retry"
     },
     pagination: {

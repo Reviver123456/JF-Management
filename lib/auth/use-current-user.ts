@@ -2,7 +2,7 @@
 
 import { useEffect, useLayoutEffect, useState } from "react";
 import { cacheUserProfile, readCachedUserProfile } from "@/lib/app-bootstrap-cache";
-import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
+import { readUserSignatureLocal, writeUserSignatureLocal } from "@/lib/auth/signature-local-storage";
 import { createClient } from "@/lib/supabase/client";
 
 type CurrentUserState = {
@@ -96,13 +96,11 @@ export function useCurrentUser(): CurrentUserState {
           ? metadata.full_name.trim()
           : user?.email ?? "";
         const userEmail = user?.email ?? "";
-        const localSignature = userEmail
-          ? window.localStorage.getItem(getUserSignatureStorageKey(userEmail)) ?? ""
-          : "";
+        const localSignature = userEmail ? readUserSignatureLocal(userEmail) : "";
         const signature = user ? await loadSignatureFromDb(localSignature) : "";
 
         if (userEmail && signature && signature !== localSignature) {
-          window.localStorage.setItem(getUserSignatureStorageKey(userEmail), signature);
+          writeUserSignatureLocal(userEmail, signature);
         }
 
         if (isCurrent) {

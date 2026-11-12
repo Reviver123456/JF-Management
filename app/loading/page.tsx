@@ -48,10 +48,16 @@ export default function LoadingPage() {
     } catch (bootstrapError) {
       const message = bootstrapError instanceof Error ? bootstrapError.message : t("bootstrap.error");
 
-      if (isBrowserStorageQuotaError(bootstrapError) && !clearedStorageRef.current) {
-        clearedStorageRef.current = true;
-        await clearAppBrowserCache({ includeLocalStorage: true, preserveAuth: true });
-        await runBootstrap();
+      if (isBrowserStorageQuotaError(bootstrapError)) {
+        if (!clearedStorageRef.current) {
+          clearedStorageRef.current = true;
+          await clearAppBrowserCache({ includeLocalStorage: true, preserveAuth: true });
+          await runBootstrap();
+          return;
+        }
+
+        setError(t("bootstrap.quota"));
+        setProgress(0);
         return;
       }
 
