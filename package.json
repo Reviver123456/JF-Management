@@ -14,10 +14,13 @@
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.107.0",
     "lucide-react": "latest",
-    "next": "latest",
+    "next": "^16.4.6",
     "react": "latest",
     "react-dom": "latest",
     "ws": "^8.21.0"
+  },
+  "overrides": {
+    "minimatch": "^11.0.2"
   },
   "devDependencies": {
     "@types/node": "latest",
@@ -25,7 +28,7 @@
     "@types/react-dom": "latest",
     "@types/ws": "^8.18.1",
     "eslint": "latest",
-    "eslint-config-next": "latest",
+    "eslint-config-next": "^16.4.6",
     "typescript": "latest"
   }
 }
