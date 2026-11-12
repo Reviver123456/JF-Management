@@ -24,7 +24,7 @@ import { PageLoadingRing } from "@/components/PageLoadingRing";
 import { useUi } from "@/lib/i18n";
 import { clearAppBrowserCache } from "@/lib/auth/clear-app-cache";
 import { PageEnterTransition } from "@/components/PageEnterTransition";
-import { createClient } from "@/lib/supabase/client";
+import { signOutSession } from "@/lib/auth/client-session";
 
 const navItems = [
   { href: "/dashboard", labelKey: "nav.dashboard", mobileKey: "navMobile.dashboard", icon: LayoutDashboard },
@@ -51,8 +51,7 @@ export function AppShell({
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
   const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOutSession();
     await clearAppBrowserCache();
     router.replace("/login");
     router.refresh();

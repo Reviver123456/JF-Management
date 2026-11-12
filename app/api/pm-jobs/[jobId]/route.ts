@@ -1,12 +1,17 @@
 import { NextResponse } from "next/server";
-import { getNextPmOrderNos, getPmOrderNoFromWorkDetails, normalizePmOrderNo } from "@/lib/pm-order-no";
+import { getNextJobOrderNos } from "@/lib/db/pm-job-order-nos";
+import {
+  deletePmJobGroup,
+  deletePmJobGroupCount,
+  findPmJobById,
+  findSiteById,
+  insertPmJobs,
+  listPmJobsInMonth,
+  updatePmJobGroup
+} from "@/lib/db/pm-jobs";
+import type { Json, PmJobInsert, WorkStatus } from "@/lib/db/types";
+import { getPmOrderNoFromWorkDetails } from "@/lib/pm-order-no";
 import { normalizeOwnerName } from "@/lib/pm-data";
-import { createAdminClient } from "@/lib/supabase/admin";
-import type { Database, Json } from "@/lib/supabase/database.types";
-
-type WorkStatus = Database["public"]["Enums"]["work_status"];
-type PmJobInsert = Database["public"]["Tables"]["pm_jobs"]["Insert"];
-type PmJobUpdate = Database["public"]["Tables"]["pm_jobs"]["Update"];
 
 type UpdatePmJobBody = {
   details?: unknown;
@@ -121,28 +126,11 @@ function getDateRangeValues(startValue: string, endValue: string) {
   return values;
 }
 
-async function getNextJobOrderNos(supabase: ReturnType<typeof createAdminClient>, count: number) {
-  const { data, error } = await supabase
-    .from("pm_jobs")
-    .select("id, work_details");
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const existingOrderNos = (data ?? []).flatMap((job) => [
-    normalizePmOrderNo(job.id),
-    getPmOrderNoFromWorkDetails(job.work_details)
-  ]);
-
-  return getNextPmOrderNos(existingOrderNos, count);
-}
-
 function assignPmOrderNos({
+  generatedOrderNos,
   oldOrderNo,
   oldVisitDate,
-  visitDates,
-  generatedOrderNos
+  visitDates
 }: {
   generatedOrderNos: string[];
   oldOrderNo: string;
@@ -197,47 +185,21 @@ export async function PATCH(
         return NextResponse.json({ message: "Invalid date range." }, { status: 400 });
       }
 
-      const supabase = createAdminClient();
-      const { data: oldJob, error: oldJobError } = await supabase
-        .from("pm_jobs")
-        .select("site_id, visit_date, visit_time, pm_cycle, work_details")
-        .eq("id", jobId)
-        .maybeSingle();
-
-      if (oldJobError) {
-        throw new Error(oldJobError.message);
-      }
+      const oldJob = await findPmJobById(jobId);
 
       if (!oldJob) {
         return NextResponse.json({ message: "PM job not found." }, { status: 404 });
       }
 
-      const { data: site, error: siteError } = await supabase
-        .from("sites")
-        .select("id, owner")
-        .eq("id", siteId)
-        .maybeSingle();
-
-      if (siteError) {
-        throw new Error(siteError.message);
-      }
+      const site = await findSiteById(siteId);
 
       if (!site) {
         return NextResponse.json({ message: "Site not found." }, { status: 404 });
       }
 
-      const { data: existingJobs, error: existingJobError } = await supabase
-        .from("pm_jobs")
-        .select("id, site_id, visit_date, visit_time")
-        .eq("site_id", site.id)
-        .gte("visit_date", monthRange.start)
-        .lt("visit_date", monthRange.end);
+      const existingJobs = await listPmJobsInMonth(site.id, monthRange.start, monthRange.end);
 
-      if (existingJobError) {
-        throw new Error(existingJobError.message);
-      }
-
-      const hasConflict = (existingJobs ?? []).some((job) => (
+      const hasConflict = existingJobs.some((job) => (
         job.site_id !== oldJob.site_id || job.visit_date !== oldJob.visit_date || job.visit_time !== oldJob.visit_time
       ));
 
@@ -251,21 +213,12 @@ export async function PATCH(
         return NextResponse.json({ message: "Please assign a site owner or follower." }, { status: 400 });
       }
 
-      const { error: deleteError } = await supabase
-        .from("pm_jobs")
-        .delete()
-        .eq("site_id", oldJob.site_id)
-        .eq("visit_date", oldJob.visit_date)
-        .eq("visit_time", oldJob.visit_time);
-
-      if (deleteError) {
-        throw new Error(deleteError.message);
-      }
+      await deletePmJobGroup(oldJob.site_id, oldJob.visit_date, oldJob.visit_time);
 
       const pmCycle = readRequiredString(body.pmCycle) || oldJob.pm_cycle || "semi annual";
       const oldOrderNo = getPmOrderNoFromWorkDetails(oldJob.work_details);
       const generatedOrderCount = visitDates.length - (oldOrderNo && visitDates[0] === oldJob.visit_date ? 1 : 0);
-      const generatedOrderNos = await getNextJobOrderNos(supabase, generatedOrderCount);
+      const generatedOrderNos = await getNextJobOrderNos(generatedOrderCount);
       const pmOrderNos = assignPmOrderNos({
         generatedOrderNos,
         oldOrderNo,
@@ -283,11 +236,7 @@ export async function PATCH(
         work_details: buildWorkDetails(pmOrderNos[dateIndex], oldJob.work_details)
       })));
 
-      const { error: insertError } = await supabase.from("pm_jobs").insert(rows);
-
-      if (insertError) {
-        throw new Error(insertError.message);
-      }
+      await insertPmJobs(rows);
 
       return NextResponse.json({ ok: true, jobsCount: rows.length });
     }
@@ -298,44 +247,21 @@ export async function PATCH(
       return NextResponse.json({ message: "Invalid PM job status." }, { status: 400 });
     }
 
-    const supabase = createAdminClient();
-    const { data: job, error: jobError } = await supabase
-      .from("pm_jobs")
-      .select("site_id, visit_date, visit_time")
-      .eq("id", jobId)
-      .maybeSingle();
-
-    if (jobError) {
-      throw new Error(jobError.message);
-    }
+    const job = await findPmJobById(jobId);
 
     if (!job) {
       return NextResponse.json({ message: "PM job not found." }, { status: 404 });
     }
 
     const result = typeof body.result === "string" && body.result.trim() ? body.result.trim() : null;
-    const updatePayload: PmJobUpdate = {
+
+    await updatePmJobGroup(job.site_id, job.visit_date, job.visit_time, {
       status,
       start_time: readOptionalTime(body.startTime),
       end_time: readOptionalTime(body.endTime),
       result,
       work_details: readDetails(body.details)
-    };
-
-    const { error } = await supabase
-      .from("pm_jobs")
-      .update(updatePayload)
-      .eq("site_id", job.site_id)
-      .eq("visit_date", job.visit_date)
-      .eq("visit_time", job.visit_time);
-
-    if (error) {
-      if (error.message.includes("work_details")) {
-        throw new Error("Missing pm_jobs.work_details column. Run: alter table public.pm_jobs add column if not exists work_details jsonb not null default '{}'::jsonb;");
-      }
-
-      throw new Error(error.message);
-    }
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -355,33 +281,15 @@ export async function DELETE(
   const { jobId } = await params;
 
   try {
-    const supabase = createAdminClient();
-    const { data: job, error: jobError } = await supabase
-      .from("pm_jobs")
-      .select("site_id, visit_date, visit_time")
-      .eq("id", jobId)
-      .maybeSingle();
-
-    if (jobError) {
-      throw new Error(jobError.message);
-    }
+    const job = await findPmJobById(jobId);
 
     if (!job) {
       return NextResponse.json({ message: "PM job not found." }, { status: 404 });
     }
 
-    const { count, error } = await supabase
-      .from("pm_jobs")
-      .delete({ count: "exact" })
-      .eq("site_id", job.site_id)
-      .eq("visit_date", job.visit_date)
-      .eq("visit_time", job.visit_time);
+    const jobsCount = await deletePmJobGroupCount(job.site_id, job.visit_date, job.visit_time);
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    return NextResponse.json({ ok: true, jobsCount: count ?? 0 });
+    return NextResponse.json({ ok: true, jobsCount });
   } catch (error) {
     return NextResponse.json(
       {

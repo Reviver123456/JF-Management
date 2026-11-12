@@ -1,19 +1,24 @@
 import { NextResponse } from "next/server";
-import { hasSupabaseConfig } from "@/lib/supabase/env";
-import { getPmAppDataFromDb } from "@/lib/supabase/pm-queries";
+import { hasDatabaseConfig } from "@/lib/db/env";
+import { getPmAppDataFromDb } from "@/lib/db/pm-queries";
 
 export async function GET() {
-  if (!hasSupabaseConfig()) {
+  if (!hasDatabaseConfig()) {
     return NextResponse.json(
       {
-        message: "Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY."
+        message: "Missing DATABASE_URL."
       },
-      { status: 500 }
+      { status: 503 }
     );
   }
 
   try {
-    return NextResponse.json(await getPmAppDataFromDb());
+    const data = await getPmAppDataFromDb();
+    return NextResponse.json(data, {
+      headers: {
+        "Cache-Control": "private, max-age=30, stale-while-revalidate=120"
+      }
+    });
   } catch (error) {
     return NextResponse.json(
       {

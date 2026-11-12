@@ -17,20 +17,10 @@ export default function LoadingPage() {
     setError("");
     setProgress(4);
 
-    const startedAt = Date.now();
-
     try {
       await bootstrapAppData((value) => setProgress(value));
 
-      const elapsed = Date.now() - startedAt;
-      const waitMs = Math.max(0, 900 - elapsed);
-
-      if (waitMs > 0) {
-        await new Promise((resolve) => window.setTimeout(resolve, waitMs));
-      }
-
       router.replace("/dashboard");
-      router.refresh();
     } catch (bootstrapError) {
       setError(bootstrapError instanceof Error ? bootstrapError.message : t("bootstrap.error"));
       setProgress(0);

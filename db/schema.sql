@@ -1,5 +1,16 @@
 create type public.work_status as enum ('completed', 'inProgress', 'pending', 'abnormal');
 
+create table public.app_users (
+  id uuid primary key default gen_random_uuid(),
+  email text not null unique,
+  password_hash text not null,
+  full_name text not null default '',
+  phone text not null default '',
+  must_change_password boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table public.sites (
   id text primary key,
   site text not null,
@@ -38,6 +49,12 @@ create index pm_jobs_site_id_idx on public.pm_jobs(site_id);
 create index pm_jobs_visit_date_idx on public.pm_jobs(visit_date);
 create index pm_jobs_status_idx on public.pm_jobs(status);
 
+create table public.user_profiles (
+  user_id uuid primary key references public.app_users(id) on delete cascade,
+  signature text not null default '',
+  updated_at timestamptz not null default now()
+);
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -47,6 +64,11 @@ begin
   return new;
 end;
 $$;
+
+create trigger app_users_set_updated_at
+before update on public.app_users
+for each row
+execute function public.set_updated_at();
 
 create trigger sites_set_updated_at
 before update on public.sites
@@ -58,63 +80,7 @@ before update on public.pm_jobs
 for each row
 execute function public.set_updated_at();
 
-alter table public.sites enable row level security;
-alter table public.pm_jobs enable row level security;
-
-create policy "Allow authenticated read sites"
-on public.sites
-for select
-to authenticated
-using (true);
-
-create policy "Allow authenticated read pm jobs"
-on public.pm_jobs
-for select
-to authenticated
-using (true);
-
-create policy "Allow authenticated writes sites"
-on public.sites
-for all
-to authenticated
-using (true)
-with check (true);
-
-create policy "Allow authenticated writes pm jobs"
-on public.pm_jobs
-for all
-to authenticated
-using (true)
-with check (true);
-
-create table if not exists public.user_profiles (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  signature text not null default '',
-  updated_at timestamptz not null default now()
-);
-
 create trigger user_profiles_set_updated_at
 before update on public.user_profiles
 for each row
 execute function public.set_updated_at();
-
-alter table public.user_profiles enable row level security;
-
-create policy "Users can read own profile"
-on public.user_profiles
-for select
-to authenticated
-using (auth.uid() = user_id);
-
-create policy "Users can insert own profile"
-on public.user_profiles
-for insert
-to authenticated
-with check (auth.uid() = user_id);
-
-create policy "Users can update own profile"
-on public.user_profiles
-for update
-to authenticated
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);

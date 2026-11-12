@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getUserSignature, saveUserSignature } from "@/lib/supabase/user-profile";
-import { createClient } from "@/lib/supabase/server";
+import { getSessionFromCookies } from "@/lib/auth/session";
+import { getUserSignature, saveUserSignature } from "@/lib/db/user-profile";
 
 type SignaturePayload = {
   signature?: string;
@@ -8,17 +8,13 @@ type SignaturePayload = {
 
 export async function GET() {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error
-    } = await supabase.auth.getUser();
+    const session = await getSessionFromCookies();
 
-    if (error || !user) {
+    if (!session) {
       return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
     }
 
-    const signature = await getUserSignature(user.id);
+    const signature = await getUserSignature(session.id);
     return NextResponse.json({ ok: true, signature });
   } catch (error) {
     return NextResponse.json(
@@ -33,13 +29,9 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error
-    } = await supabase.auth.getUser();
+    const session = await getSessionFromCookies();
 
-    if (error || !user) {
+    if (!session) {
       return NextResponse.json({ ok: false, message: "Unauthorized." }, { status: 401 });
     }
 
@@ -49,7 +41,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ ok: false, message: "Invalid signature payload." }, { status: 400 });
     }
 
-    await saveUserSignature(user.id, signature);
+    await saveUserSignature(session.id, signature);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(

@@ -2,8 +2,8 @@
 
 import { useEffect, useLayoutEffect, useState } from "react";
 import { cacheUserProfile, readCachedUserProfile } from "@/lib/app-bootstrap-cache";
+import { fetchClientSession } from "@/lib/auth/client-session";
 import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
-import { createClient } from "@/lib/supabase/client";
 
 type CurrentUserState = {
   email: string;
@@ -31,21 +31,21 @@ async function loadSignatureFromDb(localFallback: string) {
 
   const dbSignature = payload.signature ?? "";
 
-    if (!dbSignature && localFallback) {
-      const migrateResponse = await fetch("/api/auth/signature", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ signature: localFallback })
-      });
+  if (!dbSignature && localFallback) {
+    const migrateResponse = await fetch("/api/auth/signature", {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ signature: localFallback })
+    });
 
-      if (migrateResponse.ok) {
-        return localFallback;
-      }
+    if (migrateResponse.ok) {
+      return localFallback;
     }
+  }
 
-    return dbSignature || localFallback;
+  return dbSignature || localFallback;
 }
 
 export function useCurrentUser(): CurrentUserState {
@@ -69,11 +69,16 @@ export function useCurrentUser(): CurrentUserState {
 
   useEffect(() => {
     let isCurrent = true;
-    const supabase = createClient();
     const cachedProfile = readCachedUserProfile();
 
+    if (cachedProfile) {
+      return () => {
+        isCurrent = false;
+      };
+    }
+
     async function loadCurrentUser() {
-      if (isCurrent && !cachedProfile) {
+      if (isCurrent) {
         setState((current) => ({
           ...current,
           error: null,
@@ -82,24 +87,13 @@ export function useCurrentUser(): CurrentUserState {
       }
 
       try {
-        const {
-          data: { user },
-          error
-        } = await supabase.auth.getUser();
-
-        if (error) {
-          throw new Error(error.message);
-        }
-
-        const metadata = user?.user_metadata ?? {};
-        const userName = typeof metadata.full_name === "string" && metadata.full_name.trim()
-          ? metadata.full_name.trim()
-          : user?.email ?? "";
-        const userEmail = user?.email ?? "";
+        const user = await fetchClientSession();
+        const userName = user.fullName.trim() || user.email;
+        const userEmail = user.email;
         const localSignature = userEmail
           ? window.localStorage.getItem(getUserSignatureStorageKey(userEmail)) ?? ""
           : "";
-        const signature = user ? await loadSignatureFromDb(localSignature) : "";
+        const signature = await loadSignatureFromDb(localSignature);
 
         if (userEmail && signature && signature !== localSignature) {
           window.localStorage.setItem(getUserSignatureStorageKey(userEmail), signature);

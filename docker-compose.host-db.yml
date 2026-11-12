@@ -1,0 +1,16 @@
+# App only — uses PostgreSQL already running on the host (e.g. postgres / Zero1234)
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-Zero1234}@host.docker.internal:5432/${POSTGRES_DB:-jf_management}
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env.docker}
+      APP_URL: ${APP_URL:-http://localhost:3000}

@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import type { Database, Json } from "@/lib/supabase/database.types";
-
-type SiteUpdate = Database["public"]["Tables"]["sites"]["Update"];
+import { deleteSiteById, updateSiteFields } from "@/lib/db/pm-jobs";
+import type { Json } from "@/lib/db/types";
 
 type UpdateSiteBody = {
   contract?: unknown;
@@ -24,7 +22,7 @@ export async function PATCH(
 ) {
   const { siteId } = await params;
   const body = await request.json() as UpdateSiteBody;
-  const updatePayload: SiteUpdate = {};
+  const updatePayload: { owner?: string; contract?: string; contract_details?: Json } = {};
 
   if ("owner" in body) {
     updatePayload.owner = readOptionalString(body.owner);
@@ -39,20 +37,7 @@ export async function PATCH(
   }
 
   try {
-    const supabase = createAdminClient();
-    const { error } = await supabase
-      .from("sites")
-      .update(updatePayload)
-      .eq("id", siteId);
-
-    if (error) {
-      if (error.message.includes("contract_details")) {
-        throw new Error("Missing sites.contract_details column. Run: alter table public.sites add column if not exists contract_details jsonb not null default '{}'::jsonb;");
-      }
-
-      throw new Error(error.message);
-    }
-
+    await updateSiteFields(siteId, updatePayload);
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(
@@ -71,15 +56,7 @@ export async function DELETE(
   const { siteId } = await params;
 
   try {
-    const supabase = createAdminClient();
-    const { count, error } = await supabase
-      .from("sites")
-      .delete({ count: "exact" })
-      .eq("id", siteId);
-
-    if (error) {
-      throw new Error(error.message);
-    }
+    const count = await deleteSiteById(siteId);
 
     if (count === 0) {
       return NextResponse.json({ message: "Site not found." }, { status: 404 });

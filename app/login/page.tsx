@@ -1,34 +1,66 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { LockKeyhole, UserRound } from "lucide-react";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { clearAppBrowserCache } from "@/lib/auth/clear-app-cache";
+import { signOutSession } from "@/lib/auth/client-session";
 import { readRememberedLogin, writeRememberedLogin } from "@/lib/auth/remember-login";
 import { useUi } from "@/lib/i18n";
 import { usePageEnterProps } from "@/components/PageEnterTransition";
-import { createClient } from "@/lib/supabase/client";
 
-export default function LoginPage() {
+function googleErrorMessage(code: string, lang: "th" | "en") {
+  const messages: Record<string, { en: string; th: string }> = {
+    google_cancelled: {
+      en: "Google sign-in was cancelled.",
+      th: "ยกเลิกการเข้าสู่ระบบด้วย Google"
+    },
+    google_config: {
+      en: "Google sign-in is not configured.",
+      th: "ยังไม่ได้ตั้งค่า Google OAuth"
+    },
+    google_email: {
+      en: "Google account email is not verified.",
+      th: "อีเมล Google ยังไม่ยืนยัน"
+    },
+    google_failed: {
+      en: "Cannot sign in with Google.",
+      th: "เข้าสู่ระบบด้วย Google ไม่สำเร็จ"
+    },
+    google_state: {
+      en: "Google sign-in expired. Try again.",
+      th: "การยืนยัน Google หมดเวลา ลองใหม่"
+    },
+    not_registered: {
+      en: "This Google account is not registered in the system.",
+      th: "อีเมล Google นี้ยังไม่มีในระบบ"
+    }
+  };
+
+  const entry = messages[code];
+  return entry ? entry[lang] : (lang === "th" ? "เข้าสู่ระบบไม่สำเร็จ" : "Sign-in failed.");
+}
+
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { lang, t } = useUi();
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<"error" | "success">("error");
-  const [resetMode, setResetMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rememberPassword, setRememberPassword] = useState(false);
+  const [googleLoginEnabled, setGoogleLoginEnabled] = useState(false);
   const pageEnterProps = usePageEnterProps("loginPage", "login");
 
   useEffect(() => {
     let isCurrent = true;
 
     async function prepareLoginPage() {
-      const supabase = createClient();
-      await supabase.auth.signOut();
+      await signOutSession();
       await clearAppBrowserCache();
 
       if (!isCurrent) {
@@ -39,6 +71,26 @@ export default function LoginPage() {
       setRememberPassword(remembered.remember);
       setEmail(remembered.email);
       setPassword(remembered.password);
+
+      const errorCode = searchParams.get("error");
+
+      if (errorCode) {
+        setMessageTone("error");
+        setMessage(googleErrorMessage(errorCode, lang));
+      }
+
+      try {
+        const statusResponse = await fetch("/api/auth/google/status", { cache: "no-store" });
+        const status = await statusResponse.json() as { enabled?: boolean };
+
+        if (isCurrent) {
+          setGoogleLoginEnabled(Boolean(status.enabled));
+        }
+      } catch {
+        if (isCurrent) {
+          setGoogleLoginEnabled(false);
+        }
+      }
     }
 
     void prepareLoginPage();
@@ -46,9 +98,9 @@ export default function LoginPage() {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [lang, searchParams]);
 
-  const signIn = async () => {
+  const signInWithPassword = async () => {
     const normalizedEmail = email.trim().toLowerCase();
 
     if (!normalizedEmail || password.length < 8) {
@@ -63,71 +115,43 @@ export default function LoginPage() {
     setMessage("");
     setMessageTone("error");
 
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOutSession();
     await clearAppBrowserCache();
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: normalizedEmail,
-      password
+    const response = await fetch("/api/auth/login", {
+      body: JSON.stringify({
+        email: normalizedEmail,
+        password
+      }),
+      headers: {
+        "Content-Type": "application/json"
+      },
+      method: "POST"
     });
+    const payload = await response.json() as { code?: string; message?: string; ok?: boolean };
 
     setIsSubmitting(false);
 
-    if (error) {
+    if (!response.ok || !payload.ok) {
       setMessageTone("error");
-      if (error.code === "invalid_credentials") {
+      if (payload.code === "invalid_credentials") {
         setMessage(lang === "th"
-          ? "อีเมลหรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบแล้วลองอีกครั้ง"
-          : "Incorrect email or password. Please check and try again.");
-      } else if (error.code === "email_not_confirmed") {
-        setMessage(lang === "th"
-          ? "อีเมลนี้ยังไม่ได้ยืนยัน กรุณาตรวจสอบอีเมลของคุณ"
-          : "This email has not been confirmed. Please check your inbox.");
+          ? "อีเมลหรือรหัสผ่านไม่ถูกต้อง"
+          : "Incorrect email or password.");
       } else {
-        setMessage(lang === "th"
-          ? `ไม่สามารถเข้าสู่ระบบได้: ${error.message}`
-          : `Unable to sign in: ${error.message}`);
+        setMessage(payload.message ?? (lang === "th" ? "เข้าสู่ระบบไม่สำเร็จ" : "Cannot sign in."));
       }
       return;
     }
 
-    await fetch("/api/auth/cleanup-metadata", { method: "POST" });
-    await supabase.auth.refreshSession();
     writeRememberedLogin(rememberPassword, normalizedEmail, password);
-
     router.replace("/loading");
     router.refresh();
   };
-  const sendPasswordReset = async () => {
-    const normalizedEmail = email.trim().toLowerCase();
 
-    if (!normalizedEmail) {
-      setMessageTone("error");
-      setMessage("กรุณากรอกอีเมลก่อนส่งลิงก์รีเซ็ตรหัสผ่าน");
-      return;
-    }
-
-    setIsSubmitting(true);
+  const signInWithGoogle = () => {
     setMessage("");
-    setMessageTone("error");
-
-    const supabase = createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: `${window.location.origin}/reset-password`
-    });
-
-    setIsSubmitting(false);
-
-    if (error) {
-      setMessageTone("error");
-      setMessage(error.message);
-      return;
-    }
-
-    setMessageTone("success");
-    setMessage("ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลแล้ว");
-    setResetMode(false);
+    window.location.href = "/api/auth/google";
   };
 
   return (
@@ -144,17 +168,17 @@ export default function LoginPage() {
           <Image src="/report-templates/LOGO-JF.webp" alt="JF Advance Med" width={360} height={112} priority />
         </div>
         <h1>{t("login.signIn")}</h1>
-        <p>{t("app.fullName")}</p>
+        <p>
+          {lang === "th"
+            ? "เข้าสู่ระบบด้วยอีเมล/รหัสผ่าน หรือบัญชี Google ที่ลงทะเบียนในระบบ"
+            : "Sign in with email/password or a registered Google account."}
+        </p>
         <form
           className="form"
           noValidate
           onSubmit={(event) => {
             event.preventDefault();
-            if (resetMode) {
-              sendPasswordReset();
-            } else {
-              signIn();
-            }
+            signInWithPassword();
           }}
         >
           <label className="label">
@@ -174,54 +198,62 @@ export default function LoginPage() {
               />
             </span>
           </label>
-          {resetMode ? null : (
-            <>
-              <label className="label">
-                {t("login.password")}
-                <span className="inputWrap">
-                  <LockKeyhole size={16} />
-                  <input
-                    className="field"
-                    type="password"
-                    autoComplete="current-password"
-                    minLength={8}
-                    required
-                    value={password}
-                    onChange={(event) => {
-                      setPassword(event.target.value);
-                      setMessage("");
-                    }}
-                  />
-                </span>
-              </label>
-              <label className="loginRememberToggle">
-                <input
-                  checked={rememberPassword}
-                  type="checkbox"
-                  onChange={(event) => setRememberPassword(event.target.checked)}
-                />
-                <span>{t("login.remember")}</span>
-              </label>
-            </>
-          )}
+          <label className="label">
+            {t("login.password")}
+            <span className="inputWrap">
+              <LockKeyhole size={16} />
+              <input
+                className="field"
+                type="password"
+                autoComplete="current-password"
+                minLength={8}
+                required
+                value={password}
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  setMessage("");
+                }}
+              />
+            </span>
+          </label>
+          <label className="loginRememberToggle">
+            <input
+              checked={rememberPassword}
+              type="checkbox"
+              onChange={(event) => setRememberPassword(event.target.checked)}
+            />
+            <span>{t("login.remember")}</span>
+          </label>
           <button className="button primary" type="submit" disabled={isSubmitting}>
-            {resetMode ? "ส่งลิงก์รหัสผ่าน" : t("login.signIn")}
+            {t("login.signIn")}
           </button>
-          {!resetMode && messageTone === "error" && message ? (
+          {messageTone === "error" && message ? (
             <p className="loginError" role="alert">{message}</p>
           ) : null}
         </form>
-        <button
-          className="forgotPasswordButton"
-          type="button"
-          onClick={() => {
-            setMessage("");
-            setResetMode((current) => !current);
-          }}
-        >
-          {resetMode ? "กลับไปเข้าสู่ระบบ" : "ลืมรหัสผ่าน?"}
-        </button>
+
+        {googleLoginEnabled ? (
+          <>
+            <p className="loginDivider">{lang === "th" ? "หรือ" : "or"}</p>
+            <button
+              className="button googleSignInButton"
+              type="button"
+              disabled={isSubmitting}
+              onClick={signInWithGoogle}
+            >
+              {lang === "th" ? "เข้าสู่ระบบด้วย Google" : "Sign in with Google"}
+            </button>
+          </>
+        ) : null}
       </section>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

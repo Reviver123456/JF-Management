@@ -7,22 +7,28 @@
     "build": "next build",
     "start": "node --max-http-header-size=65536 node_modules/next/dist/bin/next start",
     "lint": "eslint .",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "db:init": "node scripts/init-db.mjs",
+    "db:seed-team": "node scripts/seed-team-users.mjs",
+    "docker:up": "docker compose --env-file .env.docker up -d --build",
+    "docker:down": "docker compose --env-file .env.docker down",
+    "docker:host": "docker compose -f docker-compose.host-db.yml --env-file .env.docker up -d --build",
+    "docker:seed": "DATABASE_URL=postgresql://postgres:Zero1234@127.0.0.1:5433/jf_management node scripts/create-user.mjs visarut@jfav.co.th \"Visarut\" Zero1234"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.10.3",
-    "@supabase/supabase-js": "^2.107.0",
+    "bcryptjs": "^3.0.3",
+    "jose": "^6.2.17",
     "lucide-react": "latest",
     "next": "latest",
+    "postgres": "^4.1.1",
     "react": "latest",
-    "react-dom": "latest",
-    "ws": "^8.21.0"
+    "react-dom": "latest"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
-    "@types/ws": "^8.18.1",
     "eslint": "latest",
     "eslint-config-next": "latest",
     "typescript": "latest"

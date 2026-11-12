@@ -9,7 +9,7 @@ import { PwaInstallSection } from "@/components/PwaInstallSection";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
 import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { useUi } from "@/lib/i18n";
-import { createClient } from "@/lib/supabase/client";
+import { fetchClientSession } from "@/lib/auth/client-session";
 
 function splitFullName(fullName: string) {
   const trimmed = fullName.trim();
@@ -49,37 +49,40 @@ export default function SettingsPage() {
   const [pwaGuide, setPwaGuide] = useState<{ open: boolean; mode: "ios" | "desktop" }>({ open: false, mode: "ios" });
 
   useEffect(() => {
-    const supabase = createClient();
-
     async function loadProfile() {
-      const {
-        data: { user }
-      } = await supabase.auth.getUser();
-      const metadata = user?.user_metadata ?? {};
+      try {
+        const user = await fetchClientSession();
 
-      setEmail(user?.email ?? "");
-      const fullName = typeof metadata.full_name === "string" ? metadata.full_name : user?.email ?? "";
-      const nameParts = splitFullName(fullName);
-      setFirstName(nameParts.firstName);
-      setLastName(nameParts.lastName);
-      setPhone(typeof metadata.phone === "string" ? metadata.phone : "");
+        setEmail(user.email);
+        const fullName = user.fullName || user.email;
+        const nameParts = splitFullName(fullName);
+        setFirstName(nameParts.firstName);
+        setLastName(nameParts.lastName);
+        setPhone(user.phone);
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Cannot load profile.");
+      }
     }
 
-    loadProfile();
+    void loadProfile();
   }, []);
 
   const saveProfile = async () => {
-    const supabase = createClient();
-    const { error } = await supabase.auth.updateUser({
-      data: {
-        full_name: joinFullName(firstName, lastName),
+    const response = await fetch("/api/auth/profile", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        fullName: joinFullName(firstName, lastName),
         phone
-      }
+      })
     });
+    const payload = await response.json() as { message?: string; ok?: boolean };
 
-    if (error) {
+    if (!response.ok || !payload.ok) {
       setSaved(false);
-      setMessage(error.message);
+      setMessage(payload.message ?? "Cannot save profile.");
       return;
     }
 
@@ -120,12 +123,6 @@ export default function SettingsPage() {
       setMessage(payload.message ?? "Cannot change password.");
       return;
     }
-
-    const supabase = createClient();
-    await supabase.auth.signInWithPassword({
-      email,
-      password: newPassword
-    });
 
     setCurrentPassword("");
     setNewPassword("");

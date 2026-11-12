@@ -33,7 +33,7 @@ export function usePmData(): PmDataState {
     }
 
     try {
-      const response = await fetch("/api/pm-data", { cache: "no-store" });
+      const response = await fetch("/api/pm-data", options.background ? undefined : { cache: "no-store" });
       const payload = await response.json() as PmAppData | { message?: string };
 
       if (!response.ok) {

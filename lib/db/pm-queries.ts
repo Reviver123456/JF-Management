@@ -1,9 +1,7 @@
 import { buildPmAppData, formatVisitTime, type PmJobRecord, type PmWorkDetails, type SiteCatalogRecord, type SiteContractDetails, type SiteRecord } from "@/lib/pm-data";
-import { createClient } from "@/lib/supabase/server";
-import type { Database, Json } from "@/lib/supabase/database.types";
+import { getSql } from "@/lib/db/sql";
+import type { Json, PmJobRow, SiteRow } from "@/lib/db/types";
 
-type SiteRow = Database["public"]["Tables"]["sites"]["Row"];
-type PmJobRow = Database["public"]["Tables"]["pm_jobs"]["Row"];
 type PmJobWithSiteRow = PmJobRow & { sites: SiteRow | null };
 type WorkResult = NonNullable<PmJobRecord["result"]>;
 
@@ -100,82 +98,61 @@ function uniqueSiteRecords(sites: SiteRecord[]) {
   });
 }
 
-async function createDataClient() {
-  return createClient();
-}
-
-function formatReportDate(date: string) {
-  const [year, month, day] = date.split("-");
-  return `${day}/${month}/${year}`;
+function mapPmJobWithSiteRows(rows: PmJobWithSiteRow[]) {
+  return uniqueSiteRecords(rows.map(toSiteRecord).filter((site): site is SiteRecord => site !== null));
 }
 
 export async function listSitesFromDb() {
-  const supabase = await createDataClient();
-  const { data, error } = await supabase.from("sites").select("*").order("site");
-
-  if (error) {
-    throw new Error(`Supabase sites query failed: ${error.message}`);
-  }
+  const sql = getSql();
+  const data = await sql<SiteRow[]>`select * from sites order by site`;
 
   return data.map(toSiteCatalogRecord);
 }
 
 export async function listPmJobsFromDb() {
-  const supabase = await createDataClient();
-  const { data, error } = await supabase.from("pm_jobs").select("*").order("visit_date", { ascending: false });
-
-  if (error) {
-    throw new Error(`Supabase pm_jobs query failed: ${error.message}`);
-  }
+  const sql = getSql();
+  const data = await sql<PmJobRow[]>`select * from pm_jobs order by visit_date desc`;
 
   return data.map(toPmJobRecord);
 }
 
 export async function listWorkSitesFromDb() {
-  const supabase = await createDataClient();
-  const { data, error } = await supabase
-    .from("pm_jobs")
-    .select("*, sites(*)")
-    .order("visit_date", { ascending: false })
-    .order("visit_time");
+  const sql = getSql();
+  const data = await sql<PmJobWithSiteRow[]>`
+    select j.*, to_jsonb(s) as sites
+    from pm_jobs j
+    inner join sites s on s.id = j.site_id
+    order by j.visit_date desc, j.visit_time
+  `;
 
-  if (error) {
-    throw new Error(`Supabase work sites query failed: ${error.message}`);
-  }
-
-  return uniqueSiteRecords((data as PmJobWithSiteRow[]).map(toSiteRecord).filter((site): site is SiteRecord => site !== null));
+  return mapPmJobWithSiteRows(data);
 }
 
 export async function getWorkSitesByDateFromDb(date: string) {
-  const supabase = await createDataClient();
-  const { data, error } = await supabase
-    .from("pm_jobs")
-    .select("*, sites(*)")
-    .eq("visit_date", date)
-    .order("visit_time");
+  const sql = getSql();
+  const data = await sql<PmJobWithSiteRow[]>`
+    select j.*, to_jsonb(s) as sites
+    from pm_jobs j
+    inner join sites s on s.id = j.site_id
+    where j.visit_date = ${date}::date
+    order by j.visit_time
+  `;
 
-  if (error) {
-    throw new Error(`Supabase work sites query failed: ${error.message}`);
-  }
-
-  return uniqueSiteRecords((data as PmJobWithSiteRow[]).map(toSiteRecord).filter((site): site is SiteRecord => site !== null));
+  return mapPmJobWithSiteRows(data);
 }
 
 export async function getWorkSiteBySiteIdFromDb(siteId: string) {
-  const supabase = await createDataClient();
-  const { data, error } = await supabase
-    .from("pm_jobs")
-    .select("*, sites(*)")
-    .eq("site_id", siteId)
-    .order("visit_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const sql = getSql();
+  const data = await sql<PmJobWithSiteRow[]>`
+    select j.*, to_jsonb(s) as sites
+    from pm_jobs j
+    inner join sites s on s.id = j.site_id
+    where j.site_id = ${siteId}
+    order by j.visit_date desc
+    limit 1
+  `;
 
-  if (error) {
-    throw new Error(`Supabase work site query failed: ${error.message}`);
-  }
-
-  return data ? toSiteRecord(data as PmJobWithSiteRow) : null;
+  return data[0] ? toSiteRecord(data[0]) : null;
 }
 
 export async function getPmAppDataFromDb() {

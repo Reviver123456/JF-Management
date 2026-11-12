@@ -1,8 +1,6 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import type { Database } from "@/lib/supabase/database.types";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getSupabaseConfig } from "@/lib/supabase/env";
+import { getSessionFromCookies } from "@/lib/auth/session";
+import { updateUserPassword, verifyUserCredentials } from "@/lib/auth/users";
 
 type ChangePasswordPayload = {
   currentPassword?: string;
@@ -10,21 +8,11 @@ type ChangePasswordPayload = {
   newPassword?: string;
 };
 
-function createPasswordVerifyClient() {
-  const { publishableKey, url } = getSupabaseConfig();
-
-  return createClient<Database>(url, publishableKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  });
-}
-
 export async function POST(request: Request) {
   try {
     const { currentPassword, email, newPassword } = await request.json() as ChangePasswordPayload;
-    const normalizedEmail = email?.trim().toLowerCase() ?? "";
+    const session = await getSessionFromCookies();
+    const normalizedEmail = (email?.trim().toLowerCase() || session?.email || "");
 
     if (!normalizedEmail || !currentPassword || !newPassword) {
       return NextResponse.json(
@@ -40,34 +28,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const verifyClient = createPasswordVerifyClient();
-    const { data: verifiedLogin, error: verifyError } = await verifyClient.auth.signInWithPassword({
-      email: normalizedEmail,
-      password: currentPassword
-    });
+    const user = await verifyUserCredentials(normalizedEmail, currentPassword);
 
-    if (verifyError || !verifiedLogin.user) {
+    if (!user) {
       return NextResponse.json(
-        { ok: false, message: verifyError?.message ?? "Current password is incorrect." },
+        { ok: false, message: "Current password is incorrect." },
         { status: 401 }
       );
     }
 
-    const adminClient = createAdminClient();
-    const metadataWithoutSignature = { ...(verifiedLogin.user.user_metadata ?? {}) };
-    delete metadataWithoutSignature.signature;
-    const { error: updateError } = await adminClient.auth.admin.updateUserById(verifiedLogin.user.id, {
-      password: newPassword,
-      user_metadata: {
-        ...metadataWithoutSignature,
-        signature: null,
-        must_change_password: false
-      }
-    });
-
-    if (updateError) {
-      throw new Error(updateError.message);
-    }
+  await updateUserPassword(user.id, newPassword);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

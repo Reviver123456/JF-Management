@@ -9,6 +9,7 @@ out/
 
 # Local environment files
 .env*.local
+.env.docker
 
 # Logs
 npm-debug.log*

@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
-import { getNextPmOrderNos, getPmOrderNoFromWorkDetails, normalizePmOrderNo } from "@/lib/pm-order-no";
+import { getNextJobOrderNos } from "@/lib/db/pm-job-order-nos";
+import { findPmJobInMonth, findSiteById, insertPmJobs } from "@/lib/db/pm-jobs";
+import type { Json, PmJobInsert } from "@/lib/db/types";
 import { normalizeOwnerName } from "@/lib/pm-data";
-import { createAdminClient } from "@/lib/supabase/admin";
-import type { Database, Json } from "@/lib/supabase/database.types";
-
-type PmJobInsert = Database["public"]["Tables"]["pm_jobs"]["Insert"];
 
 type CreatePmJobBody = {
   expenses?: unknown;
@@ -112,23 +110,6 @@ function getDateRangeValues(startValue: string, endValue: string) {
   return values;
 }
 
-async function getNextJobOrderNos(supabase: ReturnType<typeof createAdminClient>, count: number) {
-  const { data, error } = await supabase
-    .from("pm_jobs")
-    .select("id, work_details");
-
-  if (error) {
-    throw new Error(error.message);
-  }
-
-  const existingOrderNos = (data ?? []).flatMap((job) => [
-    normalizePmOrderNo(job.id),
-    getPmOrderNoFromWorkDetails(job.work_details)
-  ]);
-
-  return getNextPmOrderNos(existingOrderNos, count);
-}
-
 function buildWorkDetails(pmOrderNo: string, expenses: Record<string, string>): Json {
   const details: Record<string, unknown> = { pmOrderNo };
 
@@ -160,16 +141,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Invalid date range." }, { status: 400 });
     }
 
-    const supabase = createAdminClient();
-    const { data: site, error: siteError } = await supabase
-      .from("sites")
-      .select("id, owner")
-      .eq("id", siteId)
-      .maybeSingle();
-
-    if (siteError) {
-      throw new Error(siteError.message);
-    }
+    const site = await findSiteById(siteId);
 
     if (!site) {
       return NextResponse.json({ message: "Site not found." }, { status: 404 });
@@ -181,18 +153,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Invalid visit date." }, { status: 400 });
     }
 
-    const { data: existingJob, error: existingJobError } = await supabase
-      .from("pm_jobs")
-      .select("id")
-      .eq("site_id", site.id)
-      .gte("visit_date", monthRange.start)
-      .lt("visit_date", monthRange.end)
-      .limit(1)
-      .maybeSingle();
-
-    if (existingJobError) {
-      throw new Error(existingJobError.message);
-    }
+    const existingJob = await findPmJobInMonth(site.id, monthRange.start, monthRange.end);
 
     if (existingJob) {
       return NextResponse.json({ message: "This site already has a PM job this month." }, { status: 409 });
@@ -204,7 +165,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Please assign a site owner or follower." }, { status: 400 });
     }
 
-    const pmOrderNos = await getNextJobOrderNos(supabase, visitDates.length);
+    const pmOrderNos = await getNextJobOrderNos(visitDates.length);
     const rows: PmJobInsert[] = visitDates.flatMap((date, dateIndex) => participants.map((owner) => ({
       id: `PM-${crypto.randomUUID()}`,
       site_id: site.id,
@@ -216,11 +177,7 @@ export async function POST(request: Request) {
       work_details: buildWorkDetails(pmOrderNos[dateIndex], expenses)
     })));
 
-    const { error } = await supabase.from("pm_jobs").insert(rows);
-
-    if (error) {
-      throw new Error(error.message);
-    }
+    await insertPmJobs(rows);
 
     return NextResponse.json({ ok: true, jobsCount: rows.length });
   } catch (error) {

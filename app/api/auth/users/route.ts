@@ -1,33 +1,18 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import type { SystemUser } from "@/lib/auth/system-users";
+import { listAppUsers } from "@/lib/auth/users";
 
 export async function GET() {
   try {
-    const supabase = createAdminClient();
-    const { data, error } = await supabase.auth.admin.listUsers({
-      page: 1,
-      perPage: 1000
-    });
+    const data = await listAppUsers();
 
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const users: SystemUser[] = data.users
-      .map((user) => {
-        const metadata = user.user_metadata ?? {};
-        const name = typeof metadata.full_name === "string" && metadata.full_name.trim()
-          ? metadata.full_name
-          : user.email ?? "Unknown user";
-
-        return {
-          id: user.id,
-          email: user.email ?? "",
-          name,
-          phone: typeof metadata.phone === "string" ? metadata.phone : ""
-        };
-      })
+    const users: SystemUser[] = data
+      .map((user) => ({
+        id: user.id,
+        email: user.email,
+        name: user.full_name.trim() || user.email,
+        phone: user.phone
+      }))
       .filter((user) => user.email)
       .sort((first, second) => first.name.localeCompare(second.name));
 

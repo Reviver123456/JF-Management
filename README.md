@@ -1,59 +1,49 @@
 # JF-Management
 
-PM Site Management is a Next.js application for planning preventive maintenance jobs, managing sites, recording field work, and reviewing reports.
+## Login
 
-## Tech Stack
+Email + password or Google — user must exist in `app_users`. No forgot-password UI; reset via:
 
-- Next.js
-- React
-- TypeScript
-- ESLint
+```bash
+node scripts/create-user.mjs user@jfav.co.th "Full Name" new-password
+```
 
-## Getting Started
-
-Install dependencies:
+## Local development
 
 ```bash
 npm install
-```
-
-Run the development server:
-
-```bash
+npm run db:init
+node scripts/create-user.mjs visarut@jfav.co.th "Visarut" Zero1234
 npm run dev
 ```
 
-Open `http://localhost:3000` in your browser.
-
-## Supabase Setup
-
-Create a Supabase project, then open the Supabase SQL editor and run the SQL in `supabase/schema.sql`.
-
-Create `.env.local` from `.env.example` and fill in your project values:
+## Docker
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-or-anon-key
+npm run docker:up
+npm run docker:seed
 ```
 
-For server-side admin operations, add a server-only Supabase service role key:
+App: http://localhost:3001 (or `APP_PORT` in `.env.docker`)
+
+## Deploy on Render (https://jf-management.onrender.com)
+
+1. Push repo to GitHub and connect in [Render](https://render.com).
+2. Use `render.yaml` (Blueprint) or create a **Web Service**:
+   - **Build:** `npm ci && npm run build`
+   - **Start:** `npm start`
+   - **Health check:** `/api/db/health`
+3. Add **PostgreSQL** (or external `DATABASE_URL`).
+4. Environment variables (see `.env.render.example`):
+   - `APP_URL=https://jf-management.onrender.com`
+   - `AUTH_SECRET` (long random string)
+   - `DATABASE_URL`
+   - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+   - `GOOGLE_REDIRECT_URI=https://jf-management.onrender.com/api/auth/google/callback`
+5. Google Cloud Console → OAuth client → add **Authorized redirect URI** above.
+6. After first deploy, run `npm run db:init` against production `DATABASE_URL` (local shell) and `create-user.mjs` for accounts.
 
 ```bash
-SUPABASE_SECRET_KEY=sb_secret_or_service_role_key
-```
-
-Create users in Supabase Auth and set each user's `full_name` and `phone` metadata when needed by the app.
-
-Restart the dev server after changing env values. You can test the database connection at:
-
-```bash
-http://localhost:3000/api/db/health
-```
-
-## Quality Checks
-
-```bash
-npm run lint
-npm run typecheck
-npm run build
+DATABASE_URL="postgresql://..." npm run db:init
+DATABASE_URL="postgresql://..." node scripts/create-user.mjs werawong.p@jfav.co.th "Werawong" 0123456789
 ```
