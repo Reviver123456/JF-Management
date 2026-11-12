@@ -6,6 +6,8 @@ import Image from "next/image";
 import { LockKeyhole, UserRound } from "lucide-react";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { clearAppBrowserCache } from "@/lib/auth/clear-app-cache";
+import { ensureClientSession } from "@/lib/auth/ensure-client-session";
+import { syncAuthAfterLogin } from "@/lib/auth/sync-auth-after-login";
 import { readRememberedLogin, writeRememberedLogin } from "@/lib/auth/remember-login";
 import { useUi } from "@/lib/i18n";
 import { usePageEnterProps } from "@/components/PageEnterTransition";
@@ -37,8 +39,16 @@ export default function LoginPage() {
 
     async function prepareLoginPage() {
       const supabase = createClient();
-      await supabase.auth.signOut();
-      await clearAppBrowserCache();
+      const {
+        data: { session }
+      } = await supabase.auth.getSession();
+
+      if (session?.access_token) {
+        router.replace("/loading");
+        return;
+      }
+
+      await clearAppBrowserCache({ includeLocalStorage: "heavy", preserveAuth: true });
 
       if (!isCurrent) {
         return;
@@ -55,7 +65,7 @@ export default function LoginPage() {
     return () => {
       isCurrent = false;
     };
-  }, [configErrorMessage, supabaseReady]);
+  }, [configErrorMessage, router, supabaseReady]);
 
   const signIn = async () => {
     if (!supabaseReady) {
@@ -80,7 +90,7 @@ export default function LoginPage() {
 
     const supabase = createClient();
     await supabase.auth.signOut();
-    await clearAppBrowserCache();
+    await clearAppBrowserCache({ includeLocalStorage: "heavy" });
 
     const { error } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
@@ -107,12 +117,20 @@ export default function LoginPage() {
       return;
     }
 
-    await fetch("/api/auth/cleanup-metadata", { method: "POST" });
-    await supabase.auth.refreshSession();
-    writeRememberedLogin(rememberPassword, normalizedEmail, password);
+    try {
+      await syncAuthAfterLogin(supabase);
+    } catch (sessionError) {
+      setMessageTone("error");
+      setMessage(
+        sessionError instanceof Error
+          ? sessionError.message
+          : (lang === "th" ? "ไม่พบ session หลังเข้าสู่ระบบ กรุณาลองใหม่" : "No session after sign-in. Please try again.")
+      );
+      return;
+    }
 
+    writeRememberedLogin(rememberPassword, normalizedEmail, password);
     router.replace("/loading");
-    router.refresh();
   };
   const sendPasswordReset = async () => {
     if (!supabaseReady) {

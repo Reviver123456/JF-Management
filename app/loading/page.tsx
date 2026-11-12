@@ -56,7 +56,7 @@ export default function LoadingPage() {
       }
 
       if (/auth session missing/i.test(message)) {
-        router.replace("/login");
+        window.location.replace("/login");
         return;
       }
 
@@ -72,10 +72,7 @@ export default function LoadingPage() {
 
     startedRef.current = true;
 
-    void (async () => {
-      await clearAppBrowserCache({ includeLocalStorage: "heavy", preserveAuth: true });
-      await runBootstrap();
-    })();
+    void runBootstrap();
   }, [runBootstrap]);
 
   return (

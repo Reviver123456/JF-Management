@@ -1,4 +1,5 @@
 import { cachePmData, cacheUserProfile, markBootstrapComplete } from "@/lib/app-bootstrap-cache";
+import { ensureClientSession } from "@/lib/auth/ensure-client-session";
 import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import type { PmAppData } from "@/lib/pm-data";
 import { createClient } from "@/lib/supabase/client";
@@ -17,21 +18,15 @@ export async function bootstrapAppData(onProgress?: (value: number) => void) {
   onProgress?.(10);
 
   const supabase = createClient();
-  const [userResult, pmResponse] = await Promise.all([
-    supabase.auth.getUser(),
-    fetch("/api/pm-data", { cache: "no-store" })
-  ]);
+
+  onProgress?.(18);
+  const user = await ensureClientSession(supabase);
+
+  onProgress?.(32);
+
+  const pmResponse = await fetch("/api/pm-data", { cache: "no-store" });
 
   onProgress?.(42);
-
-  const {
-    data: { user },
-    error: userError
-  } = userResult;
-
-  if (userError || !user?.email) {
-    throw new Error(userError?.message ?? "Cannot verify signed-in user.");
-  }
 
   const pmPayload = await pmResponse.json() as PmAppData | { message?: string };
 
@@ -41,7 +36,10 @@ export async function bootstrapAppData(onProgress?: (value: number) => void) {
 
   onProgress?.(68);
 
-  const userEmail = user.email;
+  const userEmail = user.email ?? "";
+  if (!userEmail) {
+    throw new Error("Cannot verify signed-in user.");
+  }
   const metadata = user.user_metadata ?? {};
   const localSignature = window.localStorage.getItem(getUserSignatureStorageKey(userEmail)) ?? "";
   let signature = localSignature;
