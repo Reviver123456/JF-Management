@@ -1,4 +1,65 @@
 const authCookiePrefixes = ["sb-", "sb-auth"];
+const preservedLocalStorageKeys = new Set(["pm-site-lang", "pm-site-theme"]);
+const signatureStoragePrefix = "pm-site-user-signature:";
+const checklistStorageKey = "pm-site-checklist-configs";
+
+export function isBrowserStorageQuotaError(value: unknown) {
+  if (value instanceof DOMException && value.name === "QuotaExceededError") {
+    return true;
+  }
+
+  if (value instanceof Error && /quota has been exceeded/i.test(value.message)) {
+    return true;
+  }
+
+  return typeof value === "string" && /quota has been exceeded/i.test(value);
+}
+
+export function clearHeavyLocalStorage() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const keysToRemove: string[] = [];
+
+  for (let index = 0; index < window.localStorage.length; index += 1) {
+    const key = window.localStorage.key(index);
+
+    if (!key) {
+      continue;
+    }
+
+    if (key.startsWith(signatureStoragePrefix) || key === checklistStorageKey) {
+      keysToRemove.push(key);
+    }
+  }
+
+  for (const key of keysToRemove) {
+    window.localStorage.removeItem(key);
+  }
+}
+
+export function clearLocalStoragePreservingPreferences() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const preserved = new Map<string, string>();
+
+  for (const key of preservedLocalStorageKeys) {
+    const value = window.localStorage.getItem(key);
+
+    if (value !== null) {
+      preserved.set(key, value);
+    }
+  }
+
+  window.localStorage.clear();
+
+  for (const [key, value] of preserved) {
+    window.localStorage.setItem(key, value);
+  }
+}
 
 export function clearSupabaseAuthCookies() {
   if (typeof document === "undefined") {
@@ -47,8 +108,19 @@ export function clearSessionStorage() {
   window.sessionStorage.clear();
 }
 
-export async function clearAppBrowserCache() {
+export type ClearAppBrowserCacheOptions = {
+  includeLocalStorage?: boolean | "heavy";
+};
+
+export async function clearAppBrowserCache(options?: ClearAppBrowserCacheOptions) {
   clearSupabaseAuthCookies();
   clearSessionStorage();
+
+  if (options?.includeLocalStorage === "heavy") {
+    clearHeavyLocalStorage();
+  } else if (options?.includeLocalStorage) {
+    clearLocalStoragePreservingPreferences();
+  }
+
   await clearBrowserCaches();
 }
