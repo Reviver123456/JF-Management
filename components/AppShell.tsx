@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Building2,
   CalendarDays,
@@ -23,6 +23,7 @@ import { PageLoadingRing } from "@/components/PageLoadingRing";
 import { useUi } from "@/lib/i18n";
 import { clearAppBrowserCache } from "@/lib/auth/clear-app-cache";
 import { useCurrentUser } from "@/lib/auth/use-current-user";
+import { JF_LOGO_ALT, JF_LOGO_SRC } from "@/lib/branding";
 import { getFirstName } from "@/lib/get-first-name";
 import { PageEnterTransition } from "@/components/PageEnterTransition";
 import { DarkThemeAnimatedBackdrop } from "@/components/DarkThemeAnimatedBackdrop";
@@ -40,9 +41,11 @@ const navItems = [
 ] as const;
 
 const settingsNavItem = navItems.find((item) => item.href === "/settings");
+const SIDEBAR_AUTO_COLLAPSE_MS = 5000;
 
-const JF_LOGO_SRC = "/branding/logo-jf.png";
-const JF_LOGO_ALT = "JF Advance Med";
+function isDesktopSidebarLayout() {
+  return typeof window !== "undefined" && window.matchMedia("(min-width: 901px)").matches;
+}
 
 function resolveBrandUserName(userName: string, email: string, fallback: string) {
   const trimmedName = userName.trim();
@@ -77,7 +80,45 @@ export function AppShell({
   );
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const sidebarCollapseTimerRef = useRef<number | null>(null);
   const closeMobileMenu = () => setMobileMenuOpen(false);
+
+  const clearSidebarCollapseTimer = useCallback(() => {
+    if (sidebarCollapseTimerRef.current) {
+      window.clearTimeout(sidebarCollapseTimerRef.current);
+      sidebarCollapseTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleSidebarCollapse = useCallback(() => {
+    clearSidebarCollapseTimer();
+
+    if (!isDesktopSidebarLayout()) {
+      return;
+    }
+
+    sidebarCollapseTimerRef.current = window.setTimeout(() => {
+      setCollapsed(true);
+    }, SIDEBAR_AUTO_COLLAPSE_MS);
+  }, [clearSidebarCollapseTimer]);
+
+  const handleSidebarPointerEnter = useCallback(() => {
+    if (!isDesktopSidebarLayout()) {
+      return;
+    }
+
+    clearSidebarCollapseTimer();
+    setCollapsed(false);
+  }, [clearSidebarCollapseTimer]);
+
+  const handleSidebarPointerLeave = useCallback(() => {
+    scheduleSidebarCollapse();
+  }, [scheduleSidebarCollapse]);
+
+  const toggleSidebarCollapsed = useCallback(() => {
+    clearSidebarCollapseTimer();
+    setCollapsed((current) => !current);
+  }, [clearSidebarCollapseTimer]);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -106,6 +147,14 @@ export function AppShell({
     window.scrollTo({ top: 0, left: 0, behavior: "instant" in window ? "instant" : "auto" });
   }, [pathname]);
 
+  useEffect(() => {
+    scheduleSidebarCollapse();
+
+    return () => {
+      clearSidebarCollapseTimer();
+    };
+  }, [clearSidebarCollapseTimer, scheduleSidebarCollapse]);
+
   return (
     <div className={`${collapsed ? "shell shellCollapsed" : "shell"}${mobileMenuOpen ? " mobileMenuOpen" : ""}`}>
       <PageLoadingRing active={loading} message={t("pm.loadingSubtitle")} />
@@ -115,7 +164,17 @@ export function AppShell({
         aria-label={t("common.closeMenu")}
         onClick={closeMobileMenu}
       />
-      <aside className="sidebar">
+      <aside
+        className="sidebar"
+        onMouseEnter={handleSidebarPointerEnter}
+        onMouseLeave={handleSidebarPointerLeave}
+        onFocusCapture={handleSidebarPointerEnter}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            scheduleSidebarCollapse();
+          }
+        }}
+      >
         <Link className="brand" href="/dashboard" aria-label={brandUserName} onClick={closeMobileMenu}>
           <span className="brandMarkJf">
             <Image
@@ -165,7 +224,7 @@ export function AppShell({
         ) : null}
 
         <div className="sidebarFooter">
-          <button className="footerButton" type="button" onClick={() => setCollapsed((current) => !current)}>
+          <button className="footerButton" type="button" onClick={toggleSidebarCollapsed}>
             <PanelLeftClose size={17} />
             <span>{collapsed ? t("common.expandMenu") : t("common.collapseMenu")}</span>
           </button>

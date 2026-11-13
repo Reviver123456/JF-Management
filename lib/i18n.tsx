@@ -155,6 +155,8 @@ const dictionaries: Record<Lang, Dictionary> = {
       password: "รหัสผ่าน",
       remember: "จำรหัสผ่าน",
       signIn: "เข้าสู่ระบบ",
+      showPassword: "แสดงรหัสผ่าน",
+      hidePassword: "ซ่อนรหัสผ่าน",
       username: "ชื่อผู้ใช้งาน",
       fieldReady: "พร้อมใช้งานภาคสนาม",
       secure: "ยืนยันตัวตนแบบปลอดภัย",

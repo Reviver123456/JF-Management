@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { LockKeyhole, UserRound } from "lucide-react";
+import { Eye, EyeOff, LockKeyhole, UserRound } from "lucide-react";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { clearAppBrowserCache } from "@/lib/auth/clear-app-cache";
 import { syncAuthAfterLogin } from "@/lib/auth/sync-auth-after-login";
@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [resetMode, setResetMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rememberPassword, setRememberPassword] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const supabaseReady = hasSupabaseConfig();
   const configErrorMessage = getSupabaseConfigMessage(lang);
   const loginAlertMessage = message || (!supabaseReady ? configErrorMessage : "");
@@ -216,11 +217,11 @@ export default function LoginPage() {
             <>
               <label className="label">
                 {t("login.password")}
-                <span className="inputWrap">
+                <span className="inputWrap inputWrapPassword">
                   <LockKeyhole size={16} />
                   <input
                     className="field"
-                    type="password"
+                    type={passwordVisible ? "text" : "password"}
                     autoComplete="current-password"
                     minLength={8}
                     required
@@ -230,6 +231,15 @@ export default function LoginPage() {
                       setMessage("");
                     }}
                   />
+                  <button
+                    className="loginPasswordToggle"
+                    type="button"
+                    aria-label={passwordVisible ? t("login.hidePassword") : t("login.showPassword")}
+                    aria-pressed={passwordVisible}
+                    onClick={() => setPasswordVisible((current) => !current)}
+                  >
+                    {passwordVisible ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                 </span>
               </label>
               <label className="loginRememberToggle">

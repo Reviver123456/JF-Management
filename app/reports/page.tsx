@@ -418,67 +418,6 @@ export default function ReportsPage() {
   );
 }
 
-function ReportPhotosPreview({ workDetails }: { workDetails?: PmWorkDetails }) {
-  const { t } = useUi();
-  const photos = mergePhotoState(workDetails?.photos);
-  const photoNotes = workDetails?.photoNotes ?? {};
-  const categoriesWithContent = photoUploadItems.filter(
-    (item) => photos[item.key].length > 0 || Boolean(photoNotes[item.key]?.trim())
-  );
-  const [activePhotoCategory, setActivePhotoCategory] = useState<PhotoCategory>(
-    categoriesWithContent[0]?.key ?? "device"
-  );
-  const resolvedPhotoCategory =
-    categoriesWithContent.length > 0
-    && categoriesWithContent.some((item) => item.key === activePhotoCategory)
-      ? activePhotoCategory
-      : (categoriesWithContent[0]?.key ?? activePhotoCategory);
-  const activePhotoItem = categoriesWithContent.find((item) => item.key === resolvedPhotoCategory)
-    ?? categoriesWithContent[0];
-
-  if (categoriesWithContent.length === 0) {
-    return <p className="reportPhotoPreviewEmpty">{t("reports.noPhotosToDownload")}</p>;
-  }
-
-  return (
-    <div className="reportPhotoPreviewPanel">
-      <div className="tabs historyTabs reportPhotoTabs">
-        {categoriesWithContent.map((item) => (
-          <button
-            className={item.key === resolvedPhotoCategory ? "activeTab" : "tab"}
-            key={item.key}
-            type="button"
-            onClick={() => setActivePhotoCategory(item.key)}
-          >
-            {t(item.labelKey)}
-            {photos[item.key].length > 0 ? ` (${photos[item.key].length})` : ""}
-          </button>
-        ))}
-      </div>
-
-      {activePhotoItem ? (
-        <div className="reportPhotoPreviewGroup">
-          {photoNotes[activePhotoItem.key]?.trim() ? (
-            <p className="reportPhotoPreviewNote">{photoNotes[activePhotoItem.key]}</p>
-          ) : null}
-          {photos[activePhotoItem.key].length > 0 ? (
-            <div className="reportPhotoPreviewGrid">
-              {photos[activePhotoItem.key].map((photo) => (
-                <figure className="reportPhotoPreviewCard" key={photo.id}>
-                  <img alt={photo.name} src={photo.dataUrl} />
-                  <figcaption>{photo.name}</figcaption>
-                </figure>
-              ))}
-            </div>
-          ) : (
-            <p className="reportPhotoPreviewEmpty">{t("reports.noPhotosToDownload")}</p>
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
 function ChecklistReportPanel({
   filteredReports,
   lang,

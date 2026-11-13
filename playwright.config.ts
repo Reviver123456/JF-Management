@@ -34,6 +34,9 @@ function loadEnvLocal() {
 loadEnvLocal();
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
+const useLocalWebServer = !process.env.PLAYWRIGHT_BASE_URL
+  || baseURL.startsWith("http://localhost")
+  || baseURL.startsWith("http://127.0.0.1");
 
 export default defineConfig({
   testDir: "./e2e",
@@ -63,10 +66,12 @@ export default defineConfig({
       use: { ...devices["iPad (gen 7)"] }
     }
   ],
-  webServer: {
-    command: "npm run dev",
-    url: `${baseURL}/login`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000
-  }
+  webServer: useLocalWebServer
+    ? {
+        command: "npm run dev",
+        url: `${baseURL}/login`,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000
+      }
+    : undefined
 });

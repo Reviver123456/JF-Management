@@ -51,7 +51,8 @@ test.describe("authenticated smoke", () => {
 
     const isMobile = test.info().project.name.includes("mobile");
     if (isMobile) {
-      await page.getByRole("button", { name: /เมนู|menu/i }).click();
+      await page.getByRole("button", { name: /^เมนู$|^menu$/i }).click();
+      await expect(page.getByRole("navigation", { name: /primary navigation/i })).toBeVisible();
     }
 
     await page.getByRole("button", { name: /ติดตามสถานะ|status tracking/i }).click();
