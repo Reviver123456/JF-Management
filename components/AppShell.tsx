@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import {
   Building2,
   CalendarDays,
@@ -24,6 +24,9 @@ import { PageLoadingRing } from "@/components/PageLoadingRing";
 import { useUi } from "@/lib/i18n";
 import { clearAppBrowserCache } from "@/lib/auth/clear-app-cache";
 import { PageEnterTransition } from "@/components/PageEnterTransition";
+import { DarkThemeAnimatedBackdrop } from "@/components/DarkThemeAnimatedBackdrop";
+import { OthersNavMenu } from "@/components/OthersNavMenu";
+import { ReportsNavMenu } from "@/components/ReportsNavMenu";
 import { createClient } from "@/lib/supabase/client";
 
 const navItems = [
@@ -34,7 +37,9 @@ const navItems = [
   { href: "/history", labelKey: "nav.history", mobileKey: "navMobile.history", icon: History },
   { href: "/reports", labelKey: "nav.reports", mobileKey: "navMobile.reports", icon: FileText },
   { href: "/settings", labelKey: "nav.settings", mobileKey: "navMobile.settings", icon: Settings }
-];
+] as const;
+
+const settingsNavItem = navItems.find((item) => item.href === "/settings");
 
 export function AppShell({
   children,
@@ -94,17 +99,36 @@ export function AppShell({
         </Link>
 
         <nav className="nav" aria-label="Primary navigation">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = pathname.startsWith(item.href);
-            return (
-              <Link key={item.href} href={item.href} className={active ? "activeNavItem" : "navItem"} onClick={closeMobileMenu}>
-                <Icon size={18} />
-                <span>{t(item.labelKey)}</span>
-              </Link>
-            );
-          })}
+          {navItems
+            .filter((item) => item.href !== "/reports" && item.href !== "/settings")
+            .map((item) => {
+              const Icon = item.icon;
+              const active = pathname.startsWith(item.href);
+              return (
+                <Link key={item.href} href={item.href} className={active ? "activeNavItem" : "navItem"} onClick={closeMobileMenu}>
+                  <Icon size={18} />
+                  <span>{t(item.labelKey)}</span>
+                </Link>
+              );
+            })}
+          <Suspense fallback={null}>
+            <ReportsNavMenu collapsed={collapsed} onNavigate={closeMobileMenu} />
+          </Suspense>
+          <OthersNavMenu collapsed={collapsed} onNavigate={closeMobileMenu} />
         </nav>
+
+        {settingsNavItem ? (
+          <div className="sidebarSettings">
+            <Link
+              href={settingsNavItem.href}
+              className={pathname.startsWith(settingsNavItem.href) ? "activeNavItem" : "navItem"}
+              onClick={closeMobileMenu}
+            >
+              <Settings size={18} />
+              <span>{t(settingsNavItem.labelKey)}</span>
+            </Link>
+          </div>
+        ) : null}
 
         <div className="sidebarFooter">
           <button className="footerButton" type="button" onClick={() => setCollapsed((current) => !current)}>
@@ -119,6 +143,7 @@ export function AppShell({
       </aside>
 
       <div className="workspace">
+        <DarkThemeAnimatedBackdrop scope="page" />
         <header className="mobileTopbar">
           <Link className="mobileBrand" href="/dashboard" onClick={closeMobileMenu}>
             <span className="mobileLogo">P</span>

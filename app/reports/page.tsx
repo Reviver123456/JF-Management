@@ -1,16 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createElement, Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
   ArrowLeft,
+  Barcode,
+  Building2,
   CalendarDays,
-  Download,
+  ClipboardList,
+  Clock3,
+  Cpu,
   Eye,
+  Globe,
+  HardDrive,
+  Hospital,
+  Leaf,
+  Mail,
   MapPin,
-  Printer,
-  UserRound
+  Monitor,
+  Network,
+  Phone,
+  Server,
+  Stethoscope,
+  UserRound,
+  Wrench
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { AppShell, PageTitle, SearchControl } from "@/components/AppShell";
 import { AppSelect } from "@/components/AppSelect";
 import { DateRangePicker } from "@/components/DateRangePicker";
@@ -20,6 +36,12 @@ import { getUserSignatureStorageKey } from "@/lib/auth/user-signature";
 import { useUi, type Lang } from "@/lib/i18n";
 import { localizeLabel } from "@/lib/localize-label";
 import { getDisplayPmOrderNo } from "@/lib/pm-order-no";
+import {
+  getReportExportHtml,
+  getReportExportTitle,
+  prepareOfficeExportContentSync
+} from "@/lib/report-export";
+import { useReportPreviewScale } from "@/lib/use-report-preview-scale";
 import { downloadWorkPhotosZip, mergePhotoState, type PhotoCategory } from "@/lib/pm-photos";
 import {
   configurationBackup,
@@ -53,10 +75,32 @@ import {
   type SavedSparePart,
   type SiteCatalogRecord
 } from "@/lib/pm-data";
+import {
+  getChecklistListLabel,
+  getReportInfoFieldOrder,
+  getReportSpareParts,
+  isReportInfoBlock,
+  resolveReportChecklistGroups
+} from "@/lib/pm-report-helpers";
 import { usePmData } from "@/lib/use-pm-data";
+import { useOwnerFromUrl } from "@/lib/hooks/use-owner-from-url";
+import { parseReportSection } from "@/lib/report-section-nav";
+import { ReportListPagination } from "@/components/reports/ReportListPagination";
+import { useReportListPagination } from "@/lib/use-report-list-pagination";
+import { ReportExportMenu } from "@/components/reports/ReportExportMenu";
+import { SchedulePlanReportPanel } from "@/components/reports/SchedulePlanReportPanel";
+import { SiteInventoryReportPanel } from "@/components/reports/SiteInventoryReportPanel";
+import { REPORT_EMAIL_RECIPIENT, sendReportByEmail } from "@/lib/report-delivery";
+import { printReportPdf } from "@/lib/report-print-dialog";
+import { ALL_CONTRACTS_INDEX, resolveReportContractIndices } from "@/lib/report-contract";
+import {
+  getPeriodRange,
+  type ReportPeriodType
+} from "@/lib/report-period";
 import {
   ALL_OWNERS_VALUE,
-  buildUniqueOwnerOptions
+  buildUniqueOwnerOptions,
+  resolveActiveOwner
 } from "@/lib/owner-filter";
 type ChecklistTemplateKey = "synapse" | "server" | "switch" | "storage" | "environment" | "diag";
 
@@ -66,8 +110,6 @@ type ChecklistTemplate = {
   title: string;
 };
 
-type ReportDownloadType = "pdf" | "word" | "excel" | "photos";
-
 type PreviewState = {
   contractIndex: number;
   row: ReportRow;
@@ -75,7 +117,6 @@ type PreviewState = {
   title: string;
 };
 
-const reportPageWidth = 794;
 
 const photoUploadItems: { key: PhotoCategory; labelKey: "pm.devicePhoto" | "pm.overviewPhoto" | "pm.issuePhoto" | "pm.partPhoto" }[] = [
   { key: "device", labelKey: "pm.devicePhoto" },
@@ -85,50 +126,172 @@ const photoUploadItems: { key: PhotoCategory; labelKey: "pm.devicePhoto" | "pm.o
 ];
 
 const checklistTemplates: ChecklistTemplate[] = [
-  { key: "synapse", title: "Synapse", heading: "Synapse Maintenance Checklist" },
-  { key: "server", title: "Server", heading: "Server Maintenance Checklist" },
-  { key: "switch", title: "Switch", heading: "Switch Maintenance Checklist" },
-  { key: "storage", title: "Storage", heading: "Storage Maintenance Checklist" },
-  { key: "environment", title: "Environment", heading: "Environment Maintenance Checklist" },
-  { key: "diag", title: "DIAG", heading: "DIAG Maintenance Checklist" }
+  { key: "synapse", title: "Synapse", heading: "SYNAPSE PREVENTIVE MAINTENANCE CHECKLIST" },
+  { key: "server", title: "Server", heading: "SERVER PREVENTIVE MAINTENANCE CHECKLIST" },
+  { key: "switch", title: "Switch", heading: "SWITCH PREVENTIVE MAINTENANCE CHECKLIST" },
+  { key: "storage", title: "Storage", heading: "STORAGE PREVENTIVE MAINTENANCE CHECKLIST" },
+  { key: "environment", title: "Environment", heading: "ENVIRONMENT PREVENTIVE MAINTENANCE CHECKLIST" },
+  { key: "diag", title: "DIAG", heading: "DIAGNOSTIC PREVENTIVE MAINTENANCE CHECKLIST" }
 ];
 
-export default function ReportsPage() {
+const companyContact = {
+  address: "2521/34 Ladprao Road, Khwaeng Khlong Chao Khun Sing, Khet Wang Thonglang, Bangkok 10310",
+  email: "service@jfadvancemed.com",
+  phone: "02-583-8035",
+  website: "www.jfadvancemed.com"
+} as const;
+
+const checklistTitleIcons: Record<string, LucideIcon> = {
+  synapse: Server,
+  server: Server,
+  switch: Network,
+  storage: HardDrive,
+  environment: Leaf,
+  diag: Stethoscope
+};
+
+const reportFieldIcons: Record<string, LucideIcon> = {
+  "customer name": Hospital,
+  location: MapPin,
+  manufacturer: Server,
+  brand: Building2,
+  model: Monitor,
+  "host name": Monitor,
+  "s/n": Barcode,
+  "s/n or s/t": Barcode,
+  "ip address": Globe,
+  mt: Wrench,
+  "esx version": Cpu,
+  "synapse version": Server,
+  "license studies": ClipboardList,
+  "current studies per year": ClipboardList,
+  os: Monitor,
+  "definition date": CalendarDays
+};
+
+function ReportsPageInner() {
   const { lang, t } = useUi();
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const reportSectionParam = searchParams.get("section");
   const { email, signature, userName } = useCurrentUser();
+  const ownerParam = useOwnerFromUrl();
   const { data, error } = usePmData();
+  const reportSection = parseReportSection(searchParams.get("section"));
   const [query, setQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [ownerFilter, setOwnerFilter] = useState(ALL_OWNERS_VALUE);
+  const [pmOwnerFilter, setPmOwnerFilter] = useState("");
+  const [pmResultFilter, setPmResultFilter] = useState("");
+  const [operationalOwnerFilter, setOperationalOwnerFilter] = useState("");
+  const [operationalPeriodType, setOperationalPeriodType] = useState<ReportPeriodType>("daily");
+  const [operationalStartDate, setOperationalStartDate] = useState("");
+  const [operationalEndDate, setOperationalEndDate] = useState("");
+  const [operationalAnchorStart, setOperationalAnchorStart] = useState("");
+  const [operationalAnchorEnd, setOperationalAnchorEnd] = useState("");
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const responsibleName = userName.trim() || email || "";
   const responsibleSignature = signature || getStoredUserSignature(email);
+  const pmOwner = resolveActiveOwner({
+    selectedOwner: pmOwnerFilter,
+    ownerParam,
+    userName
+  });
+  const operationalOwner = resolveActiveOwner({
+    selectedOwner: operationalOwnerFilter,
+    ownerParam,
+    userName
+  });
   const ownerOptions = useMemo(
     () => buildUniqueOwnerOptions(
+      [userName],
+      data.owners,
       data.reportRows.flatMap((row) => row.inspector.split(", ")),
+      data.pmJobs.map((job) => job.owner),
       data.siteCatalog.map((site) => site.owner)
     ),
-    [data.reportRows, data.siteCatalog]
+    [data.owners, data.pmJobs, data.reportRows, data.siteCatalog, userName]
   );
+  const periodRange = useMemo(
+    () => getPeriodRange(operationalPeriodType, {
+      anchor: "",
+      anchorEnd: operationalAnchorEnd,
+      anchorStart: operationalAnchorStart,
+      dailyEndDate: operationalEndDate,
+      dailyStartDate: operationalStartDate
+    }),
+    [
+      operationalAnchorEnd,
+      operationalAnchorStart,
+      operationalEndDate,
+      operationalPeriodType,
+      operationalStartDate
+    ]
+  );
+
+  useEffect(() => {
+    if (!searchParams.get("section")) {
+      router.replace("/reports?section=pm", { scroll: false });
+    }
+  }, [router, searchParams]);
+
+  useEffect(() => {
+    setPreview(null);
+  }, [pathname, reportSectionParam]);
+
+  useEffect(() => {
+    if (!pmOwnerFilter && userName) {
+      setPmOwnerFilter(userName);
+    }
+
+    if (!operationalOwnerFilter && userName) {
+      setOperationalOwnerFilter(userName);
+    }
+  }, [operationalOwnerFilter, pmOwnerFilter, userName]);
+
   const filteredReports = useMemo(() => (
     data.reportRows.filter((row) => rowMatchesFilters({
       endDate,
-      ownerFilter,
+      ownerFilter: pmOwner,
       query,
+      result: row.result,
+      resultFilter: pmResultFilter,
       rowDate: toInputDate(row.date),
       searchableText: `${row.site} ${row.customer} ${row.inspector} ${row.province}`,
       startDate,
       owners: row.inspector.split(", ")
     }))
-  ), [data.reportRows, endDate, ownerFilter, query, startDate]);
-  const openReportPreview = (row: ReportRow) => {
+  ), [data.reportRows, endDate, pmOwner, pmResultFilter, query, startDate]);
+  const openReportPreview = (row: ReportRow, contractIndex?: number) => {
     setPreview({
-      contractIndex: row.workDetails?.contractIndex ?? 0,
+      contractIndex: contractIndex ?? row.workDetails?.contractIndex ?? 0,
       row,
       site: data.siteCatalog.find((site) => site.id === row.siteId) ?? null,
       title: `รายงาน PM - ${row.site}`
     });
+  };
+  const handleOperationalPeriodTypeChange = (value: ReportPeriodType) => {
+    setOperationalPeriodType(value);
+
+    if (value !== "monthly" && value !== "yearly") {
+      return;
+    }
+
+    const today = new Date();
+
+    if (value === "monthly" && !operationalAnchorStart && !operationalAnchorEnd) {
+      const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+      setOperationalAnchorStart(currentMonth);
+      setOperationalAnchorEnd(currentMonth);
+      return;
+    }
+
+    if (value === "yearly" && !operationalAnchorStart && !operationalAnchorEnd) {
+      const currentYear = String(today.getFullYear());
+      setOperationalAnchorStart(currentYear);
+      setOperationalAnchorEnd(currentYear);
+    }
   };
 
   return (
@@ -147,42 +310,123 @@ export default function ReportsPage() {
           />
         ) : (
           <>
-            <PageTitle title={t("reports.title")} subtitle={t("reports.subtitle")} />
-
-            <section className="toolbar reportToolbar">
-              <div className="reportFilterField">
-                <span>{t("common.search")}</span>
-                <SearchControl placeholder={t("reports.searchInput")} value={query} onChange={setQuery} />
-              </div>
-              <label className="reportFilterField reportDateRangeField">
-                <span>{t("common.dateRange")}</span>
-                <DateRangePicker
-                  endDate={endDate}
-                  startDate={startDate}
-                  onEndDateChange={setEndDate}
-                  onStartDateChange={setStartDate}
-                />
-              </label>
-              <label className="reportFilterField">
-                <span>{t("common.inspector")}</span>
-                <AppSelect className="select" firstNameOnly value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
-                  <option value={ALL_OWNERS_VALUE}>{t("common.all")}</option>
-                  {ownerOptions.map((owner) => (
-                    <option key={owner} value={owner}>{owner}</option>
-                  ))}
-                </AppSelect>
-              </label>
-            </section>
-
-            <ChecklistReportPanel
-              filteredReports={filteredReports}
-              lang={lang}
-              onPreviewReport={openReportPreview}
+            <PageTitle
+              title={t(`reports.sections.${reportSection}`)}
+              subtitle={t("reports.subtitle")}
             />
+
+            {reportSection === "pm" ? (
+              <>
+                <section className="toolbar reportToolbar">
+                  <div className="reportFilterField">
+                    <span>{t("common.search")}</span>
+                    <SearchControl placeholder={t("reports.searchInput")} value={query} onChange={setQuery} />
+                  </div>
+                  <label className="reportFilterField reportDateRangeField">
+                    <span>{t("common.dateRange")}</span>
+                    <DateRangePicker
+                      endDate={endDate}
+                      startDate={startDate}
+                      onEndDateChange={setEndDate}
+                      onStartDateChange={setStartDate}
+                    />
+                  </label>
+                  <label className="reportFilterField">
+                    <span>{t("common.status")}</span>
+                    <AppSelect className="select" value={pmResultFilter} onChange={(event) => setPmResultFilter(event.target.value)}>
+                      <option value="">{t("common.all")}</option>
+                      <option value="ปกติ">{t("common.normal")}</option>
+                      <option value="ผิดปกติ">{t("common.abnormal")}</option>
+                    </AppSelect>
+                  </label>
+                  <label className="reportFilterField">
+                    <span>{t("common.inspector")}</span>
+                    <AppSelect className="select" firstNameOnly value={pmOwnerFilter} onChange={(event) => setPmOwnerFilter(event.target.value)}>
+                      <option value={ALL_OWNERS_VALUE}>{t("common.all")}</option>
+                      {ownerOptions.map((owner) => (
+                        <option key={owner} value={owner}>{owner}</option>
+                      ))}
+                    </AppSelect>
+                  </label>
+                </section>
+
+                <ChecklistReportPanel
+                  filteredReports={filteredReports}
+                  lang={lang}
+                  onPreviewReport={openReportPreview}
+                />
+              </>
+            ) : null}
+
+            {reportSection === "plan" ? (
+              <SchedulePlanReportPanel
+                filterProps={{
+                  anchorEnd: operationalAnchorEnd,
+                  anchorStart: operationalAnchorStart,
+                  endDate: operationalEndDate,
+                  ownerFilter: operationalOwnerFilter,
+                  ownerOptions,
+                  onAnchorEndChange: setOperationalAnchorEnd,
+                  onAnchorStartChange: setOperationalAnchorStart,
+                  onEndDateChange: setOperationalEndDate,
+                  onOwnerFilterChange: setOperationalOwnerFilter,
+                  onPeriodTypeChange: handleOperationalPeriodTypeChange,
+                  onStartDateChange: setOperationalStartDate,
+                  periodType: operationalPeriodType,
+                  startDate: operationalStartDate
+                }}
+                ownerFilter={operationalOwner}
+                periodRange={periodRange}
+                pmJobs={data.pmJobs}
+                siteCatalog={data.siteCatalog}
+              />
+            ) : null}
+
+            {reportSection === "site" ? (
+              <SiteInventoryReportPanel
+                filterProps={{
+                  anchorEnd: operationalAnchorEnd,
+                  anchorStart: operationalAnchorStart,
+                  endDate: operationalEndDate,
+                  ownerFilter: operationalOwnerFilter,
+                  ownerOptions,
+                  onAnchorEndChange: setOperationalAnchorEnd,
+                  onAnchorStartChange: setOperationalAnchorStart,
+                  onEndDateChange: setOperationalEndDate,
+                  onOwnerFilterChange: setOperationalOwnerFilter,
+                  onPeriodTypeChange: handleOperationalPeriodTypeChange,
+                  onStartDateChange: setOperationalStartDate,
+                  periodType: operationalPeriodType,
+                  startDate: operationalStartDate
+                }}
+                ownerFilter={operationalOwner}
+                periodRange={periodRange}
+                pmJobs={data.pmJobs}
+                siteCatalog={data.siteCatalog}
+              />
+            ) : null}
           </>
         )}
       </div>
     </AppShell>
+  );
+}
+
+function ReportsPageFallback() {
+  const { t } = useUi();
+
+  return (
+    <AppShell loading>
+      <PageTitle title={t("nav.reports")} subtitle={t("reports.reportList")} />
+    </AppShell>
+  );
+}
+
+export default function ReportsPage() {
+  return (
+    <Suspense fallback={<ReportsPageFallback />}>
+      <ReportsPageInner />
+    </Suspense>
   );
 }
 
@@ -259,43 +503,59 @@ function ChecklistReportPanel({
 }: {
   filteredReports: ReportRow[];
   lang: Lang;
-  onPreviewReport: (row: ReportRow) => void;
+  onPreviewReport: (row: ReportRow, contractIndex?: number) => void;
 }) {
   const { t } = useUi();
+  const listTopRef = useRef<HTMLDivElement>(null);
+  const listPagination = useReportListPagination(filteredReports);
 
   return (
-    <section className="reportListPanel reportListOnly">
-      <div className="panelTitleRow">
-        <h2>{t("reports.reportList")}</h2>
-        <span>{filteredReports.length}</span>
-      </div>
-      <div className="rows reportRows">
-        {filteredReports.length > 0 ? filteredReports.map((row) => (
-          <button
-            aria-label={`${t("reports.preview")} ${row.site}`}
-            className="row reportListRow"
-            key={row.id}
-            type="button"
-            onClick={() => onPreviewReport(row)}
-          >
-            <div>
-              <strong>{row.site}</strong>
-              <span className={row.result === "ผิดปกติ" ? "statusPill danger" : "statusPill success"}>{localizeLabel(row.result, lang)}</span>
-            </div>
-            <small>
-              <UserRound size={13} /> {row.customer}
-              <CalendarDays size={13} /> {row.date}
-              <span>{t("common.inspectorPrefix")}: {row.inspector}</span>
-              <MapPin size={13} /> {row.province}
-            </small>
-            {/* <span className="reportPreviewCue">
-              <Eye size={14} />
-              {t("reports.preview")}
-            </span> */}
-          </button>
+    <div className="reportAnalyticsPanel">
+      <section className="reportListPanel reportListOnly">
+        <div ref={listTopRef} className="panelTitleRow">
+          <h2>{t("reports.reportList")}</h2>
+          <span>{listPagination.totalItems}</span>
+        </div>
+        <div className="rows reportRows">
+        {listPagination.items.length > 0 ? listPagination.items.map((row) => (
+            <article className="row reportListRow" key={row.id}>
+              <div className="reportListRowMain">
+                <div>
+                  <strong>{row.site}</strong>
+                  <span className={row.result === "ผิดปกติ" ? "statusPill danger" : "statusPill success"}>{localizeLabel(row.result, lang)}</span>
+                </div>
+                <small>
+                  <UserRound size={13} /> {row.customer}
+                  <CalendarDays size={13} /> {row.date}
+                  <span>{t("common.inspectorPrefix")}: {row.inspector}</span>
+                  <MapPin size={13} /> {row.province}
+                </small>
+              </div>
+              <div className="reportListRowActions">
+                <button
+                  aria-label={`${t("reports.preview")} ${row.site}`}
+                  className="button primary reportListPreviewButton"
+                  type="button"
+                  onClick={() => onPreviewReport(row)}
+                >
+                  <Eye size={14} />
+                  {t("reports.preview")}
+                </button>
+              </div>
+            </article>
         )) : <EmptyState message={t("reports.empty")} />}
-      </div>
-    </section>
+        </div>
+      </section>
+      <ReportListPagination
+        endIndex={listPagination.endIndex}
+        page={listPagination.page}
+        scrollTargetRef={listTopRef as RefObject<HTMLElement | null>}
+        startIndex={listPagination.startIndex}
+        totalItems={listPagination.totalItems}
+        totalPages={listPagination.totalPages}
+        onPageChange={listPagination.setPage}
+      />
+    </div>
   );
 }
 
@@ -386,6 +646,43 @@ function ReportDocumentPacket({
   row: ReportRow;
   site: SiteCatalogRecord | null;
 }) {
+  const contractIndices = useMemo(
+    () => resolveReportContractIndices(site, contractIndex),
+    [contractIndex, site]
+  );
+
+  return (
+    <>
+      {contractIndices.map((index) => (
+        <ReportDocumentPacketForContract
+          contractIndex={index}
+          key={`contract-packet-${index}`}
+          pmJobs={pmJobs}
+          responsibleName={responsibleName}
+          responsibleSignature={responsibleSignature}
+          row={row}
+          site={site}
+        />
+      ))}
+    </>
+  );
+}
+
+function ReportDocumentPacketForContract({
+  contractIndex,
+  pmJobs,
+  responsibleName,
+  responsibleSignature,
+  row,
+  site
+}: {
+  contractIndex: number;
+  pmJobs: PmJobRecord[];
+  responsibleName: string;
+  responsibleSignature: string;
+  row: ReportRow;
+  site: SiteCatalogRecord | null;
+}) {
   const reportRow = useMemo(() => ({
     ...row,
     workDetails: mergeWorkDetailsForContract(row.workDetails, contractIndex)
@@ -393,7 +690,7 @@ function ReportDocumentPacket({
   const reportGroups = getReportGroups(reportRow.workDetails);
 
   return (
-    <div className="reportDocumentStack">
+  <>
       <CoverTemplatePage
         contractIndex={contractIndex}
         groups={reportGroups}
@@ -407,14 +704,14 @@ function ReportDocumentPacket({
         group.sets.map((set, setIndex) => (
           <ChecklistSetPage
             group={group}
-            key={`${group.key}-${set.title}-${setIndex}`}
+            key={`${contractIndex}-${group.key}-${set.title}-${setIndex}`}
             row={reportRow}
             set={set}
             site={site}
           />
         ))
       ))}
-    </div>
+    </>
   );
 }
 
@@ -441,57 +738,71 @@ function CoverTemplatePage({
   const projectName = getSiteProjectName(site, contractIndex) || row.site;
   const visitRoundText = getVisitRoundText(pmJobs, row, site, contractIndex);
 
+  const summaryNote = row.workDetails?.summaryNote?.trim() ?? "";
+
   return (
     <section className="templateSheet coverSheet">
-      <TemplateHeader heading="Preventive Maintenance" row={row} />
-      <table className="templateTable coverInfoTable">
-        <tbody>
-          <tr>
-            <th>โครงการ</th>
-            <td>{projectName}</td>
-          </tr>
-          <tr>
-            <th>หน่วยงาน</th>
-            <td>{site?.department ?? ""}</td>
-          </tr>
-          <tr>
-            <th>สถาบัน</th>
-            <td>{row.customer}</td>
-          </tr>
-          <tr>
-            <th>ครั้งที่ตรวจสอบ</th>
-            <td>{visitRoundText}</td>
-          </tr>
-        </tbody>
-      </table>
+      <TemplateHeader heading="Preventive Maintenance" icon={Wrench} row={row} />
+      <div className="coverMetaStrip">
+        <div className="coverMetaField">
+          <span>วันที่</span>
+          <strong>{row.date}</strong>
+        </div>
+        <div className="coverMetaField">
+          <span>ครั้งที่</span>
+          <strong>{visitRoundText}</strong>
+        </div>
+      </div>
 
-      <table className="templateTable coverDeviceTable">
-        <thead>
-          <tr>
-            <th colSpan={5}>รายละเอียดอุปกรณ์</th>
-          </tr>
-          <tr>
-            <th>ลำดับที่</th>
-            <th>รายการ</th>
-            <th>จำนวน</th>
-            <th>สถานะ</th>
-            <th>หมายเหตุ</th>
-          </tr>
-        </thead>
-        <tbody>
-          {groups.map((group, index) => (
-            <tr key={`${group.key}-${group.title}`}>
-              <td>{index + 1}</td>
-              <td>{getChecklistHeading(group.key, group.title)}</td>
-              <td>{group.sets.length}</td>
-              <td className="reportStatusCell"><StatusMark variant="ok" /></td>
-              <td />
+      <div className="coverProjectList">
+        <CoverProjectRow icon={ClipboardList} label="โครงการ" value={projectName} />
+        <CoverProjectRow icon={Building2} label="หน่วยงาน" value={site?.department ?? ""} />
+        <CoverProjectRow icon={Hospital} label="สถาบัน" value={row.customer} />
+      </div>
+
+      <div className="reportSectionCard coverDeviceSection">
+        <div className="reportSectionHeading coverDeviceHeading">
+          <ClipboardList size={15} />
+          <span>รายละเอียดอุปกรณ์</span>
+        </div>
+        <table className="templateTable coverDeviceTable">
+          <thead>
+            <tr>
+              <th>ลำดับที่</th>
+              <th>รายการ</th>
+              <th>จำนวน</th>
+              <th>สถานะ</th>
+              <th>หมายเหตุ</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {groups.map((group, index) => (
+              <tr key={`${group.key}-${group.title}`}>
+                <td>{index + 1}</td>
+                <td>{getChecklistListLabel(group.key, group.title)}</td>
+                <td>{group.sets.length}</td>
+                <td className="reportStatusCell">
+                  <ReportStatusLabel result="ok" />
+                </td>
+                <td />
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      <div className="signatureGrid">
+      <div className="coverSuggestionBlock">
+        <div className="coverSuggestionHeading">
+          <ClipboardList size={15} />
+          ข้อเสนอแนะ
+        </div>
+        <p>{summaryNote || "\u00a0"}</p>
+        <span className="coverSuggestionLine" aria-hidden="true" />
+        <span className="coverSuggestionLine" aria-hidden="true" />
+        <span className="coverSuggestionLine" aria-hidden="true" />
+      </div>
+
+      <div className="signatureGrid coverSignatureGrid">
         <SignaturePersonBox
           date={row.date}
           label="ผู้เข้าดำเนินการ"
@@ -507,7 +818,29 @@ function CoverTemplatePage({
           signature={customerSignature}
         />
       </div>
+
+      <CompanyContactFooter />
     </section>
+  );
+}
+
+function CoverProjectRow({
+  icon: Icon,
+  label,
+  value
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="coverProjectRow">
+      <div className="coverProjectLabel">
+        <Icon size={14} />
+        <span>{label}</span>
+      </div>
+      <div className="coverProjectValue">{value}</div>
+    </div>
   );
 }
 
@@ -560,44 +893,104 @@ function ChecklistSetPage({
 }) {
   const heading = getChecklistHeading(group.key, group.title);
   const showSetTitle = group.sets.length > 1 || !set.title.toLowerCase().includes(String(group.title).toLowerCase());
+  const usesSidebar = group.key !== "environment";
 
   return (
     <section className="templateSheet">
-      <TemplateHeader heading={heading} row={row} />
+      <TemplateHeader heading={heading} icon={checklistTitleIcons[group.key] ?? ClipboardList} row={row} />
       {showSetTitle ? <div className="templateSetTitle">{set.title}</div> : null}
       {group.key === "diag" ? (
         <DiagReportInfoGrid groupKey={group.key} row={row} set={set} site={site} />
-      ) : null}
-      {set.blocks.map((block, blockIndex) => (
-        group.key === "diag" && isDiagCalibrateBlock(block) ? (
-          isFirstDiagCalibrateBlock(set.blocks, blockIndex) ? (
-            <DiagCalibrateTable
-              blocks={getDiagCalibrateBlocks(set.blocks)}
-              groupKey={group.key}
-              key={`${set.title}-diag-calibrate`}
-              row={row}
-              setTitle={set.title}
-              site={site}
-            />
-          ) : null
-        ) : shouldSkipReportBlock(group.key, block) ? null : (
-          <ReportChecklistBlock
-            block={block}
-            blockIndex={blockIndex}
-            groupKey={group.key}
-            key={`${set.title}-${blockIndex}`}
-            row={row}
-            setTitle={set.title}
-            site={site}
-          />
-        )
-      ))}
-      <TemplateFooter
-        compact={group.key === "environment" || group.key === "diag"}
-        row={row}
-      />
+      ) : (
+        <ChecklistInfoSection fields={getSetInfoFields(group.key, row, set, site)} groupKey={group.key} row={row} site={site} />
+      )}
+      <div className={usesSidebar ? "templateBody withSidebar" : "templateBody footerSummary"}>
+        <div className="templateMain">
+          {set.blocks.map((block, blockIndex) => (
+            group.key === "diag" && isDiagCalibrateBlock(block) ? (
+              isFirstDiagCalibrateBlock(set.blocks, blockIndex) ? (
+                <DiagCalibrateTable
+                  blocks={getDiagCalibrateBlocks(set.blocks)}
+                  groupKey={group.key}
+                  key={`${set.title}-diag-calibrate`}
+                  row={row}
+                  setTitle={set.title}
+                  site={site}
+                />
+              ) : null
+            ) : shouldSkipReportBlock(group.key, block) ? null : (
+              <ReportChecklistBlock
+                block={block}
+                blockIndex={blockIndex}
+                groupKey={group.key}
+                key={`${set.title}-${blockIndex}`}
+                row={row}
+                setTitle={set.title}
+                site={site}
+              />
+            )
+          ))}
+        </div>
+        {usesSidebar ? <ReportSummarySidebar row={row} /> : null}
+      </div>
+      {usesSidebar ? null : (
+        <>
+          <ReportSummaryBar row={row} />
+          <ReportSparePartsBlock parts={getReportSpareParts(row.workDetails)} />
+        </>
+      )}
+      <CompanyContactFooter />
     </section>
   );
+}
+
+function getSetInfoFields(
+  groupKey: string,
+  row: ReportRow,
+  set: SavedChecklistSet,
+  site: SiteCatalogRecord | null
+) {
+  const details = row.workDetails;
+  const infoBlock = set.blocks.find(
+    (block): block is Extract<SavedChecklistBlock, { type: "fields" }> => block.type === "fields" && isReportInfoBlock(block)
+  );
+
+  if (!infoBlock) {
+    return [] as ReportField[];
+  }
+
+  const blockIndex = set.blocks.indexOf(infoBlock);
+
+  return getVisibleReportFields(groupKey, infoBlock).map((field) => ({
+    label: field.label,
+    value: getReportFieldValue({
+      blockIndex,
+      details,
+      field,
+      groupKey,
+      row,
+      setTitle: set.title,
+      site
+    })
+  }));
+}
+
+function ChecklistInfoSection({
+  fields,
+  groupKey,
+  row,
+  site
+}: {
+  fields: ReportField[];
+  groupKey: string;
+  row: ReportRow;
+  site: SiteCatalogRecord | null;
+}) {
+  if (fields.length === 0) {
+    return null;
+  }
+
+  return <ReportInfoGrid fields={fields} groupKey={groupKey} row={row} site={site} />;
 }
 
 type DiagCalibrateBlockEntry = {
@@ -605,19 +998,177 @@ type DiagCalibrateBlockEntry = {
   blockIndex: number;
 };
 
-function TemplateHeader({ heading, row }: { heading: string; row?: ReportRow }) {
+function TemplateHeader({
+  heading,
+  icon: Icon = ClipboardList,
+  row
+}: {
+  heading: string;
+  icon?: LucideIcon;
+  row?: ReportRow;
+}) {
   return (
-    <header className="templateHeader">
-      <div className="templateHeaderLogo">
-        <Image src="/report-templates/LOGO-JF.webp" alt="JF Advance Med" width={132} height={62} />
+  <>
+      <header className="templateBrandHeader templateBrandHeaderSheetCenter">
+        <div className="reportBrandLogoSlot">
+          <Image src="/report-templates/LOGO-JF.webp" alt="JF Advance Med" width={118} height={55} />
+        </div>
+        <p className="templateBrandText reportBrandTitleCenter">
+          <strong>JF Advance Med CO., LTD</strong>
+          <span>Service Report</span>
+        </p>
+        <div className="templateReportBadge reportBrandAside">
+          <span className="templateReportBadgeLabel">SERVICE REPORT NO.</span>
+          <strong>
+            {row
+              ? getDisplayPmOrderNo({
+                  date: row.date,
+                  jobId: row.jobId,
+                  workDetails: row.workDetails
+                })
+              : ""}
+          </strong>
+          <span>วันที่ตรวจสอบ : {row?.date ?? ""}</span>
+        </div>
+      </header>
+      <div className="templateTitleBanner">
+        <span className="templateTitleBannerIcon">
+          <Icon size={18} />
+        </span>
+        <strong>{heading}</strong>
       </div>
-      <strong className="templateHeaderTitle">{heading}</strong>
-      <div className="templateHeaderMeta">
-        <span>JF Advance Med CO., LTD</span>
-        <span className="pmOrderNo">PM Order No. : {row ? getDisplayPmOrderNo(row) : ""}</span>
-        <span>{row?.date ?? ""}</span>
+    </>
+  );
+}
+
+function CompanyContactFooter() {
+  return (
+    <footer className="templateCompanyFooter">
+      <div>
+        <MapPin size={13} />
+        <span>{companyContact.address}</span>
       </div>
-    </header>
+      <div>
+        <Phone size={13} />
+        <span>{companyContact.phone}</span>
+      </div>
+      <div>
+        <Mail size={13} />
+        <span>{companyContact.email}</span>
+      </div>
+      <div>
+        <Globe size={13} />
+        <span>{companyContact.website}</span>
+      </div>
+    </footer>
+  );
+}
+
+function ReportSparePartsBlock({ parts }: { parts: SavedSparePart[] }) {
+  if (parts.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="reportSparePartsBlock">
+      <strong>อะไหล่ที่เปลี่ยน :</strong>
+      <span>1. {formatSparePart(parts[0])}</span>
+      <span>2. {formatSparePart(parts[1])}</span>
+    </div>
+  );
+}
+
+function ReportSummarySidebar({ row }: { row: ReportRow }) {
+  const details = row.workDetails;
+  const finalStatus = details?.finalStatus ?? (row.result === "ผิดปกติ" ? "abnormal" : "normal");
+  const spareParts = getReportSpareParts(details);
+
+  return (
+    <aside className="reportSummaryAside">
+      <div className="reportSummaryCard">
+        <div className="reportSummaryCardHeading">
+          <BarChart3Icon />
+          <span>SUMMARY</span>
+        </div>
+        <div className="reportSummaryResultBox">
+          <span className="reportSummaryResultLabel">Overall Result</span>
+          <div className={finalStatus === "abnormal" ? "reportOverallResult abnormal" : "reportOverallResult"}>
+            <StatusMark variant={finalStatus === "abnormal" ? "bad" : "ok"} />
+            <em>({finalStatus === "abnormal" ? "ผิดปกติ" : "ปกติ"})</em>
+          </div>
+        </div>
+        <div className="reportRemarksBlock">
+          <strong>หมายเหตุ :</strong>
+          <p>{details?.summaryNote?.trim() ?? ""}</p>
+          <span className="coverSuggestionLine" aria-hidden="true" />
+          <span className="coverSuggestionLine" aria-hidden="true" />
+          <span className="coverSuggestionLine" aria-hidden="true" />
+        </div>
+        <ReportSparePartsBlock parts={spareParts} />
+      </div>
+
+      <div className="reportWorkTimeCard">
+        <div className="reportSummaryCardHeading">
+          <Clock3 size={14} />
+          <span>WORK TIME</span>
+        </div>
+        <table className="templateTable reportWorkTimeTable">
+          <tbody>
+            <tr>
+              <th>Start Time</th>
+              <td>{details?.startTime ?? row.startTime}</td>
+            </tr>
+            <tr>
+              <th>Finish Time</th>
+              <td>{details?.endTime ?? row.endTime}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </aside>
+  );
+}
+
+function BarChart3Icon() {
+  return (
+    <svg aria-hidden="true" height="14" viewBox="0 0 24 24" width="14">
+      <path d="M4 20V10M10 20V4M16 20v-6M22 20V14" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function ReportSummaryBar({ row }: { row: ReportRow }) {
+  const details = row.workDetails;
+  const finalStatus = details?.finalStatus ?? (row.result === "ผิดปกติ" ? "abnormal" : "normal");
+
+  return (
+    <div className="reportSummaryBar">
+      <div className="reportSummaryBarCard">
+        <strong>SUMMARY OVERALL RESULT</strong>
+        <div className={finalStatus === "abnormal" ? "reportOverallResult abnormal inline" : "reportOverallResult inline"}>
+          <StatusMark variant={finalStatus === "abnormal" ? "bad" : "ok"} />
+          <em>({finalStatus === "abnormal" ? "ผิดปกติ" : "ปกติ"})</em>
+        </div>
+      </div>
+      <div className="reportWorkTimeCard inline">
+        <div className="reportSummaryCardHeading">
+          <Clock3 size={14} />
+          <span>WORK TIME</span>
+        </div>
+        <table className="templateTable reportWorkTimeTable">
+          <tbody>
+            <tr>
+              <th>Start Time</th>
+              <td>{details?.startTime ?? row.startTime}</td>
+            </tr>
+            <tr>
+              <th>Finish Time</th>
+              <td>{details?.endTime ?? row.endTime}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
@@ -659,9 +1210,14 @@ function ReportChecklistBlock({
   site: SiteCatalogRecord | null;
 }) {
   const details = row.workDetails;
+  const isEnvironment = groupKey === "environment";
 
   if (block.type === "fields") {
     if (shouldHideReportFieldBlock(groupKey, block)) {
+      return null;
+    }
+
+    if (isReportInfoBlock(block) && groupKey !== "diag") {
       return null;
     }
 
@@ -715,55 +1271,75 @@ function ReportChecklistBlock({
 
   if (block.type === "diagTable") {
     return (
-      <table className="templateTable diagDeviceTable">
-        <thead>
-          <tr>
-            <th />
-            {diagDevices.map((device) => <th key={device}>{device}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {diagColumns.map((column) => (
-            <tr key={column}>
-              <th>{column}</th>
-              {diagDevices.map((device) => {
-                const resultKey = `${groupKey}:${setTitle}:${blockIndex}:${device}:${column}`;
-                return (
-                  <td className="reportStatusCell" key={`${column}-${device}`}>
-                    {resultSymbol(details?.checkResults?.[resultKey])}
-                  </td>
-                );
-              })}
+      <div className="reportSectionCard">
+        <div className="reportSectionHeading">
+          <ClipboardList size={14} />
+          <span>{block.title}</span>
+        </div>
+        <table className="templateTable diagDeviceTable">
+          <thead>
+            <tr>
+              <th />
+              {diagDevices.map((device) => <th key={device}>{device}</th>)}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {diagColumns.map((column) => (
+              <tr key={column}>
+                <th>{column}</th>
+                {diagDevices.map((device) => {
+                  const resultKey = `${groupKey}:${setTitle}:${blockIndex}:${device}:${column}`;
+                  return (
+                    <td className="reportStatusCell" key={`${column}-${device}`}>
+                      <ReportStatusLabel result={details?.checkResults?.[resultKey]} />
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
   }
 
   return (
-    <table className="templateTable checklistTemplateTable">
-      <thead>
-        <tr>
-          <th>{block.title}</th>
-          <th>STATUS</th>
-          <th>DETAIL</th>
-        </tr>
-      </thead>
-      <tbody>
-        {block.items.map((item) => {
-          const resultKey = checkKey(`${groupKey}:${setTitle}:${blockIndex}`, block.title, item);
+    <div className="reportSectionCard">
+      <div className="reportSectionHeading">
+        <ClipboardList size={14} />
+        <span>{block.title}</span>
+      </div>
+      <table className={`templateTable checklistTemplateTable${isEnvironment ? " environmentChecklistTable" : ""}`}>
+        <thead>
+          <tr>
+            {isEnvironment ? <th className="checklistNoCol">No.</th> : null}
+            <th>{isEnvironment ? "รายการตรวจสอบ" : "Item"}</th>
+            <th className="reportStatusCol">STATUS</th>
+            <th>DETAIL</th>
+          </tr>
+        </thead>
+        <tbody>
+          {block.items.map((item, itemIndex) => {
+            const resultKey = checkKey(`${groupKey}:${setTitle}:${blockIndex}`, block.title, item);
+            const detail = getChecklistDetail({ details, groupKey, item, resultKey, setTitle });
 
-          return (
-            <tr key={item}>
-              <td>{item}</td>
-              <td className="reportStatusCell">{resultSymbol(details?.checkResults?.[resultKey])}</td>
-              <td>{getChecklistDetail({ details, groupKey, item, resultKey, setTitle })}</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+            return (
+              <tr key={item}>
+                {isEnvironment ? <td className="checklistNoCol">{itemIndex + 1}</td> : null}
+                <td>{item}</td>
+                <td className="reportStatusCell">
+                  <ReportStatusLabel
+                    result={details?.checkResults?.[resultKey]}
+                    thaiLabel={isEnvironment}
+                  />
+                </td>
+                <td>{detail}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -781,9 +1357,13 @@ function DiagCalibrateTable({
   site: SiteCatalogRecord | null;
 }) {
   const details = row.workDetails;
-
   return (
-    <table className="templateTable diagCalibrateTable">
+    <div className="reportSectionCard">
+      <div className="reportSectionHeading">
+        <ClipboardList size={14} />
+        <span>DIAGNOSTIC - CALIBRATION RESULT</span>
+      </div>
+      <table className="templateTable diagCalibrateTable">
       <thead>
         <tr>
           <th className="diagCalibrateTitle" colSpan={4}>CALIBRATE</th>
@@ -806,7 +1386,9 @@ function DiagCalibrateTable({
             <th>Monitor {getDiagMonitorNumber(entry.block.title) ?? index + 1}</th>
             <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label.includes("brand / model"), groupKey, row, setTitle, site })}</td>
             <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label === "s/n", groupKey, row, setTitle, site })}</td>
-            <td className="reportStatusCell">{resultSymbol(details?.checkResults?.[diagCalibrateStatusKey(groupKey, setTitle, entry.blockIndex, entry.block.title)])}</td>
+            <td className="reportStatusCell">
+              <ReportStatusLabel result={details?.checkResults?.[diagCalibrateStatusKey(groupKey, setTitle, entry.blockIndex, entry.block.title)]} />
+            </td>
             <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label.includes("target min"), groupKey, row, setTitle, site })}</td>
             <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label.includes("target max"), groupKey, row, setTitle, site })}</td>
             <td>{getDiagCalibrateValue({ details, entry, fieldMatcher: (label) => label.includes("result min"), groupKey, row, setTitle, site })}</td>
@@ -815,6 +1397,7 @@ function DiagCalibrateTable({
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 
@@ -911,30 +1494,34 @@ function DiagReportInfoGrid({
   );
 
   return (
-    <section className="reportInfoBlock">
-      <div className="reportCustomerRow">
-        <strong>Customer Name :</strong>
-        <span>{fieldValue("Customer Name")}</span>
+    <section className="reportInfoBlock diagInfoBlock">
+      <div className="reportSectionHeading compact">
+        <UserRound size={14} />
+        <span>CUSTOMER INFORMATION</span>
       </div>
-      <div className="reportInfoGrid">
-        <ReportFieldValue label="Location" value={fieldValue("Location")} />
-        <ReportFieldValue label="Brand" value={fieldValue("Brand")} />
-        <ReportFieldValue label="Model" value={fieldValue("Model")} />
-        <ReportFieldValue label="S/N" value={fieldValue("S/N")} />
-        <ReportFieldValue label="IP Address" value={fieldValue("IP Address")} />
-        <ReportFieldValue label="OS" value={fieldValue("OS")} />
-        <div className="fieldLabel diagAntivirusField">
-          <span>Antivirus :</span>
-          <div className="diagCheckboxRow">
-            {["Installed", "No Installation"].map((item) => (
-              <label className="choiceItem" key={item}>
-                <CheckBoxMark checked={selectedAntivirus === item} />
-                {item}
-              </label>
-            ))}
-          </div>
+      <div className="reportIconGrid cols3">
+        <ReportIconField label="Customer Name" value={fieldValue("Customer Name")} />
+        <ReportIconField label="Location" value={fieldValue("Location")} />
+        <ReportIconField label="Brand" value={fieldValue("Brand")} />
+        <ReportIconField label="Model" value={fieldValue("Model")} />
+        <ReportIconField label="S/N" value={fieldValue("S/N")} />
+        <ReportIconField label="IP Address" value={fieldValue("IP Address")} />
+        <ReportIconField label="OS" value={fieldValue("OS")} />
+        <div className="reportIconField antivirusField">
+          <span className="reportIconFieldIcon"><Monitor size={15} /></span>
+          <span className="reportIconFieldBody">
+            <em>Antivirus</em>
+            <div className="diagCheckboxRow">
+              {["Installed", "No Installation"].map((item) => (
+                <label className="choiceItem" key={item}>
+                  <CheckBoxMark checked={selectedAntivirus === item} />
+                  {item}
+                </label>
+              ))}
+            </div>
+          </span>
         </div>
-        <ReportFieldValue label="Definition Date" value={fieldValue("Definition Date")} />
+        <ReportIconField label="Definition Date" value={fieldValue("Definition Date")} />
       </div>
     </section>
   );
@@ -952,38 +1539,65 @@ function ReportInfoGrid({
   site: SiteCatalogRecord | null;
 }) {
   const fieldValue = (label: string) => fields.find((field) => field.label === label)?.value ?? "";
-  const customerName = fieldValue("Customer Name") || getFallbackFieldValue("Customer Name", row, site);
-  const orderedFields = getReportInfoFieldOrder(groupKey, fields)
-    .map((label) => ({ label, value: fieldValue(label) }))
-    .filter((field) => field.label !== "Customer Name");
+  const orderedFieldLabels = getReportInfoFieldOrder(groupKey, fields);
+  const displayFields = orderedFieldLabels.map((label) => ({
+    label,
+    value: label === "Customer Name"
+      ? fieldValue("Customer Name") || getFallbackFieldValue("Customer Name", row, site)
+      : fieldValue(label) || getFallbackFieldValue(label, row, site)
+  }));
+
+  if (groupKey === "environment") {
+    const customerName = displayFields.find((field) => field.label === "Customer Name")?.value ?? "";
+    const location = displayFields.find((field) => field.label === "Location")?.value ?? "";
+
+    return (
+      <section className="reportInfoBlock environmentInfoBlock">
+        <ReportIconField label="Customer Name" value={customerName} variant="split" />
+        <ReportIconField label="Location" value={location} variant="split" />
+      </section>
+    );
+  }
 
   return (
-    <section className="reportInfoBlock">
-      <div className="reportCustomerRow">
-        <strong>Customer Name :</strong>
-        <span>{customerName}</span>
-      </div>
-      <div className="reportInfoGrid">
-        {orderedFields.map((field) => (
-          <ReportFieldValue key={field.label} label={field.label} value={field.value} />
+    <section className={`reportInfoBlock equipmentInfoBlock${groupKey === "synapse" ? " synapseInfoBlock" : ""}`}>
+      <div className={`reportIconGrid${groupKey === "synapse" ? " cols2" : " cols3"}`}>
+        {displayFields.map((field) => (
+          <ReportIconField key={field.label} label={field.label} value={field.value} />
         ))}
       </div>
     </section>
   );
 }
 
-function ReportFieldValue({ label, value }: ReportField) {
-  const displayValue = stripFieldColon(label).toLowerCase() === "running date"
+function getReportFieldIcon(label: string) {
+  return reportFieldIcons[stripFieldColon(label).toLowerCase()] ?? ClipboardList;
+}
+
+function ReportIconField({
+  label,
+  value,
+  variant = "grid"
+}: ReportField & { variant?: "grid" | "split" }) {
+  const normalizedLabel = stripFieldColon(label).toLowerCase();
+  const displayValue = normalizedLabel === "running date" || normalizedLabel === "definition date"
     ? formatDefinitionDate(value ?? "")
     : value;
+  const className = variant === "split" ? "reportIconField split" : "reportIconField";
 
   return (
-    <div className="fieldLabel">
-      <span>{formatFieldLabel(label)}</span>
-      <i>{displayValue ?? ""}</i>
+    <div className={className}>
+      <span className="reportIconFieldIcon">
+        {createElement(getReportFieldIcon(label), { size: 15 })}
+      </span>
+      <span className="reportIconFieldBody">
+        <em>{stripFieldColon(label)}</em>
+        <strong>{displayValue ?? ""}</strong>
+      </span>
     </div>
   );
 }
+
 
 function shouldSkipReportBlock(groupKey: string, block: SavedChecklistBlock) {
   if (groupKey !== "diag") {
@@ -992,28 +1606,6 @@ function shouldSkipReportBlock(groupKey: string, block: SavedChecklistBlock) {
 
   return (block.type === "fields" && (block.title === "DIAG INFORMATION" || block.title === "DEFINITION DATE"))
     || (block.type === "radios" && block.label === "Antivirus");
-}
-
-function isReportInfoBlock(block: Extract<SavedChecklistBlock, { type: "fields" }>) {
-  return block.title.includes("INFORMATION");
-}
-
-function getReportInfoFieldOrder(groupKey: string, fields: ReportField[]) {
-  const fallbackOrder = fields.map((field) => field.label);
-  const orders: Record<string, string[]> = {
-    environment: ["Customer Name", "Location"],
-    server: ["Customer Name", "Location", "Manufacturer", "Host Name", "S/N or S/T", "Model", "IP Address", "MT", "ESX Version"],
-    storage: ["Customer Name", "Location", "Manufacturer", "Model", "S/N or S/T", "MT"],
-    switch: ["Customer Name", "Location", "Brand", "Model", "S/N", "Host Name", "IP Address"],
-    synapse: ["Customer Name", "Synapse Version", "Host Name", "License Studies", "Current Studies Per Year"]
-  };
-  const preferredOrder = orders[groupKey] ?? fallbackOrder;
-  const knownLabels = new Set(fields.map((field) => field.label));
-
-  return [
-    ...preferredOrder.filter((label) => knownLabels.has(label)),
-    ...fallbackOrder.filter((label) => !preferredOrder.includes(label))
-  ];
 }
 
 function shouldHideReportFieldBlock(groupKey: string, block: Extract<SavedChecklistBlock, { type: "fields" }>) {
@@ -1123,54 +1715,6 @@ function getSavedFieldValueByLabels(
   return "";
 }
 
-function TemplateFooter({
-  compact = false,
-  row
-}: {
-  compact?: boolean;
-  row: ReportRow;
-}) {
-  const details = row.workDetails;
-  const finalStatus = details?.finalStatus ?? (row.result === "ผิดปกติ" ? "abnormal" : "normal");
-  const spareParts = details?.spareParts?.filter((part) => part.name.trim() || part.quantity.trim() || part.note.trim()) ?? [];
-
-  return (
-    <footer className={compact ? "templateFooter compactFooter" : "templateFooter"}>
-      <div className="statusBlock">
-        <div className="statusRow">
-          <span>สรุปผลการดำเนินงาน :</span>
-          <label className="statusOption"><CheckBoxMark checked={finalStatus === "normal"} />สภาพปกติ</label>
-          <label className="statusOption"><CheckBoxMark checked={finalStatus === "abnormal"} />ผิดปกติ</label>
-        </div>
-        <div className="noteLine">
-          <span>หมายเหตุ :</span>
-          <span>{details?.summaryNote ?? ""}</span>
-        </div>
-      </div>
-      {spareParts.length > 0 ? (
-        <div className="partsBox">
-          <span>อะไหล่ที่เปลี่ยน :</span>
-          <span>1. {formatSparePart(spareParts[0])}</span>
-          <span>2. {formatSparePart(spareParts[1])}</span>
-        </div>
-      ) : null}
-      <div className="footerBottomGrid">
-        <div className="workTimeGrid">
-          <div>
-            <strong>STATUS</strong>
-            <span><StatusMark variant="ok" compact /> : Normal</span>
-            <span><StatusMark variant="bad" compact /> : Abnormal</span>
-          </div>
-          <div>
-            <strong>Work Time</strong>
-            <span>เวลาเริ่มงาน {details?.startTime ?? row.startTime}</span>
-            <span>เวลาเสร็จงาน {details?.endTime ?? row.endTime}</span>
-          </div>
-        </div>
-      </div>
-    </footer>
-  );
-}
 
 function CheckBoxMark({ checked = false }: { checked?: boolean }) {
   return <span className="checkbox">{checked ? <StatusMark variant="ok" compact /> : ""}</span>;
@@ -1186,8 +1730,7 @@ function StatusMark({ compact = false, variant }: { compact?: boolean; variant: 
 }
 
 function getReportGroups(details: PmWorkDetails | undefined): SavedChecklistGroup[] {
-  const snapshot = details?.checklistSnapshot?.filter((group) => group.sets.length > 0);
-  return snapshot && snapshot.length > 0 ? snapshot : buildFallbackChecklistGroups();
+  return resolveReportChecklistGroups(details) ?? buildFallbackChecklistGroups();
 }
 
 function buildFallbackChecklistGroups(): SavedChecklistGroup[] {
@@ -1232,7 +1775,7 @@ function buildFallbackChecklistGroups(): SavedChecklistGroup[] {
 }
 
 function getChecklistHeading(key: string, title: string) {
-  return checklistTemplates.find((template) => template.key === key)?.heading ?? `${title} Maintenance Checklist`;
+  return checklistTemplates.find((template) => template.key === key)?.heading ?? `${title.toUpperCase()} PREVENTIVE MAINTENANCE CHECKLIST`;
 }
 
 function chunkReportFields(fields: ReportField[]) {
@@ -1303,7 +1846,11 @@ function getFallbackFieldValue(label: string, row: ReportRow, site: SiteCatalogR
   }
 
   if (normalizedLabel === "pm order no" || normalizedLabel === "pm order no.") {
-    return getDisplayPmOrderNo(row);
+    return getDisplayPmOrderNo({
+      date: row.date,
+      jobId: row.jobId,
+      workDetails: row.workDetails
+    });
   }
 
   return "";
@@ -1330,17 +1877,26 @@ function checkKey(resultPrefix: string, title: string, item: string) {
   return `${resultPrefix}:${title}:${item}`;
 }
 
-function resultSymbol(result: CheckResult | undefined) {
-  if (result === "ok") {
-    return <StatusMark variant="ok" />;
-  }
+function ReportStatusLabel({
+  result,
+  thaiLabel = false
+}: {
+  result?: CheckResult;
+  thaiLabel?: boolean;
+}) {
+  const variant = result === "bad" ? "bad" : "ok";
+  const label = variant === "bad"
+    ? (thaiLabel ? "ผิดปกติ" : "Abnormal")
+    : (thaiLabel ? "ปกติ" : "Normal");
 
-  if (result === "bad") {
-    return <StatusMark variant="bad" />;
-  }
-
-  return <StatusMark variant="ok" />;
+  return (
+    <span className={`reportStatusLabel ${variant === "bad" ? "abnormal" : "normal"}`}>
+      <StatusMark compact variant={variant} />
+      <span>{label}</span>
+    </span>
+  );
 }
+
 
 function formatSparePart(part: SavedSparePart | undefined) {
   if (!part) {
@@ -1374,571 +1930,157 @@ function ReportPreviewPage({
   responsibleSignature: string;
 }) {
   const { t } = useUi();
-  const viewportRef = useRef<HTMLDivElement | null>(null);
-  const scaleShellRef = useRef<HTMLDivElement | null>(null);
-  const documentRef = useRef<HTMLDivElement | null>(null);
-  const [downloadType, setDownloadType] = useState<ReportDownloadType>("pdf");
-  const [showPreview, setShowPreview] = useState(false);
   const [exportMessage, setExportMessage] = useState("");
-  const isPhotoDownload = downloadType === "photos";
+  const [exportHint, setExportHint] = useState(false);
   const contracts = getSiteContractItems(preview.site);
-  const selectedContract = getSiteContractAt(preview.site, preview.contractIndex);
-  const selectedContractLabel = getSiteContractLabel(selectedContract, preview.contractIndex);
 
-  const updatePreviewScale = useCallback(() => {
-    const viewport = viewportRef.current;
-    const documentNode = documentRef.current;
-    const shell = scaleShellRef.current;
-
-    if (!viewport || !documentNode || !shell) {
-      return;
-    }
-
-    const availableWidth = Math.max(240, viewport.clientWidth - 12);
-    const nextScale = Math.min(1, availableWidth / reportPageWidth);
-
-    documentNode.style.width = `${reportPageWidth}px`;
-    documentNode.style.transformOrigin = "top left";
-    documentNode.style.transform = nextScale < 1 ? `scale(${nextScale})` : "none";
-
-    shell.style.width = `${reportPageWidth * nextScale}px`;
-    shell.style.height = `${documentNode.scrollHeight * nextScale}px`;
-  }, []);
-
-  useEffect(() => {
-    if (!showPreview || isPhotoDownload) {
-      return;
-    }
-
-    updatePreviewScale();
-    const settleTimer = window.setTimeout(updatePreviewScale, 150);
-
-    const viewport = viewportRef.current;
-    const documentNode = documentRef.current;
-
-    if (!viewport || !documentNode) {
-      return () => {
-        window.clearTimeout(settleTimer);
-      };
-    }
-
-    const resizeObserver = new ResizeObserver(() => {
-      updatePreviewScale();
-    });
-
-    resizeObserver.observe(viewport);
-    resizeObserver.observe(documentNode);
-    window.addEventListener("resize", updatePreviewScale);
-
-    return () => {
-      window.clearTimeout(settleTimer);
-      resizeObserver.disconnect();
-      window.removeEventListener("resize", updatePreviewScale);
-    };
-  }, [isPhotoDownload, preview.contractIndex, preview.row.id, showPreview, updatePreviewScale]);
-
-  const openPreview = () => {
-    if (downloadType === "photos") {
-      const photos = mergePhotoState(preview.row.workDetails?.photos);
-      const hasPhotos = photoUploadItems.some((item) => photos[item.key].length > 0);
-
-      if (!hasPhotos) {
-        setExportMessage(t("reports.noPhotosToDownload"));
-        return;
-      }
-
-      setExportMessage("");
-      setShowPreview(true);
-      return;
-    }
-
-    setShowPreview(true);
-  };
+  const { viewportRef, scaleShellRef, documentRef } = useReportPreviewScale(true);
 
   const getReportExportContent = useCallback(() => {
-    return (documentRef.current?.innerHTML ?? "").trim();
+    return getReportExportHtml(documentRef.current);
   }, []);
 
-  const printReport = () => {
+  const openReportPrintDialog = useCallback((options?: { forPdfDownload?: boolean }) => {
     const content = getReportExportContent();
 
     if (!content) {
-      setExportMessage("ไม่พบเนื้อหารายงาน กรุณารอสักครู่แล้วลองใหม่");
+      setExportHint(false);
+      setExportMessage("ไม่พบเนื้อหารายงาน กรุณากดพรีวิวแล้วลองใหม่ หรือรอสักครู่แล้วลองอีกครั้ง");
+      return false;
+    }
+
+    const didPrint = printReportPdf(
+      prepareOfficeExportContentSync(content),
+      getReportExportTitle(preview.row)
+    );
+
+    if (!didPrint) {
+      setExportHint(false);
+      setExportMessage("ไม่สามารถเปิดหน้าพิมพ์ได้ กรุณาลองใหม่อีกครั้ง");
+      return false;
+    }
+
+    if (options?.forPdfDownload) {
+      setExportHint(true);
+      setExportMessage(
+        `เปิดหน้าต่างพิมพ์แล้ว — เลือก Save as PDF / บันทึกเป็น PDF ชื่อไฟล์ควรเป็น "${getReportExportTitle(preview.row)}"`
+      );
+    } else {
+      setExportHint(false);
+      setExportMessage("");
+    }
+
+    return true;
+  }, [getReportExportContent, preview.row]);
+
+  const sendReportEmail = useCallback(async () => {
+    const content = getReportExportContent();
+
+    if (!content) {
+      setExportHint(false);
+      setExportMessage(t("reports.exportEmpty"));
       return;
     }
 
-    const didPrint = printReportPdf(content, `${preview.title} - ${selectedContractLabel}`);
+    setExportHint(false);
 
-    if (!didPrint) {
-      setExportMessage("ไม่สามารถเปิดหน้าพิมพ์ได้ กรุณาลองใหม่อีกครั้ง");
+    try {
+      const title = getReportExportTitle(preview.row);
+      const result = await sendReportByEmail({
+        title,
+        htmlContent: prepareOfficeExportContentSync(content)
+      });
+
+      if (result === "sent") {
+        setExportHint(true);
+        setExportMessage(t("reports.sendEmailSuccess").replace("{email}", REPORT_EMAIL_RECIPIENT));
+        return;
+      }
+
+      setExportHint(true);
+      setExportMessage(t("reports.sendEmailComingSoon").replace("{email}", REPORT_EMAIL_RECIPIENT));
+    } catch {
+      setExportMessage(t("reports.sendEmailFailed"));
+    }
+  }, [getReportExportContent, preview.row, t]);
+
+  const exportReportPdf = () => {
+    setExportHint(false);
+    openReportPrintDialog({ forPdfDownload: true });
+  };
+
+  const exportReportPhotos = () => {
+    setExportHint(false);
+
+    const didDownload = downloadWorkPhotosZip({
+      archiveName: getReportExportTitle(preview.row),
+      photosValue: preview.row.workDetails?.photos
+    });
+
+    if (!didDownload) {
+      setExportMessage(t("reports.noPhotosToDownload"));
       return;
     }
 
     setExportMessage("");
   };
 
-  const downloadReport = async () => {
-    try {
-      if (downloadType === "photos") {
-        const didDownload = downloadWorkPhotosZip({
-          archiveName: `${sanitizeFileName(preview.row.site)}-${selectedContractLabel}`,
-          photosValue: preview.row.workDetails?.photos
-        });
-
-        if (!didDownload) {
-          setExportMessage(t("reports.noPhotosToDownload"));
-          return;
-        }
-
-        setExportMessage("");
-        return;
-      }
-
-      const content = getReportExportContent();
-
-      if (!content) {
-        setExportMessage("ไม่พบเนื้อหารายงาน กรุณารอสักครู่แล้วลองใหม่");
-        return;
-      }
-
-      if (downloadType === "pdf") {
-        printReport();
-        return;
-      }
-
-      const html = await prepareOfficeExportContent(content);
-      const isExcel = downloadType === "excel";
-      const extension = isExcel ? "xls" : "doc";
-      const mimeType = isExcel ? "application/vnd.ms-excel;charset=utf-8" : "application/msword;charset=utf-8";
-      const blob = new Blob([
-        "\ufeff",
-        buildExportHtml(html, `${preview.title} - ${selectedContractLabel}`, isExcel ? "excel" : "word")
-      ], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${sanitizeFileName(preview.row.site)}-${selectedContractLabel}.${extension}`;
-      link.style.display = "none";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      setExportMessage("");
-    } catch {
-      setExportMessage("ไม่สามารถดาวน์โหลดไฟล์ได้ กรุณาลองใหม่อีกครั้ง");
-    }
-  };
-
   return (
-    <div className={`reportEditorPage${showPreview ? " reportEditorPagePreview" : ""}`}>
-      <header className="reportEditorHeader">
+    <div className="reportEditorPage reportEditorPagePreview">
+      <header className="reportEditorHeader reportEditorHeaderPreview">
         <button
           aria-label={t("common.back")}
           className="reportEditorBackButton"
           type="button"
-          onClick={showPreview ? () => setShowPreview(false) : onClose}
+          onClick={onClose}
         >
           <ArrowLeft size={18} />
         </button>
-        <div>
+        <div className="reportEditorHeaderMain">
           <h1>{preview.title}</h1>
-          {!showPreview ? <p>{selectedContractLabel}</p> : null}
+          <label className="reportEditorContractField">
+            <span>{t("pm.selectContract")}</span>
+            <AppSelect className="select" value={String(preview.contractIndex)} onChange={(event) => onContractIndexChange(Number(event.target.value))}>
+              <option value={String(ALL_CONTRACTS_INDEX)}>{t("common.all")}</option>
+              {contracts.map((contract, index) => (
+                <option key={index} value={index}>{getSiteContractLabel(contract, index)}</option>
+              ))}
+            </AppSelect>
+          </label>
+        </div>
+        <div className="reportEditorHeaderActions">
+          <button className="button subtle" type="button" onClick={sendReportEmail}>
+            <Mail size={16} />
+            {t("reports.sendEmail")}
+          </button>
+          <ReportExportMenu onExportPdf={exportReportPdf} onExportPhotos={exportReportPhotos} />
         </div>
       </header>
 
-      {!showPreview ? (
-        <div className="reportEditorBody">
-          <div className="reportModalControls">
-            <label className="label">
-              เลือกสัญญา
-              <AppSelect className="select" value={String(preview.contractIndex)} onChange={(event) => onContractIndexChange(Number(event.target.value))}>
-                {contracts.map((contract, index) => (
-                  <option key={index} value={index}>{getSiteContractLabel(contract, index)}</option>
-                ))}
-              </AppSelect>
-            </label>
-            <label className="label">
-              ประเภทไฟล์
-              <AppSelect className="select" value={downloadType} onChange={(event) => setDownloadType(event.target.value as ReportDownloadType)}>
-                <option value="pdf">PDF</option>
-                <option value="word">Word</option>
-                <option value="excel">Excel</option>
-                <option value="photos">{t("reports.fileTypePhotos")}</option>
-              </AppSelect>
-            </label>
-            <button className="button subtle" disabled={isPhotoDownload} type="button" onClick={printReport}>
-              <Printer size={16} />
-              {t("common.print")}
-            </button>
-            <button className="button subtle" type="button" onClick={() => void downloadReport()}>
-              <Download size={16} />
-              {t("common.download")}
-            </button>
-            <button className="button primary" type="button" onClick={openPreview}>
-              <Eye size={16} />
-              {t("reports.preview")}
-            </button>
-          </div>
-          {exportMessage ? <p className="reportExportMessage">{exportMessage}</p> : null}
-        </div>
+      {exportMessage ? (
+        <p className={exportHint ? "reportExportMessage reportExportHint" : "reportExportMessage"}>{exportMessage}</p>
       ) : null}
 
       <div
         ref={viewportRef}
-        className={
-          showPreview
-            ? (isPhotoDownload ? "reportPhotoPreviewViewport" : "reportPreviewViewport")
-            : "reportDocumentHidden"
-        }
-        aria-hidden={!showPreview}
+        className="reportPreviewViewport"
+        aria-hidden={false}
       >
-        {showPreview && isPhotoDownload ? (
-          <ReportPhotosPreview workDetails={preview.row.workDetails} />
-        ) : (
-          <div ref={scaleShellRef} className="reportPreviewScaleShell">
-            <div ref={documentRef} className="reportDocumentStack">
-              <ReportDocumentPacket
-                contractIndex={preview.contractIndex}
-                pmJobs={pmJobs}
-                responsibleName={responsibleName}
-                responsibleSignature={responsibleSignature}
-                row={preview.row}
-                site={preview.site}
-              />
-            </div>
+        <div ref={scaleShellRef} className="reportPreviewScaleShell">
+          <div ref={documentRef} className="reportDocumentStack">
+            <ReportDocumentPacket
+              contractIndex={preview.contractIndex}
+              pmJobs={pmJobs}
+              responsibleName={responsibleName}
+              responsibleSignature={responsibleSignature}
+              row={preview.row}
+              site={preview.site}
+            />
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
-}
-
-async function prepareOfficeExportContent(content: string) {
-  if (!content.trim()) {
-    return "";
-  }
-
-  const container = document.createElement("div");
-  container.innerHTML = content;
-  const images = Array.from(container.querySelectorAll("img"));
-
-  await Promise.all(images.map(async (image) => {
-    const source = image.getAttribute("src");
-
-    image.removeAttribute("srcset");
-    image.removeAttribute("sizes");
-
-    if (!source) {
-      return;
-    }
-
-    if (source.startsWith("data:image/png")) {
-      return;
-    }
-
-    const absoluteSource = new URL(source, window.location.origin).href;
-
-    try {
-      image.setAttribute("src", await imageUrlToPngDataUrl(absoluteSource));
-    } catch {
-      image.setAttribute("src", absoluteSource);
-    }
-  }));
-
-  return container.innerHTML;
-}
-
-function imageUrlToPngDataUrl(source: string) {
-  return new Promise<string>((resolve, reject) => {
-    const image = new window.Image();
-
-    image.onload = () => {
-      const canvas = document.createElement("canvas");
-      const width = image.naturalWidth || image.width;
-      const height = image.naturalHeight || image.height;
-      const context = canvas.getContext("2d");
-
-      if (!context || width <= 0 || height <= 0) {
-        reject(new Error("Cannot prepare export image."));
-        return;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      context.drawImage(image, 0, 0, width, height);
-      resolve(canvas.toDataURL("image/png"));
-    };
-
-    image.onerror = () => reject(new Error("Cannot load export image."));
-    image.crossOrigin = "anonymous";
-    image.src = source;
-  });
-}
-
-function buildExportHtml(content: string, title: string, exportType: "word" | "excel") {
-  return `<!doctype html>
-<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns:x="urn:schemas-microsoft-com:office:excel">
-  <head>
-    <meta charset="utf-8">
-    <base href="${window.location.origin}">
-    <title>${escapeHtml(title)}</title>
-    ${exportType === "word" ? getWordOfficeXml() : getExcelOfficeXml()}
-    <style>${getPrintableStyles()}${getOfficeExportStyles(exportType)}</style>
-  </head>
-  <body>
-    <main class="reportsPage printReportRoot officeExportRoot ${exportType === "excel" ? "excelExportRoot" : "wordExportRoot"}">${content}</main>
-  </body>
-</html>`;
-}
-
-function printReportPdf(content: string, title: string): boolean {
-  if (!content.trim()) {
-    return false;
-  }
-
-  const printFrame = getReportPrintFrame();
-  const frameWindow = printFrame.contentWindow;
-  const frameDocument = printFrame.contentDocument ?? frameWindow?.document;
-
-  if (!frameWindow || !frameDocument) {
-    return false;
-  }
-
-  frameDocument.open();
-  frameDocument.write(buildPdfPrintHtml(content, title));
-  frameDocument.close();
-
-  const triggerPrint = () => {
-    frameWindow.focus();
-    frameWindow.print();
-  };
-
-  const waitForImages = Array.from(frameDocument.images).map((image) => (
-    image.complete
-      ? Promise.resolve()
-      : new Promise<void>((resolve) => {
-        image.onload = () => resolve();
-        image.onerror = () => resolve();
-      })
-  ));
-
-  void Promise.all(waitForImages).then(() => {
-    window.setTimeout(triggerPrint, 250);
-  });
-
-  return true;
-}
-
-let reportPrintFrame: HTMLIFrameElement | null = null;
-
-function getReportPrintFrame() {
-  if (reportPrintFrame?.isConnected) {
-    return reportPrintFrame;
-  }
-
-  reportPrintFrame = document.createElement("iframe");
-  reportPrintFrame.setAttribute("title", "PM report print");
-  reportPrintFrame.setAttribute("aria-hidden", "true");
-  reportPrintFrame.style.position = "fixed";
-  reportPrintFrame.style.right = "0";
-  reportPrintFrame.style.bottom = "0";
-  reportPrintFrame.style.width = "0";
-  reportPrintFrame.style.height = "0";
-  reportPrintFrame.style.border = "0";
-  reportPrintFrame.style.opacity = "0";
-  reportPrintFrame.style.pointerEvents = "none";
-  document.body.appendChild(reportPrintFrame);
-  return reportPrintFrame;
-}
-
-function buildPdfPrintHtml(content: string, title: string) {
-  return `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <base href="${window.location.origin}">
-    <title>${escapeHtml(title)}</title>
-    <style>${getPrintableStyles()}</style>
-  </head>
-  <body>
-    <main class="reportsPage printReportRoot">${content}</main>
-  </body>
-</html>`;
-}
-
-function getPrintableStyles() {
-  const appStyles = sanitizeStylesForInlineHtml(Array.from(document.styleSheets).flatMap((sheet) => {
-    try {
-      return Array.from(sheet.cssRules).map((rule) => rule.cssText);
-    } catch {
-      return [];
-    }
-  }).join("\n"));
-
-  return `${appStyles}
-@page {
-  size: A4;
-  margin: 0;
-}
-
-html,
-body {
-  margin: 0;
-  padding: 0;
-  background: #ffffff !important;
-}
-
-.printReportRoot {
-  width: 210mm;
-  margin: 0 auto;
-  background: #ffffff !important;
-}
-
-.printReportRoot .reportDocumentStack {
-  display: block !important;
-  padding: 0 !important;
-}
-
-.printReportRoot .templateSheet {
-  width: 210mm !important;
-  min-height: 297mm !important;
-  margin: 0 auto !important;
-  padding: 10mm 13mm !important;
-  box-shadow: none !important;
-  page-break-after: always;
-  break-after: page;
-  box-sizing: border-box;
-}
-
-.printReportRoot .templateSheet:last-child {
-  page-break-after: auto;
-  break-after: auto;
-}
-
-.printReportRoot * {
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}
-
-.printReportRoot .signatureGrid,
-.printReportRoot .coverSignatureCard {
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
-
-.printReportRoot .coverSignatureSlot {
-  min-height: 54px;
-  padding-bottom: 4px;
-}
-
-.printReportRoot .coverSignatureSlot img {
-  display: block;
-  max-width: 100%;
-  max-height: 50px;
-  object-fit: contain;
-}
-
-.printReportRoot .coverSignatureRule {
-  width: 100%;
-  height: 0;
-  border-bottom: 1px solid #000000;
-}`;
-}
-
-function getOfficeExportStyles(exportType: "word" | "excel") {
-  const officeRootClass = exportType === "excel" ? "excelExportRoot" : "wordExportRoot";
-
-  return `
-.officeExportRoot {
-  width: 210mm;
-  margin: 0 auto;
-  background: #ffffff !important;
-}
-
-.officeExportRoot .reportDocumentStack {
-  display: block !important;
-  padding: 0 !important;
-}
-
-.officeExportRoot .templateSheet {
-  width: 210mm !important;
-  min-height: 297mm !important;
-  margin: 0 auto 0 auto !important;
-  padding: 10mm 13mm !important;
-  box-shadow: none !important;
-  box-sizing: border-box;
-  page-break-after: always;
-  break-after: page;
-  mso-page-orientation: portrait;
-}
-
-.officeExportRoot .templateSheet:last-child {
-  page-break-after: auto;
-  break-after: auto;
-}
-
-.officeExportRoot .templateTable,
-.officeExportRoot table {
-  border-collapse: collapse;
-}
-
-.officeExportRoot img {
-  max-width: 100%;
-}
-
-.${officeRootClass} * {
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
-}`;
-}
-
-function getWordOfficeXml() {
-  return `<!--[if gte mso 9]>
-<xml>
-  <w:WordDocument>
-    <w:View>Print</w:View>
-    <w:Zoom>100</w:Zoom>
-    <w:DoNotOptimizeForBrowser/>
-  </w:WordDocument>
-</xml>
-<![endif]-->`;
-}
-
-function getExcelOfficeXml() {
-  return `<!--[if gte mso 9]>
-<xml>
-  <x:ExcelWorkbook>
-    <x:ExcelWorksheets>
-      <x:ExcelWorksheet>
-        <x:Name>PM Report</x:Name>
-        <x:WorksheetOptions>
-          <x:Print>
-            <x:ValidPrinterInfo/>
-            <x:PaperSizeIndex>9</x:PaperSizeIndex>
-          </x:Print>
-        </x:WorksheetOptions>
-      </x:ExcelWorksheet>
-    </x:ExcelWorksheets>
-  </x:ExcelWorkbook>
-</xml>
-<![endif]-->`;
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function sanitizeStylesForInlineHtml(value: string) {
-  return value.replace(/<\/style/gi, "<\\/style");
-}
-
-function sanitizeFileName(value: string) {
-  return value.replace(/[\\/:*?"<>|]+/g, "-").trim() || "pm-report";
 }
 
 function getVisitRoundText(pmJobs: PmJobRecord[], row: ReportRow, site: SiteCatalogRecord | null, contractIndex = 0) {
@@ -1979,6 +2121,8 @@ function rowMatchesFilters({
   ownerFilter,
   owners,
   query,
+  result,
+  resultFilter,
   rowDate,
   searchableText,
   startDate
@@ -1987,6 +2131,8 @@ function rowMatchesFilters({
   ownerFilter: string;
   owners: string[];
   query: string;
+  result: ReportRow["result"];
+  resultFilter?: string;
   rowDate: string;
   searchableText: string;
   startDate: string;
@@ -1995,10 +2141,11 @@ function rowMatchesFilters({
   const matchesOwner = ownerFilter === ALL_OWNERS_VALUE
     ? true
     : owners.some((owner) => normalizeOwnerName(owner) === normalizeOwnerName(ownerFilter));
+  const matchesResult = resultFilter ? result === resultFilter : true;
   const matchesStart = startDate ? rowDate >= startDate : true;
   const matchesEnd = endDate ? rowDate <= endDate : true;
 
-  return matchesQuery && matchesOwner && matchesStart && matchesEnd;
+  return matchesQuery && matchesOwner && matchesResult && matchesStart && matchesEnd;
 }
 
 function toInputDate(date: string) {

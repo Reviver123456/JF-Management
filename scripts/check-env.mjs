@@ -38,8 +38,15 @@ function loadEnvFile(filename) {
   return values;
 }
 
-const fromProcess = Object.fromEntries(required.map((key) => [key, process.env[key] ?? ""]));
 const fromLocal = loadEnvFile(".env.local");
+const fromProcess = Object.fromEntries(
+  required
+    .filter((key) => {
+      const value = process.env[key];
+      return typeof value === "string" && value.length > 0;
+    })
+    .map((key) => [key, process.env[key]])
+);
 const env = { ...fromLocal, ...fromProcess };
 
 if (!env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY && env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {

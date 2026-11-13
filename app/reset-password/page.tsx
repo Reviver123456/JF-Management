@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Eye, EyeOff, LockKeyhole } from "lucide-react";
+import { DarkThemeAnimatedBackdrop } from "@/components/DarkThemeAnimatedBackdrop";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { useUi } from "@/lib/i18n";
-import { usePageEnterProps } from "@/components/PageEnterTransition";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ResetPasswordPage() {
@@ -18,8 +18,6 @@ export default function ResetPasswordPage() {
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<"error" | "success">("error");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const pageEnterProps = usePageEnterProps("loginPage", "reset-password");
-
   const updatePassword = async () => {
     if (password.length < 8) {
       setMessageTone("error");
@@ -62,7 +60,8 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <main {...pageEnterProps}>
+    <main className="loginPage">
+      <DarkThemeAnimatedBackdrop scope="login" />
       <FeedbackPopups loading={isSubmitting} loadingMessage={t("pm.loadingSubtitle")} alertMessage={message} alertTone={messageTone} />
       <section className="card">
         <div className="brand brandLogo">

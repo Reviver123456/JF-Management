@@ -3,9 +3,11 @@
 /* App shell */
 .shell {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   background: var(--bg);
+  overflow-x: clip;
 }
 
 .shell.shellCollapsed {
@@ -59,9 +61,18 @@
 }
 
 .shell .nav {
-  padding: 18px 10px;
+  flex: 1;
+  min-height: 0;
+  padding: 18px 10px 10px;
   display: grid;
   gap: 7px;
+  align-content: start;
+  overflow-y: auto;
+}
+
+.shell .sidebarSettings {
+  margin-top: auto;
+  padding: 0 10px 8px;
 }
 
 .shell .navItem,
@@ -86,6 +97,101 @@
   background: var(--primary);
   color: #ffffff;
   box-shadow: 0 8px 20px rgba(47, 125, 246, 0.35);
+}
+
+.shell .navGroup {
+  display: grid;
+  gap: 4px;
+  position: relative;
+}
+
+.shell .navGroupTrigger {
+  width: 100%;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  appearance: none;
+}
+
+.shell .navGroupTrigger.navItem {
+  background: transparent;
+  color: var(--text-soft);
+}
+
+.shell .navGroupTrigger.navItem:hover {
+  background: var(--nav-hover-bg);
+  color: var(--text);
+}
+
+.shell .navGroupTrigger.activeNavItem {
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(47, 125, 246, 0.35);
+}
+
+.shell .navGroupTrigger .navChevron {
+  margin-left: auto;
+  opacity: 0.9;
+  transition: transform 0.18s ease;
+}
+
+.shell .navGroupTrigger .navChevron.open {
+  transform: rotate(180deg);
+}
+
+.shell .navSubmenu {
+  display: grid;
+  gap: 4px;
+  padding: 4px 0 2px 4px;
+  margin-left: 10px;
+  border-left: 1px solid var(--border);
+}
+
+.shell .navSubItem {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.shell .navSubItem:hover {
+  background: var(--nav-hover-bg);
+  color: var(--text);
+}
+
+.shell .navSubItem.active {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  font-weight: 600;
+}
+
+.shell .activeNavItem.navGroupTrigger .navChevron {
+  color: #ffffff;
+}
+
+.shell.shellCollapsed .navGroup .navSubmenu {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 0;
+  z-index: 20;
+  min-width: 188px;
+  margin-left: 0;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--sidebar);
+  box-shadow: var(--shadow);
+}
+
+.shell.shellCollapsed .navGroup:not(.navGroupOpen) .navSubmenu {
+  display: none;
 }
 
 .shell .sidebarFooter {
@@ -136,7 +242,20 @@
 }
 
 .shell .workspace {
+  position: relative;
+  isolation: isolate;
   min-width: 0;
+  background: var(--bg);
+}
+
+[data-theme="dark"] .shell .workspace {
+  background: var(--bg-deep);
+}
+
+.shell .workspace > .mobileTopbar,
+.shell .workspace > .content {
+  position: relative;
+  z-index: 1;
 }
 
 .shell .content {
@@ -216,7 +335,7 @@
 
   .shell {
     display: block;
-    padding-bottom: 62px;
+    padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px));
   }
 
   .shell .sidebar {
@@ -287,7 +406,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    padding: 0 10px;
+    padding: max(0px, env(safe-area-inset-top)) 10px 0;
     background: var(--panel);
     border-bottom: 1px solid var(--border);
   }
@@ -350,7 +469,8 @@
     left: 0;
     right: 0;
     bottom: 0;
-    height: 58px;
+    height: calc(58px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     background: var(--panel);
@@ -858,8 +978,82 @@
   }
 }
 
+/* Dark theme animated backdrop (Pixabay geometry lines — dark theme only) */
+.darkThemeAnimatedBackdrop {
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.darkThemeAnimatedBackdropLogin {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+
+.darkThemeAnimatedBackdropPage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.darkThemeAnimatedBackdropVideo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 100%;
+  min-height: 100%;
+  object-fit: cover;
+  object-position: center;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+}
+
+.darkThemeAnimatedBackdropLogin .darkThemeAnimatedBackdropVideo {
+  opacity: 0.55;
+}
+
+.darkThemeAnimatedBackdropPage .darkThemeAnimatedBackdropVideo {
+  opacity: 0.38;
+}
+
+.darkThemeAnimatedBackdropVeil {
+  position: absolute;
+  inset: 0;
+}
+
+.darkThemeAnimatedBackdropLogin .darkThemeAnimatedBackdropVeil {
+  background:
+    radial-gradient(circle at 50% 12%, rgba(47, 125, 246, 0.14), transparent 42%),
+    linear-gradient(180deg, rgba(8, 13, 25, 0.45), rgba(8, 13, 25, 0.9));
+}
+
+.darkThemeAnimatedBackdropPage .darkThemeAnimatedBackdropVeil {
+  background:
+    radial-gradient(circle at 82% 0%, rgba(47, 125, 246, 0.07), transparent 35%),
+    linear-gradient(180deg, rgba(8, 13, 25, 0.62), rgba(8, 13, 25, 0.9));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .darkThemeAnimatedBackdropVideo {
+    display: none;
+  }
+
+  .darkThemeAnimatedBackdropLogin .darkThemeAnimatedBackdropVeil {
+    background:
+      radial-gradient(circle at 50% 12%, rgba(47, 125, 246, 0.1), transparent 42%),
+      var(--bg);
+  }
+
+  .darkThemeAnimatedBackdropPage .darkThemeAnimatedBackdropVeil {
+    background: var(--bg);
+  }
+}
+
 /* Login */
 .loginPage {
+  position: relative;
+  isolation: isolate;
   min-height: 100vh;
   display: grid;
   place-items: center;
@@ -869,7 +1063,13 @@
   padding: 20px;
 }
 
+[data-theme="dark"] .loginPage {
+  background: var(--bg-deep);
+}
+
 .loginPage .card {
+  position: relative;
+  z-index: 1;
   width: min(100%, 410px);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -2299,6 +2499,103 @@
   font-size: 13px;
 }
 
+.reportsPage .reportEditorHeaderPreview {
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px 16px;
+}
+
+.reportsPage .reportEditorHeaderMain {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.reportsPage .reportEditorContractField {
+  display: grid;
+  gap: 6px;
+  max-width: 280px;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.reportsPage .reportEditorContractField .select {
+  width: 100%;
+  min-height: 38px;
+}
+
+.reportsPage .reportEditorContractCaption {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 13px;
+}
+
+.reportsPage .reportEditorHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.reportsPage .reportEditorHeaderActions .button {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.reportsPage .reportExportMenu {
+  position: relative;
+}
+
+.reportsPage .reportExportMenuTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reportsPage .reportExportMenuChevron {
+  transition: transform 0.18s ease;
+}
+
+.reportsPage .reportExportMenuChevron.open {
+  transform: rotate(180deg);
+}
+
+.reportsPage .reportExportMenuPanel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 25;
+  min-width: 140px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 4px;
+}
+
+.reportsPage .reportExportMenuItem {
+  width: 100%;
+  min-height: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.reportsPage .reportExportMenuItem:hover {
+  background: var(--panel-2);
+  color: var(--primary-strong);
+}
+
 .reportsPage .reportEditorBody {
   display: grid;
   gap: 12px;
@@ -2520,6 +2817,29 @@
   flex-shrink: 0;
 }
 
+.reportsPage .reportPreviewFloatControls {
+  position: fixed;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 120;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  width: min(100% - 24px, 640px);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+}
+
+.reportsPage .reportPreviewFloatControls .button {
+  min-height: 40px;
+}
+
 .reportsPage .reportExportMessage {
   margin: 0 0 12px;
   padding: 10px 12px;
@@ -2531,17 +2851,590 @@
   font-weight: 500;
 }
 
+.reportsPage .reportExportHint {
+  border-color: rgba(37, 99, 235, 0.35);
+  background: rgba(219, 234, 254, 0.65);
+  color: #1d4ed8;
+}
+
 .reportsPage .reportDocumentHidden {
-  display: none;
+  position: fixed;
+  top: 0;
+  left: -120vw;
+  width: 794px;
+  max-width: 794px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
 }
 
 .reportsPage .reportToolbar {
-  grid-template-columns: minmax(240px, 1fr) minmax(190px, 220px) minmax(190px, 220px) 170px;
+  grid-template-columns: minmax(200px, 1.1fr) minmax(190px, 1fr) minmax(150px, 0.8fr) minmax(170px, 0.9fr) minmax(150px, 0.8fr);
   border: 1px solid var(--border);
   background: var(--panel);
   border-radius: var(--radius);
   padding: 14px;
   box-shadow: var(--shadow);
+}
+
+.reportsPage .reportSectionTabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.reportsPage .reportSectionTab {
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  color: var(--text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.reportsPage .reportSectionTab.active {
+  border-color: rgba(47, 125, 246, 0.45);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+
+.reportsPage .operationalReportToolbar {
+  margin-bottom: 14px;
+}
+
+.reportsPage .operationalReportToolbarWithActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 16px;
+  grid-template-columns: unset;
+}
+
+.reportsPage .operationalReportFilterGrid {
+  display: grid;
+  grid-template-columns: minmax(150px, 180px) minmax(260px, 1.2fr) minmax(170px, 0.8fr);
+  gap: 10px;
+  flex: 1 1 560px;
+  min-width: 0;
+}
+
+.reportsPage .operationalReportToolbarActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.reportsPage .operationalReportToolbarActions .button,
+.reportsPage .operationalReportToolbarActions .operationalReportToolbarMenu {
+  min-height: 38px;
+  white-space: nowrap;
+}
+
+.reportsPage .reportPeriodSummaryChip {
+  display: grid;
+  gap: 4px;
+  align-content: end;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  min-height: 54px;
+}
+
+.reportsPage .reportPeriodSummaryChip span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.reportsPage .reportPeriodSummaryChip strong {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.reportsPage .reportPeriodSummaryChip.invalid {
+  border-color: rgba(234, 179, 8, 0.45);
+  color: var(--warning);
+}
+
+.reportsPage .reportAnalyticsPanel {
+  display: grid;
+  gap: 14px;
+}
+
+.reportsPage .paginationBarBottom {
+  position: sticky;
+  bottom: 12px;
+  z-index: 6;
+  margin-top: 16px;
+}
+
+@media (max-width: 900px) {
+  .reportsPage {
+    padding-bottom: 72px;
+  }
+
+  .reportsPage .paginationBarBottom {
+    bottom: 70px;
+  }
+}
+
+.reportsPage .operationalReportExportControls {
+  flex-wrap: wrap;
+}
+
+.reportsPage .operationalReportEditor.reportEditorPagePreview {
+  min-height: calc(100vh - 120px);
+}
+
+.reportsPage .operationalReportPreviewViewport {
+  flex: 1;
+  min-height: 0;
+}
+
+.reportsPage .operationalReportSheet {
+  gap: 14px;
+}
+
+.reportsPage .operationalReportTitleBanner {
+  margin-bottom: 4px;
+}
+
+.reportsPage .operationalReportSheet .operationalDocBody {
+  gap: 14px;
+}
+
+.reportsPage .templateBrandHeaderSheetCenter {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-height: 58px;
+  margin-bottom: 2px;
+}
+
+.reportsPage .templateBrandHeaderSheetCenter.templateBrandHeader {
+  grid-template-columns: unset;
+}
+
+.reportsPage .reportBrandLogoSlot {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  z-index: 2;
+  transform: translateY(-50%);
+}
+
+.reportsPage .reportBrandTitleCenter {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  width: max-content;
+  max-width: min(100%, calc(100% - 280px));
+  margin: 0;
+  text-align: center;
+}
+
+.reportsPage .reportBrandAside {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  z-index: 2;
+  transform: translateY(-50%);
+}
+
+.reportsPage .operationalDocPeriodCard {
+  width: auto;
+  max-width: min(42vw, 220px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  text-align: right;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+}
+
+.reportsPage .operationalDocPeriodCardLabel {
+  display: block;
+  background: transparent;
+  color: #5b6f8f;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0;
+  text-transform: none;
+}
+
+.reportsPage .operationalDocPeriodCard strong {
+  display: block;
+  color: #0b2f6d;
+  font-size: 10px;
+  line-height: 1.35;
+  font-weight: 700;
+  padding: 0;
+  word-break: break-word;
+}
+
+.reportsPage .operationalDocOwnerSummary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+  row-gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  padding: 6px 4px 14px;
+  border-bottom: 1px solid #e3ebf8;
+}
+
+.reportsPage .operationalDocOwnerSummarySet {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed #cfe0f7;
+}
+
+.reportsPage .operationalDocOwnerSummarySet .operationalDocOwnerSummaryLine {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+}
+
+.reportsPage .operationalDocOwnerSummarySet .operationalDocOwnerSummaryLine strong {
+  justify-self: auto;
+}
+
+.reportsPage .operationalDocOwnerSummarySet:nth-last-child(-n + 2) {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.reportsPage .operationalDocOwnerSummarySet:last-child:nth-child(odd) {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.reportsPage .operationalDocSummaryGrid {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  padding: 6px 0 14px;
+  border-bottom: 1px solid #e3ebf8;
+}
+
+.reportsPage .operationalDocSummaryItem {
+  display: grid;
+  grid-template-columns: minmax(118px, 38%) minmax(0, 1fr);
+  align-items: baseline;
+  gap: 10px 16px;
+  text-align: left;
+  padding: 0;
+}
+
+.reportsPage .operationalDocSummaryItem span {
+  color: #5b6f8f;
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: 0.01em;
+}
+
+.reportsPage .operationalDocSummaryItem strong {
+  color: #0b2f6d;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 700;
+  word-break: break-word;
+  justify-self: start;
+}
+
+.reportsPage .operationalDocSummaryItem.isMetric strong {
+  font-size: 13px;
+  line-height: 1.25;
+  font-weight: 800;
+}
+
+.reportsPage .operationalDocSummaryItem.success strong {
+  color: #15803d;
+}
+
+.reportsPage .operationalDocSummaryItem.warning strong {
+  color: #b91c1c;
+}
+
+.reportsPage .operationalDocSectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+  padding: 0 0 0 10px;
+  border-left: 3px solid #0b2f6d;
+}
+
+.reportsPage .operationalDocSectionHead strong {
+  color: #0b2f6d;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.reportsPage .operationalDocTableWrap {
+  border: 1px solid #cfe0f7;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.reportsPage .operationalDocTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5px;
+}
+
+.reportsPage .operationalDocTable thead {
+  background: linear-gradient(180deg, #0b2f6d 0%, #164280 100%);
+}
+
+.reportsPage .operationalDocTable th {
+  padding: 7px 8px;
+  color: #ffffff;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: left;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.reportsPage .operationalDocTable th:last-child {
+  border-right: 0;
+}
+
+.reportsPage .operationalDocTable th.operationalDocStatusCol,
+.reportsPage .operationalDocTable td.operationalDocStatusCol {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.reportsPage .operationalDocTable td {
+  padding: 6px 8px;
+  color: #0f2147;
+  border-bottom: 1px solid #e3ebf8;
+  vertical-align: top;
+  line-height: 1.35;
+}
+
+.reportsPage .operationalDocTable tbody tr:nth-child(even) td {
+  background: #f8fbff;
+}
+
+.reportsPage .operationalDocTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.reportsPage .operationalDocNumCol {
+  width: 28px;
+  color: #5b6f8f !important;
+  font-weight: 700;
+  text-align: center;
+}
+
+.reportsPage .operationalDocStrong {
+  color: #0b2f6d !important;
+  font-weight: 700;
+}
+
+.reportsPage .operationalDocMetric {
+  font-weight: 700;
+  text-align: center;
+}
+
+.reportsPage .operationalDocMetric.success {
+  color: #15803d !important;
+}
+
+.reportsPage .operationalDocMetric.warning {
+  color: #b91c1c !important;
+}
+
+.reportsPage .operationalDocStatus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 8.5px;
+  font-weight: 700;
+  border: 1px solid transparent;
+}
+
+.reportsPage .operationalDocStatus.pending {
+  color: #475569;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.reportsPage .operationalDocStatus.inProgress {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+
+.reportsPage .operationalDocStatus.completed {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.reportsPage .operationalDocStatus.abnormal {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+.reportsPage .operationalDocEmpty {
+  margin: 0;
+  padding: 16px;
+  border: 1px dashed #cfe0f7;
+  border-radius: 10px;
+  color: #5b6f8f;
+  text-align: center;
+  font-size: 11px;
+}
+
+.reportsPage .operationalDocFooter {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid #d8e4f4;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  color: #5b6f8f;
+  font-size: 8.5px;
+}
+
+.reportsPage .reportSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reportsPage .reportSummaryGrid.cols4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.reportsPage .reportStatCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 12px;
+  display: grid;
+  gap: 6px;
+}
+
+.reportsPage .reportStatCard span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.reportsPage .reportStatCard strong {
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.reportsPage .reportStatCard.success strong {
+  color: var(--success);
+}
+
+.reportsPage .reportStatCard.warning strong {
+  color: var(--danger);
+}
+
+.reportsPage .reportTablePanel {
+  position: static;
+  max-height: none;
+  overflow: visible;
+}
+
+.reportsPage .reportDataTableWrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.reportsPage .reportDataTable {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.reportsPage .reportDataTable th,
+.reportsPage .reportDataTable td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.reportsPage .reportDataTable th {
+  background: var(--panel-2);
+  color: var(--text-soft);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.reportsPage .reportDataTable tbody tr:hover td {
+  background: var(--surface-hover);
+}
+
+.reportsPage .reportDataTable td {
+  color: var(--text);
+}
+
+.reportsPage .reportDataTable svg {
+  margin-right: 4px;
+  vertical-align: -2px;
+  opacity: 0.8;
+}
+
+.reportsPage .reportEmptyState {
+  margin: 0;
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  color: var(--text-muted);
 }
 
 .reportsPage .reportListPanel,
@@ -2607,15 +3500,54 @@
   transform: translateY(-1px);
 }
 
-.reportsPage .reportRows .row>div {
+.reportsPage .reportRows .reportListRow {
+  align-items: center;
+}
+
+.reportsPage .reportListRowMain {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.reportsPage .reportListRowMain>div {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 
-.reportsPage .reportRows .row small {
+.reportsPage .reportListRowMain small {
   grid-column: 1;
+}
+
+.reportsPage .reportListRowActions {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.reportsPage .reportListContractField {
+  display: grid;
+  gap: 4px;
+  min-width: min(200px, 42vw);
+}
+
+.reportsPage .reportListContractField>span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.reportsPage .reportListPreviewButton {
+  min-height: 38px;
+  white-space: nowrap;
+  padding-left: 14px;
+  padding-right: 14px;
 }
 
 .reportsPage .reportPreviewCue {
@@ -2647,16 +3579,134 @@
   width: min(100%, 794px);
   min-height: 1123px;
   background: #ffffff;
-  color: #111827;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  padding: 38px 50px;
+  color: #0f2147;
+  border: 1px solid #d8e4f4;
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(16, 54, 112, 0.08);
+  padding: 28px 34px 22px;
   display: flex;
   flex-direction: column;
-  font-family: Arial, Tahoma, sans-serif;
-  font-size: 11px;
+  gap: 12px;
+  font-family: "Prompt", "Noto Sans Thai", sans-serif;
+  font-size: 10.5px;
   page-break-after: always;
+}
+
+.reportsPage .templateBrandHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  align-items: start;
+  gap: 16px;
+  margin-bottom: 2px;
+}
+
+.reportsPage .templateBrandLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.reportsPage .templateBrandText {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+
+.reportsPage .templateBrandText strong {
+  color: #0b2f6d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reportsPage .templateBrandText span {
+  color: #5b6f8f;
+  font-size: 10px;
+  font-weight: 500;
+}
+
+.reportsPage .templateReportBadge {
+  border: 1.5px solid #0b2f6d;
+  border-radius: 10px;
+  overflow: hidden;
+  text-align: center;
+}
+
+.reportsPage .templateReportBadgeLabel {
+  display: block;
+  background: #0b2f6d;
+  color: #ffffff;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 4px 8px;
+}
+
+.reportsPage .templateReportBadge strong {
+  display: block;
+  color: #0b2f6d;
+  font-size: 17px;
+  line-height: 1.1;
+  padding: 7px 10px 3px;
+}
+
+.reportsPage .templateReportBadge span:last-child {
+  display: block;
+  color: #334155;
+  font-size: 9px;
+  padding: 0 8px 7px;
+}
+
+.reportsPage .templateTitleBanner {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #e7f1fc 0%, #f2f7fd 100%);
+  border: 1px solid #cfe0f7;
+}
+
+.reportsPage .templateTitleBannerIcon {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #0b2f6d;
+  color: #ffffff;
+}
+
+.reportsPage .templateTitleBanner strong {
+  color: #0b2f6d;
+  font-size: 12.5px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+
+.reportsPage .templateBody {
+  display: grid;
+  gap: 14px;
+  flex: 1 1 auto;
+  align-items: start;
+}
+
+.reportsPage .templateBody.withSidebar {
+  grid-template-columns: minmax(0, 1fr) 188px;
+}
+
+.reportsPage .templateBody.footerSummary {
+  grid-template-columns: 1fr;
+}
+
+.reportsPage .templateMain {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
 }
 
 .reportsPage .templateHeader {
@@ -2920,8 +3970,9 @@
 }
 
 .reportsPage .checklistTemplateTable th:nth-child(2) {
-  width: 18%;
-  text-align: center;
+  width: 20%;
+  min-width: 92px;
+  text-align: left;
 }
 
 .reportsPage .checklistTemplateTable th:nth-child(3) {
@@ -2942,8 +3993,14 @@
 }
 
 .reportsPage .checklistTemplateTable td {
+  height: auto;
   min-height: 28px;
   line-height: 1.28;
+}
+
+.reportsPage .checklistTemplateTable th {
+  height: auto;
+  min-height: 28px;
 }
 
 .reportsPage .checklistTemplateTable thead th {
@@ -2958,14 +4015,23 @@
   font-weight: 500;
 }
 
-.reportsPage .checklistTemplateTable tbody td:nth-child(3) {
+.reportsPage .checklistTemplateTable:not(.environmentChecklistTable) tbody td:nth-child(3) {
   color: #334155;
+  text-align: center;
+}
+
+.reportsPage .checklistTemplateTable th.reportStatusCol {
+  text-align: left;
+  width: 20%;
+  min-width: 108px;
 }
 
 .reportsPage .reportStatusCell {
-  text-align: center;
+  text-align: left;
   color: #000000;
   vertical-align: middle;
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 .reportsPage .templateBlockBox {
@@ -3021,6 +4087,34 @@
   border-radius: 2px;
   flex: 0 0 16px;
   padding: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.reportsPage .checkbox .reportMark {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reportsPage .checkbox .reportMark.compact {
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
+}
+
+.reportsPage .checkbox .reportMarkCheck.compact::before {
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 8px;
+  border-right-width: 2px;
+  border-bottom-width: 2px;
+  transform: translate(-58%, -62%) rotate(45deg);
 }
 
 .reportsPage .reportMark {
@@ -3477,6 +4571,573 @@
 
 .reportsPage .diagDeviceTable tbody tr:nth-child(even) td {
   background: #ffffff;
+}
+
+.reportsPage .reportIconGrid {
+  display: grid;
+  gap: 0;
+  border: 1px solid #dbe7f6;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.reportsPage .reportIconGrid.cols3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.reportsPage .reportIconGrid.cols2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.reportsPage .reportIconField {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: center;
+  min-height: 48px;
+  padding: 8px 10px;
+  border-right: 1px solid #e4edf8;
+  border-bottom: 1px solid #e4edf8;
+}
+
+.reportsPage .reportIconGrid .reportIconField:nth-child(3n) {
+  border-right: 0;
+}
+
+.reportsPage .reportIconGrid.cols2 .reportIconField:nth-child(2n) {
+  border-right: 0;
+}
+
+.reportsPage .reportIconField.split {
+  border: 1px solid #dbe7f6;
+  border-radius: 10px;
+  margin-bottom: -1px;
+}
+
+.reportsPage .environmentInfoBlock {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reportsPage .reportIconFieldIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #edf4fc;
+  color: #0b2f6d;
+}
+
+.reportsPage .reportIconFieldBody {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.reportsPage .reportIconFieldBody em {
+  font-style: normal;
+  color: #5b6f8f;
+  font-size: 8.5px;
+  font-weight: 600;
+}
+
+.reportsPage .reportIconFieldBody strong {
+  color: #102a4c;
+  font-size: 10px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.reportsPage .reportSectionCard {
+  border: 1px solid #d6e3f3;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.reportsPage .reportSectionHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  padding: 6px 10px;
+  background: #0b2f6d;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.reportsPage .reportSectionHeading.compact {
+  border-radius: 10px 10px 0 0;
+}
+
+.reportsPage .reportSectionCard .templateTable thead th {
+  background: #e8f1fb;
+  color: #0b2f6d;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.reportsPage .reportSectionCard .checklistTemplateTable tbody tr:nth-child(odd) td,
+.reportsPage .reportSectionCard .diagDeviceTable tbody tr:nth-child(odd) td,
+.reportsPage .reportSectionCard .diagCalibrateTable tbody tr:nth-child(odd) td {
+  background: #f6faff;
+}
+
+.reportsPage .reportSectionCard .checklistTemplateTable tbody tr:nth-child(even) td,
+.reportsPage .reportSectionCard .diagDeviceTable tbody tr:nth-child(even) td,
+.reportsPage .reportSectionCard .diagCalibrateTable tbody tr:nth-child(even) td {
+  background: #ffffff;
+}
+
+.reportsPage .checklistNoCol {
+  width: 36px;
+  max-width: 40px;
+  min-width: 32px;
+  padding-left: 4px;
+  padding-right: 4px;
+  text-align: center !important;
+  white-space: nowrap;
+}
+
+.reportsPage .checklistTemplateTable th.checklistNoCol,
+.reportsPage .checklistTemplateTable td.checklistNoCol {
+  width: 36px;
+  max-width: 40px;
+}
+
+.reportsPage .environmentChecklistTable th.checklistNoCol,
+.reportsPage .environmentChecklistTable td.checklistNoCol {
+  width: 32px;
+  max-width: 36px;
+  min-width: 28px;
+}
+
+.reportsPage .environmentChecklistTable th:nth-child(2) {
+  width: 46%;
+  min-width: 0;
+  text-align: left;
+}
+
+.reportsPage .environmentChecklistTable th.reportStatusCol {
+  width: 14%;
+  min-width: 88px;
+}
+
+.reportsPage .environmentChecklistTable th:nth-child(4) {
+  width: 32%;
+  min-width: 120px;
+  text-align: center;
+}
+
+.reportsPage .environmentChecklistTable tbody td:nth-child(2) {
+  color: #16263f;
+  font-weight: 500;
+}
+
+.reportsPage .environmentChecklistTable tbody td:nth-child(4) {
+  color: #334155;
+  text-align: center;
+}
+
+.reportsPage .environmentChecklistTable tbody td.checklistNoCol {
+  font-weight: 400;
+  color: #475569;
+}
+
+.reportsPage .reportStatusLabel {
+  display: inline-grid;
+  grid-template-columns: 16px max-content;
+  align-items: center;
+  column-gap: 6px;
+  font-size: 9.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.reportsPage .reportStatusLabel > .reportMark {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.reportsPage .reportStatusLabel .reportMark.compact {
+  width: 16px;
+  height: 16px;
+}
+
+.reportsPage .reportStatusLabel .reportMarkCheck.compact::before {
+  left: 4px;
+  top: 1px;
+  width: 3px;
+  height: 9px;
+  border-right-width: 2px;
+  border-bottom-width: 2px;
+}
+
+.reportsPage .reportStatusLabel .reportMarkCross.compact::before,
+.reportsPage .reportStatusLabel .reportMarkCross.compact::after {
+  left: 2px;
+  top: 7px;
+  width: 12px;
+  height: 2px;
+}
+
+.reportsPage .reportStatusLabel.normal {
+  color: #12814b;
+}
+
+.reportsPage .reportStatusLabel.abnormal {
+  color: #b42318;
+}
+
+.reportsPage .reportSummaryAside {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.reportsPage .reportSummaryCard,
+.reportsPage .reportWorkTimeCard,
+.reportsPage .reportSummaryBarCard {
+  border: 1px solid #d3e0f1;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.reportsPage .reportSummaryCardHeading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 5px 8px;
+  background: #0b2f6d;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.reportsPage .reportSummaryResultBox {
+  padding: 8px;
+}
+
+.reportsPage .reportSummaryResultLabel {
+  display: block;
+  color: #5b6f8f;
+  font-size: 8.5px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.reportsPage .reportOverallResult {
+  min-height: 84px;
+  border-radius: 8px;
+  background: #f4f7fb;
+  border: 1px solid #e2ebf7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.reportsPage .reportOverallResult strong {
+  color: #12814b;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.reportsPage .reportOverallResult em {
+  font-style: normal;
+  color: #12814b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.reportsPage .reportOverallResult.abnormal strong,
+.reportsPage .reportOverallResult.abnormal em {
+  color: #b42318;
+}
+
+.reportsPage .reportOverallResult.inline {
+  min-height: 72px;
+}
+
+.reportsPage .reportRemarksBlock {
+  padding: 8px;
+  border-top: 1px solid #e6eef8;
+}
+
+.reportsPage .reportRemarksBlock strong {
+  display: block;
+  color: #0b2f6d;
+  font-size: 9px;
+  margin-bottom: 6px;
+}
+
+.reportsPage .reportRemarksBlock p {
+  margin: 0 0 6px;
+  color: #334155;
+  line-height: 1.35;
+  min-height: 14px;
+}
+
+.reportsPage .reportSparePartsBlock {
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border-top: 1px solid #e6eef8;
+  color: #334155;
+  font-size: 9px;
+}
+
+.reportsPage .reportSparePartsBlock strong {
+  color: #0b2f6d;
+  font-weight: 700;
+}
+
+.reportsPage .templateSheet > .reportSparePartsBlock {
+  border: 1px solid #d6e3f3;
+  border-radius: 10px;
+  background: #fbfdff;
+  padding: 10px 12px;
+}
+
+.reportsPage .coverSuggestionLine {
+  display: block;
+  border-bottom: 1px dotted #94a8c6;
+  margin-top: 10px;
+  min-height: 12px;
+}
+
+.reportsPage .reportWorkTimeTable th,
+.reportsPage .reportWorkTimeTable td {
+  border-top: 1px solid #e5edf8;
+  height: 26px;
+  font-size: 9px;
+}
+
+.reportsPage .reportWorkTimeTable th {
+  width: 46%;
+  background: #f7faff;
+  color: #0b2f6d;
+  font-weight: 700;
+}
+
+.reportsPage .reportSummaryBar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.reportsPage .reportSummaryBarCard > strong {
+  display: block;
+  padding: 8px 10px;
+  background: #0b2f6d;
+  color: #ffffff;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.reportsPage .templateCompanyFooter {
+  margin-top: auto;
+  border: 1.5px solid #0b2f6d;
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 0.7fr));
+  gap: 8px;
+  color: #0b2f6d;
+  font-size: 8.2px;
+  font-weight: 600;
+  align-items: start;
+}
+
+.reportsPage .templateCompanyFooter>div {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+}
+
+.reportsPage .templateCompanyFooter svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.reportsPage .coverMetaStrip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reportsPage .coverMetaField {
+  border: 1px solid #cfe0f7;
+  border-radius: 10px;
+  background: #f7fbff;
+  padding: 8px 12px;
+  text-align: center;
+}
+
+.reportsPage .coverMetaField span {
+  display: block;
+  color: #5b6f8f;
+  font-size: 9px;
+}
+
+.reportsPage .coverMetaField strong {
+  display: block;
+  margin-top: 2px;
+  color: #0b2f6d;
+  font-size: 12px;
+}
+
+.reportsPage .coverProjectList {
+  border: 1px solid #d6e3f3;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.reportsPage .coverProjectRow {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr);
+  border-bottom: 1px solid #e4edf8;
+}
+
+.reportsPage .coverProjectRow:last-child {
+  border-bottom: 0;
+}
+
+.reportsPage .coverProjectLabel {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: #0b2f6d;
+  color: #ffffff;
+  padding: 8px 10px;
+  font-weight: 700;
+}
+
+.reportsPage .coverProjectValue {
+  display: flex;
+  align-items: center;
+  padding: 8px 10px;
+  color: #102a4c;
+  font-weight: 600;
+}
+
+.reportsPage .coverDeviceSection {
+  margin-top: 2px;
+}
+
+.reportsPage .coverDeviceHeading {
+  border-radius: 0;
+}
+
+.reportsPage .coverDeviceTable thead th {
+  background: #0b2f6d !important;
+  color: #ffffff !important;
+}
+
+.reportsPage .coverSuggestionBlock {
+  border: 1px solid #d6e3f3;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fbfdff;
+}
+
+.reportsPage .coverSuggestionHeading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #0b2f6d;
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.reportsPage .coverSuggestionBlock p {
+  margin: 0;
+  color: #334155;
+  min-height: 16px;
+}
+
+.reportsPage .coverSignatureGrid {
+  margin-top: 4px;
+}
+
+.reportsPage .coverSignatureCard {
+  border: 1px solid #d6e3f3;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.reportsPage .reportMark {
+  border-radius: 999px;
+  background: #22a556;
+  color: #ffffff;
+}
+
+.reportsPage .checkbox .reportMark {
+  border-radius: 0;
+  background: #22a556;
+}
+
+.reportsPage .reportMark.bad,
+.reportsPage .reportMarkCross {
+  background: #d92d20;
+}
+
+.reportsPage .reportMarkCheck::before {
+  left: 5px;
+  top: 2px;
+  border-color: #ffffff;
+}
+
+.reportsPage .reportMarkCheck.compact::before {
+  left: 4px;
+  top: 0;
+}
+
+.reportsPage .reportMarkCross::before,
+.reportsPage .reportMarkCross::after {
+  background: #ffffff;
+}
+
+.reportsPage .reportOverallResult .reportMark {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-inline: auto;
+}
+
+.reportsPage .reportOverallResult .reportMarkCheck::before {
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 14px;
+  transform: translate(-55%, -58%) rotate(45deg);
+}
+
+.reportsPage .reportOverallResult .reportMarkCross::before,
+.reportsPage .reportOverallResult .reportMarkCross::after {
+  left: 50%;
+  top: 50%;
+  width: 16px;
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.reportsPage .reportOverallResult .reportMarkCross::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
 }
 
 .reportsPage .reportPaper {
@@ -3953,6 +5614,162 @@
   padding: 4px 6px;
 }
 
+.reportsPage.reportDevPreviewPage {
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  background: var(--report-preview-bg, #e8f0fb);
+  box-sizing: border-box;
+}
+
+.reportsPage .reportDevPreviewCaption {
+  margin: 0 0 12px;
+  text-align: center;
+  color: #334155;
+  font-size: 12px;
+}
+
+.reportsPage.reportDevPreviewViewport,
+.reportsPage .reportDevPreviewViewport {
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.reportsPage.reportDevPreviewViewport .reportDocumentStack,
+.reportsPage .reportDevPreviewViewport .reportDocumentStack {
+  width: 794px;
+  gap: 16px;
+  padding: 0;
+  justify-items: stretch;
+}
+
+.reportsPage.reportDevPreviewViewport .templateSheet,
+.reportsPage .reportDevPreviewViewport .templateSheet {
+  width: 794px;
+  max-width: none;
+  min-height: auto;
+  box-sizing: border-box;
+}
+
+@media (max-width: 720px) {
+
+  .reportsPage .templateSheet {
+    padding: 18px 16px 20px;
+  }
+
+  .reportsPage .templateBrandHeader {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .reportsPage .templateBrandLeft {
+    flex-wrap: wrap;
+  }
+
+  .reportsPage .templateReportBadge {
+    width: min(100%, 240px);
+    justify-self: start;
+  }
+
+  .reportsPage .templateTitleBanner strong {
+    font-size: 10px;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+
+  .reportsPage .templateBody.withSidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .reportsPage .reportIconGrid.cols3,
+  .reportsPage .reportIconGrid.cols2 {
+    grid-template-columns: 1fr;
+  }
+
+  .reportsPage .reportIconGrid .reportIconField {
+    border-right: 0;
+  }
+
+  .reportsPage .templateCompanyFooter {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .reportsPage .reportSectionCard {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .reportsPage .checklistTemplateTable {
+    min-width: 320px;
+  }
+
+  /* พรีวิว: คง layout แบบ A4 แล้วให้ JS scale ลงตามความกว้างจอ */
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .templateSheet {
+    padding: 28px 34px 22px;
+  }
+
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .templateBrandHeaderSheetCenter {
+    min-height: 58px;
+  }
+
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .reportBrandLogoSlot,
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .reportBrandTitleCenter,
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .reportBrandAside {
+    position: absolute;
+    transform: translateY(-50%);
+  }
+
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .reportBrandTitleCenter {
+    transform: translate(-50%, -50%);
+  }
+
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .templateReportBadge {
+    width: auto;
+    justify-self: stretch;
+  }
+
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .templateTitleBanner strong {
+    font-size: 12.5px;
+    line-height: 1.2;
+    word-break: normal;
+  }
+
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .templateBody.withSidebar {
+    grid-template-columns: minmax(0, 1fr) 188px;
+  }
+
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .reportIconGrid.cols3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .reportIconGrid.cols2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .reportIconGrid .reportIconField {
+    border-right: 1px solid #e4edf8;
+  }
+
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .templateCompanyFooter {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .reportSectionCard {
+    overflow: visible;
+  }
+
+  .reportsPage :is(.reportPreviewViewport, .reportDevPreviewViewport) .checklistTemplateTable {
+    min-width: 0;
+    table-layout: fixed;
+    width: 100%;
+  }
+}
+
 @media (max-width: 900px) {
 
   .reportsPage .toolbar,
@@ -4001,6 +5818,41 @@
     max-height: none;
   }
 
+  .reportsPage .reportListRow {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .reportsPage .reportListRowActions {
+    grid-column: 1;
+    grid-row: auto;
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .reportsPage .reportListContractField {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .reportsPage .reportListPreviewButton {
+    flex: 0 0 auto;
+  }
+
+  .reportsPage .reportEditorHeaderPreview {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .reportsPage .reportEditorHeaderActions {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .reportsPage .reportEditorContractField {
+    max-width: none;
+  }
+
   .reportsPage .reportFilterField .searchControl,
   .reportsPage .reportFilterField .select,
   .reportsPage .reportFilterField .field,
@@ -4029,6 +5881,61 @@
 
   .reportsPage .reportPreviewViewport {
     padding: 8px;
+  }
+
+  .reportsPage .reportSectionTabs {
+    grid-template-columns: 1fr;
+  }
+
+  .reportsPage .reportSummaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reportsPage .templateBrandHeaderSheetCenter {
+    min-height: 0;
+    padding-bottom: 8px;
+  }
+
+  .reportsPage .reportBrandLogoSlot,
+  .reportsPage .reportBrandTitleCenter,
+  .reportsPage .reportBrandAside,
+  .reportsPage .operationalDocPeriodCard.reportBrandAside {
+    position: static;
+    transform: none;
+    width: 100%;
+    max-width: none;
+  }
+
+  .reportsPage .reportBrandTitleCenter {
+    text-align: center;
+    margin: 6px 0;
+  }
+
+  .reportsPage .operationalDocPeriodCard {
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .reportsPage .operationalDocSummaryItem {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .reportsPage .operationalDocOwnerSummary {
+    grid-template-columns: 1fr;
+    column-gap: 0;
+  }
+
+  .reportsPage .operationalDocOwnerSummarySet {
+    border-right: 0 !important;
+    padding-right: 0 !important;
+    border-bottom: 1px dashed #cfe0f7;
+    padding-bottom: 12px;
+  }
+
+  .reportsPage .operationalDocOwnerSummarySet:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
   }
 
   .reportsPage .paperCheckRow {
@@ -6525,6 +8432,21 @@
 .dateRangePickerYear.isSelected {
   background: var(--primary);
   color: #ffffff;
+}
+
+.dateRangePickerYear.isInRange:not(.isRangeStart):not(.isRangeEnd) {
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  color: var(--text);
+}
+
+.dateRangePickerYear.isRangeStart,
+.dateRangePickerYear.isRangeEnd {
+  background: var(--primary);
+  color: #ffffff;
+}
+
+.dateRangePickerMonthGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .dateRangePickerFooter {

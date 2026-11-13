@@ -9,7 +9,8 @@ const publicPaths = [
   "/api/db/health",
   "/api/auth/cleanup-metadata",
   "/manifest.webmanifest",
-  "/sw.js"
+  "/sw.js",
+  "/videos"
 ];
 
 export async function proxy(request: NextRequest) {

@@ -25,6 +25,49 @@ npm run dev
 
 Open `http://localhost:3000` in your browser.
 
+## Tests
+
+After `npm install`, run unit tests and TypeScript checks:
+
+```bash
+npm test
+npm run verify   # test + typecheck
+```
+
+### Browser E2E (Playwright)
+
+Install browsers once:
+
+```bash
+npx playwright install
+```
+
+Set test credentials in `.env.local` (or export before running):
+
+```bash
+E2E_TEST_EMAIL=...
+E2E_TEST_PASSWORD=...
+```
+
+```bash
+npm run test:e2e        # desktop + mobile + tablet projects
+npm run test:e2e:ui     # interactive UI mode
+npm run test:all        # unit + typecheck + Playwright
+```
+
+With seeded data (`npm run seed:e2e`), also set `E2E_EXPECT_SEED=1` to assert the E2E hospital appears on PM work.
+
+### E2E seed data (Supabase)
+
+Creates/removes a test site `E2E-SITE-001`, today’s PM jobs, and a completed job for Reports preview:
+
+```bash
+npm run seed:e2e
+npm run cleanup:e2e
+```
+
+After `seed:e2e`, log out and back in once so `full_name` metadata matches site owners. Use `?owner=__all` on list pages to see all sites/jobs during QA.
+
 ## Supabase Setup
 
 Create a Supabase project, then open the Supabase SQL editor and run the SQL in `supabase/schema.sql`.

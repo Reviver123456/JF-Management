@@ -2,10 +2,10 @@
 
 import { useLayoutEffect, useState } from "react";
 
-const enterTransition = "opacity 800ms cubic-bezier(0.16, 1, 0.3, 1), transform 800ms cubic-bezier(0.16, 1, 0.3, 1)";
+const enterTransition = "transform 420ms cubic-bezier(0.16, 1, 0.3, 1)";
 
 export function usePageEnterVisible(resetKey = "", enabled = true) {
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(true);
 
   useLayoutEffect(() => {
     if (!enabled) {
@@ -46,8 +46,8 @@ export function usePageEnterVisible(resetKey = "", enabled = true) {
 function getEnterSurfaceStyle(visible: boolean) {
   return {
     width: "100%",
-    opacity: visible ? 1 : 0,
-    transform: visible ? "translateY(0)" : "translateY(36px)",
+    opacity: 1,
+    transform: visible ? "translateY(0)" : "translateY(14px)",
     transition: enterTransition
   } as const;
 }

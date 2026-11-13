@@ -1,9 +1,59 @@
-const pmOrderNoPattern = /^\d{6}$/;
-const legacyPmOrderNoPattern = /^PM-(\d{6})(?:\D|$)/i;
-const maxPmOrderNo = 999999;
+const pmOrderNoPattern = /^\d{8}$/;
+const legacyPmOrderNoPattern = /^\d{6}$/;
+const legacyPmOrderIdPattern = /^PM-(\d{6})(?:\D|$)/i;
+const maxPmOrderSequence = 9999;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function parseIsoDateParts(value: string) {
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    year: Number(match[1]),
+    month: Number(match[2])
+  };
+}
+
+function parseReportDateParts(value: string) {
+  const match = value.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    year: Number(match[3]),
+    month: Number(match[2])
+  };
+}
+
+export function getPmOrderMonthPrefix(referenceDate: string) {
+  const isoParts = parseIsoDateParts(referenceDate);
+  const displayParts = isoParts ? null : parseReportDateParts(referenceDate);
+  const parts = isoParts ?? displayParts;
+
+  if (!parts || parts.month < 1 || parts.month > 12) {
+    return "";
+  }
+
+  const yearSuffix = String(parts.year % 100).padStart(2, "0");
+  const month = String(parts.month).padStart(2, "0");
+  return `${yearSuffix}${month}`;
+}
+
+function parsePmOrderNo(value: string) {
+  if (pmOrderNoPattern.test(value)) {
+    return {
+      prefix: value.slice(0, 4),
+      sequence: Number(value.slice(4))
+    };
+  }
+
+  return null;
 }
 
 export function normalizePmOrderNo(value: unknown) {
@@ -12,7 +62,11 @@ export function normalizePmOrderNo(value: unknown) {
   }
 
   const trimmedValue = value.trim();
-  return pmOrderNoPattern.test(trimmedValue) ? trimmedValue : "";
+  if (pmOrderNoPattern.test(trimmedValue) || legacyPmOrderNoPattern.test(trimmedValue)) {
+    return trimmedValue;
+  }
+
+  return "";
 }
 
 export function getPmOrderNoFromWorkDetails(details: unknown) {
@@ -20,10 +74,14 @@ export function getPmOrderNoFromWorkDetails(details: unknown) {
 }
 
 export function getDisplayPmOrderNo({
+  date,
   jobId,
+  visitDate,
   workDetails
 }: {
+  date?: string;
   jobId: string;
+  visitDate?: string;
   workDetails?: unknown;
 }) {
   const savedOrderNo = getPmOrderNoFromWorkDetails(workDetails);
@@ -32,8 +90,29 @@ export function getDisplayPmOrderNo({
     return savedOrderNo;
   }
 
-  const legacyOrderNo = jobId.match(legacyPmOrderNoPattern)?.[1] ?? "";
-  return legacyOrderNo || getStableFallbackPmOrderNo(jobId);
+  const legacyOrderNo = jobId.match(legacyPmOrderIdPattern)?.[1] ?? "";
+  if (legacyOrderNo) {
+    return legacyOrderNo;
+  }
+
+  const referenceDate = visitDate ?? date ?? "";
+  const prefix = referenceDate ? getPmOrderMonthPrefix(referenceDate) : "";
+
+  if (prefix) {
+    return `${prefix}${getStableFallbackSequence(jobId)}`;
+  }
+
+  return getStableFallbackPmOrderNo(jobId);
+}
+
+function getStableFallbackSequence(value: string) {
+  let hash = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+
+  return String((hash % maxPmOrderSequence) + 1).padStart(4, "0");
 }
 
 function getStableFallbackPmOrderNo(value: string) {
@@ -43,12 +122,18 @@ function getStableFallbackPmOrderNo(value: string) {
     hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
   }
 
-  return String((hash % maxPmOrderNo) + 1).padStart(6, "0");
+  return String((hash % 999999) + 1).padStart(6, "0");
 }
 
-export function getNextPmOrderNos(existingOrderNos: unknown[], count: number) {
+export function getNextPmOrderNos(existingOrderNos: unknown[], count: number, referenceDate: string) {
+  const monthPrefix = getPmOrderMonthPrefix(referenceDate);
+
+  if (!monthPrefix) {
+    throw new Error("Invalid PM visit date.");
+  }
+
   const usedOrderNos = new Set<string>();
-  let maxOrderNo = 0;
+  let maxSequence = 0;
 
   existingOrderNos.forEach((value) => {
     const orderNo = normalizePmOrderNo(value);
@@ -58,20 +143,26 @@ export function getNextPmOrderNos(existingOrderNos: unknown[], count: number) {
     }
 
     usedOrderNos.add(orderNo);
-    maxOrderNo = Math.max(maxOrderNo, Number(orderNo));
+
+    const parts = parsePmOrderNo(orderNo);
+    if (!parts || parts.prefix !== monthPrefix || !Number.isFinite(parts.sequence)) {
+      return;
+    }
+
+    maxSequence = Math.max(maxSequence, parts.sequence);
   });
 
   const nextOrderNos: string[] = [];
-  let cursor = maxOrderNo;
+  let sequence = maxSequence;
 
   while (nextOrderNos.length < count) {
-    cursor += 1;
+    sequence += 1;
 
-    if (cursor > maxPmOrderNo) {
-      throw new Error("PM Order No. has reached the 6-digit limit.");
+    if (sequence > maxPmOrderSequence) {
+      throw new Error(`PM Order No. has reached the monthly limit for ${monthPrefix}.`);
     }
 
-    const orderNo = String(cursor).padStart(6, "0");
+    const orderNo = `${monthPrefix}${String(sequence).padStart(4, "0")}`;
 
     if (!usedOrderNos.has(orderNo)) {
       usedOrderNos.add(orderNo);

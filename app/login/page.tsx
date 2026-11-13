@@ -10,8 +10,8 @@ import { ensureClientSession } from "@/lib/auth/ensure-client-session";
 import { syncAuthAfterLogin } from "@/lib/auth/sync-auth-after-login";
 import { readRememberedLogin, writeRememberedLogin } from "@/lib/auth/remember-login";
 import { useUi } from "@/lib/i18n";
-import { usePageEnterProps } from "@/components/PageEnterTransition";
 import { createClient } from "@/lib/supabase/client";
+import { DarkThemeAnimatedBackdrop } from "@/components/DarkThemeAnimatedBackdrop";
 import { getSupabaseConfigMessage, hasSupabaseConfig } from "@/lib/supabase/env";
 
 export default function LoginPage() {
@@ -24,7 +24,6 @@ export default function LoginPage() {
   const [resetMode, setResetMode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rememberPassword, setRememberPassword] = useState(false);
-  const pageEnterProps = usePageEnterProps("loginPage", "login");
   const supabaseReady = hasSupabaseConfig();
   const configErrorMessage = getSupabaseConfigMessage(lang);
 
@@ -170,7 +169,8 @@ export default function LoginPage() {
   };
 
   return (
-    <main {...pageEnterProps}>
+    <main className="loginPage">
+      <DarkThemeAnimatedBackdrop scope="login" />
       <FeedbackPopups
         alertMessage={message}
         alertTone={messageTone}

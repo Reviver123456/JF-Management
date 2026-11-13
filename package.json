@@ -8,7 +8,15 @@
     "start": "node --max-http-header-size=65536 node_modules/next/dist/bin/next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit",
-    "check:env": "node scripts/check-env.mjs"
+    "check:env": "node scripts/check-env.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify": "npm run test && npm run typecheck",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:all": "npm run verify && npm run test:e2e",
+    "seed:e2e": "node scripts/seed-e2e-test.mjs",
+    "cleanup:e2e": "node scripts/cleanup-e2e-test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
@@ -29,6 +37,8 @@
     "@types/ws": "^8.18.1",
     "eslint": "latest",
     "eslint-config-next": "^16.4.6",
-    "typescript": "latest"
+    "typescript": "latest",
+    "@playwright/test": "^1.51.1",
+    "vitest": "^5.1.0"
   }
 }

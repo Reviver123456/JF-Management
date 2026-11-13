@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getPaginationWindow } from "@/lib/pagination";
 import { useUi } from "@/lib/i18n";
@@ -7,6 +8,7 @@ import { useUi } from "@/lib/i18n";
 export function Pagination({
   className = "",
   endIndex,
+  leading,
   onPageChange,
   page,
   startIndex,
@@ -15,6 +17,7 @@ export function Pagination({
 }: {
   className?: string;
   endIndex: number;
+  leading?: ReactNode;
   onPageChange: (page: number) => void;
   page: number;
   startIndex: number;
@@ -32,6 +35,7 @@ export function Pagination({
 
   return (
     <nav aria-label={t("pagination.label")} className={rootClassName}>
+      {leading}
       <p className="paginationSummary">
         {t("pagination.summary")
           .replace("{start}", String(startIndex))

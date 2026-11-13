@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getNextPmOrderNos, getPmOrderNoFromWorkDetails, normalizePmOrderNo } from "@/lib/pm-order-no";
+import { getNextPmOrderNos, getPmOrderNoFromWorkDetails } from "@/lib/pm-order-no";
 import { normalizeOwnerName } from "@/lib/pm-data";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database, Json } from "@/lib/supabase/database.types";
@@ -112,7 +112,7 @@ function getDateRangeValues(startValue: string, endValue: string) {
   return values;
 }
 
-async function getNextJobOrderNos(supabase: ReturnType<typeof createAdminClient>, count: number) {
+async function getExistingPmOrderNos(supabase: ReturnType<typeof createAdminClient>) {
   const { data, error } = await supabase
     .from("pm_jobs")
     .select("id, work_details");
@@ -121,12 +121,18 @@ async function getNextJobOrderNos(supabase: ReturnType<typeof createAdminClient>
     throw new Error(error.message);
   }
 
-  const existingOrderNos = (data ?? []).flatMap((job) => [
-    normalizePmOrderNo(job.id),
-    getPmOrderNoFromWorkDetails(job.work_details)
-  ]);
+  return (data ?? []).flatMap((job) => getPmOrderNoFromWorkDetails(job.work_details));
+}
 
-  return getNextPmOrderNos(existingOrderNos, count);
+function getNextJobOrderNos(existingOrderNos: string[], visitDates: string[]) {
+  const assignedOrderNos: string[] = [];
+
+  visitDates.forEach((visitDate) => {
+    const nextOrderNos = getNextPmOrderNos([...existingOrderNos, ...assignedOrderNos], 1, visitDate);
+    assignedOrderNos.push(nextOrderNos[0]);
+  });
+
+  return assignedOrderNos;
 }
 
 function buildWorkDetails(pmOrderNo: string, expenses: Record<string, string>): Json {
@@ -204,7 +210,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Please assign a site owner or follower." }, { status: 400 });
     }
 
-    const pmOrderNos = await getNextJobOrderNos(supabase, visitDates.length);
+    const existingOrderNos = await getExistingPmOrderNos(supabase);
+    const pmOrderNos = getNextJobOrderNos(existingOrderNos, visitDates);
     const rows: PmJobInsert[] = visitDates.flatMap((date, dateIndex) => participants.map((owner) => ({
       id: `PM-${crypto.randomUUID()}`,
       site_id: site.id,
