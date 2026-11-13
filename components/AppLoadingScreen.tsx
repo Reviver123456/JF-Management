@@ -20,7 +20,7 @@ export function AppLoadingScreen({
 }) {
   const [parallax, setParallax] = useState({ x: 0, y: 0 });
   const frameRef = useRef<number | null>(null);
-  const pageEnterProps = usePageEnterProps("appLoadingScreen", "app-loading");
+  const pageEnterProps = usePageEnterProps("appLoadingScreen");
   const clampedProgress = Math.max(4, Math.min(100, progress));
 
   useEffect(() => {
@@ -54,7 +54,7 @@ export function AppLoadingScreen({
   } as CSSProperties;
 
   return (
-    <main {...pageEnterProps} style={{ ...pageEnterProps.style, ...style }}>
+    <main className={pageEnterProps.className} style={style}>
       <div className="appLoadingParallax" aria-hidden="true">
         <span className="appLoadingLayer appLoadingLayerBack" />
         <span className="appLoadingLayer appLoadingLayerMid" />

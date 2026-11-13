@@ -15,6 +15,7 @@ import {
   type ReactNode
 } from "react";
 import { createPortal } from "react-dom";
+import { getFirstName } from "@/lib/get-first-name";
 
 type SelectOption = {
   value: string;
@@ -74,22 +75,6 @@ function truncateSelectLabel(label: string, maxLength?: number) {
   }
 
   return `${label.slice(0, maxLength)}...`;
-}
-
-function getFirstName(label: string) {
-  const trimmed = label.trim();
-
-  if (!trimmed) {
-    return trimmed;
-  }
-
-  const spaceIndex = trimmed.indexOf(" ");
-
-  if (spaceIndex === -1) {
-    return trimmed;
-  }
-
-  return trimmed.slice(0, spaceIndex);
 }
 
 function formatSelectLabel(label: string, firstNameOnly?: boolean, labelMaxLength?: number) {

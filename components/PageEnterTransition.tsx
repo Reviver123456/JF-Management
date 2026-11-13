@@ -1,72 +1,76 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useLayoutEffect, useState } from "react";
 
-const enterTransition = "transform 420ms cubic-bezier(0.16, 1, 0.3, 1)";
+/** Matches `pageEnterMacOpen` duration in ui.css — keep in sync for dashboard stagger. */
+export const PAGE_ENTER_MAC_MS = 820;
+
+function prefersReducedMotion() {
+  return typeof window !== "undefined"
+    && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function macOpenClassName() {
+  return prefersReducedMotion() ? "pageEnterSurface" : "pageEnterSurface pageEnterSurface--macOpen";
+}
 
 export function usePageEnterVisible(resetKey = "", enabled = true) {
-  const [visible, setVisible] = useState(true);
+  const animationToken = `${resetKey}:${enabled ? "on" : "off"}`;
+  const skipMotion = !enabled || prefersReducedMotion();
+  const [ready, setReady] = useState({
+    token: animationToken,
+    value: skipMotion
+  });
+
+  if (ready.token !== animationToken) {
+    const nextValue = skipMotion;
+    setReady({ token: animationToken, value: nextValue });
+  }
 
   useLayoutEffect(() => {
-    if (!enabled) {
+    if (!enabled || prefersReducedMotion()) {
       return;
     }
 
     let cancelled = false;
-    let innerFrame = 0;
-
-    const frame = window.requestAnimationFrame(() => {
-      if (cancelled) {
-        return;
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) {
+        setReady((current) => (
+          current.token === animationToken ? { ...current, value: true } : current
+        ));
       }
-
-      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        setVisible(true);
-        return;
-      }
-
-      setVisible(false);
-      innerFrame = window.requestAnimationFrame(() => {
-        if (!cancelled) {
-          setVisible(true);
-        }
-      });
-    });
+    }, PAGE_ENTER_MAC_MS);
 
     return () => {
       cancelled = true;
-      window.cancelAnimationFrame(frame);
-      window.cancelAnimationFrame(innerFrame);
+      window.clearTimeout(timeout);
     };
-  }, [resetKey, enabled]);
+  }, [animationToken, enabled]);
 
-  return enabled && visible;
+  return !enabled || ready.value;
 }
 
-function getEnterSurfaceStyle(visible: boolean) {
-  return {
-    width: "100%",
-    opacity: 1,
-    transform: visible ? "translateY(0)" : "translateY(14px)",
-    transition: enterTransition
-  } as const;
-}
-
-export function PageEnterTransition({ children }: { children: React.ReactNode }) {
-  const visible = usePageEnterVisible();
-
+function PageEnterSurface({ children }: { children: React.ReactNode }) {
   return (
-    <div className="pageEnterSurface" style={getEnterSurfaceStyle(visible)}>
+    <div className={macOpenClassName()}>
       {children}
     </div>
   );
 }
 
-export function usePageEnterProps(className = "", resetKey = "page") {
-  const visible = usePageEnterVisible(resetKey);
+export function PageEnterTransition({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
 
+  return (
+    <PageEnterSurface key={pathname}>
+      {children}
+    </PageEnterSurface>
+  );
+}
+
+export function usePageEnterProps(className = "") {
   return {
-    className: [className, "pageEnterSurface"].filter(Boolean).join(" "),
-    style: getEnterSurfaceStyle(visible)
+    className: [className, macOpenClassName()].filter(Boolean).join(" ")
   } as const;
 }

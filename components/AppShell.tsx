@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import {
   Building2,
   CalendarDays,
@@ -14,7 +15,6 @@ import {
   Moon,
   PanelLeftClose,
   Settings,
-  Shield,
   Sun,
   Wrench,
   X
@@ -22,6 +22,8 @@ import {
 import { PageLoadingRing } from "@/components/PageLoadingRing";
 import { useUi } from "@/lib/i18n";
 import { clearAppBrowserCache } from "@/lib/auth/clear-app-cache";
+import { useCurrentUser } from "@/lib/auth/use-current-user";
+import { getFirstName } from "@/lib/get-first-name";
 import { PageEnterTransition } from "@/components/PageEnterTransition";
 import { DarkThemeAnimatedBackdrop } from "@/components/DarkThemeAnimatedBackdrop";
 import { OthersNavMenu } from "@/components/OthersNavMenu";
@@ -39,6 +41,25 @@ const navItems = [
 
 const settingsNavItem = navItems.find((item) => item.href === "/settings");
 
+const JF_LOGO_SRC = "/branding/logo-jf.png";
+const JF_LOGO_ALT = "JF Advance Med";
+
+function resolveBrandUserName(userName: string, email: string, fallback: string) {
+  const trimmedName = userName.trim();
+
+  if (trimmedName) {
+    return getFirstName(trimmedName);
+  }
+
+  const localPart = email.trim().split("@")[0] ?? "";
+
+  if (localPart) {
+    return getFirstName(localPart.replace(/[._-]/g, " "));
+  }
+
+  return fallback;
+}
+
 export function AppShell({
   children,
   loading = false
@@ -49,6 +70,11 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const { lang, theme, toggleLang, toggleTheme, t } = useUi();
+  const { email, userName } = useCurrentUser();
+  const brandUserName = useMemo(
+    () => resolveBrandUserName(userName, email, t("app.name")),
+    [email, t, userName]
+  );
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const closeMobileMenu = () => setMobileMenuOpen(false);
@@ -76,6 +102,10 @@ export function AppShell({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [mobileMenuOpen]);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" in window ? "instant" : "auto" });
+  }, [pathname]);
+
   return (
     <div className={`${collapsed ? "shell shellCollapsed" : "shell"}${mobileMenuOpen ? " mobileMenuOpen" : ""}`}>
       <PageLoadingRing active={loading} message={t("pm.loadingSubtitle")} />
@@ -86,12 +116,18 @@ export function AppShell({
         onClick={closeMobileMenu}
       />
       <aside className="sidebar">
-        <Link className="brand" href="/dashboard" aria-label="PM Site" onClick={closeMobileMenu}>
-          <span className="brandMark">
-            <Shield size={22} />
+        <Link className="brand" href="/dashboard" aria-label={brandUserName} onClick={closeMobileMenu}>
+          <span className="brandMarkJf">
+            <Image
+              alt={JF_LOGO_ALT}
+              className="brandJfLogo"
+              height={28}
+              src={JF_LOGO_SRC}
+              width={44}
+            />
           </span>
-          <span>
-            <strong>PM Site</strong>
+          <span className="brandText">
+            <strong title={brandUserName}>{brandUserName}</strong>
             <small>Management System</small>
           </span>
         </Link>
@@ -143,9 +179,17 @@ export function AppShell({
       <div className="workspace">
         <DarkThemeAnimatedBackdrop scope="page" />
         <header className="mobileTopbar">
-          <Link className="mobileBrand" href="/dashboard" onClick={closeMobileMenu}>
-            <span className="mobileLogo">P</span>
-            <strong>PM Site</strong>
+          <Link className="mobileBrand" href="/dashboard" aria-label={brandUserName} onClick={closeMobileMenu}>
+            <span className="brandMarkJf brandMarkJfMobile">
+              <Image
+                alt={JF_LOGO_ALT}
+                className="brandJfLogo"
+                height={24}
+                src={JF_LOGO_SRC}
+                width={38}
+              />
+            </span>
+            <strong title={brandUserName}>{brandUserName}</strong>
           </Link>
           <div className="mobileActions">
             <button className="iconButton" type="button" onClick={toggleLang} aria-label="Language">
@@ -166,7 +210,7 @@ export function AppShell({
           </div>
         </header>
         <main className="content">
-          <PageEnterTransition key={pathname}>{children}</PageEnterTransition>
+          <PageEnterTransition>{children}</PageEnterTransition>
         </main>
       </div>
 

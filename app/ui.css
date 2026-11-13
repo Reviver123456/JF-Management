@@ -34,7 +34,7 @@
 }
 
 .shell .brandMark,
-.shell .mobileLogo {
+.shell .mobileLogo:not(.brandMarkJfMobile) {
   width: 30px;
   height: 30px;
   border-radius: 8px;
@@ -45,6 +45,40 @@
   box-shadow: 0 8px 18px rgba(47, 125, 246, 0.34);
 }
 
+.shell .brandMarkJf {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+  overflow: visible;
+}
+
+.shell .brandMarkJfMobile {
+  width: 38px;
+  height: 24px;
+}
+
+.shell .brandJfLogo,
+.shell .brandMarkJf img {
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: left center;
+  background: transparent;
+  mix-blend-mode: screen;
+}
+
+[data-theme="light"] .shell .brandJfLogo,
+[data-theme="light"] .shell .brandMarkJf img {
+  mix-blend-mode: multiply;
+}
+
 .shell .brand strong,
 .shell .brand small {
   display: block;
@@ -53,6 +87,14 @@
 .shell .brand strong {
   font-size: 14px;
   line-height: 1;
+  max-width: 148px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shell .brandText {
+  min-width: 0;
 }
 
 .shell .brand small {
@@ -420,12 +462,16 @@
   .shell .mobileLogo {
     width: 26px;
     height: 26px;
-    border-radius: 999px;
+    border-radius: 6px;
     font-size: 11px;
   }
 
   .shell .mobileBrand strong {
     font-size: 13px;
+    max-width: min(42vw, 168px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .shell .mobileActions {
@@ -8026,9 +8072,74 @@
   }
 }
 
-/* Page enter animation — inline styles on .pageEnterSurface drive the motion */
+/* Page enter — macOS-style folder/window open (scale + soft overshoot) */
 .pageEnterSurface {
   width: 100%;
+  transform-origin: 50% 14%;
+  backface-visibility: hidden;
+}
+
+@keyframes pageEnterMacOpen {
+  0% {
+    opacity: 0.76;
+    transform: perspective(1200px) translate3d(0, 20px, 0) scale(0.9);
+  }
+
+  52% {
+    opacity: 1;
+    transform: perspective(1200px) translate3d(0, -3px, 0) scale(1.014);
+  }
+
+  76% {
+    transform: perspective(1200px) translate3d(0, 1px, 0) scale(0.997);
+  }
+
+  100% {
+    opacity: 1;
+    transform: perspective(1200px) translate3d(0, 0, 0) scale(1);
+  }
+}
+
+.pageEnterSurface--macOpen {
+  animation: pageEnterMacOpen 820ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (min-width: 768px) {
+  @keyframes pageEnterMacOpen {
+    0% {
+      opacity: 0.76;
+      transform: perspective(1200px) translate3d(0, 20px, 0) scale(0.9);
+      filter: blur(4px);
+    }
+
+    52% {
+      opacity: 1;
+      transform: perspective(1200px) translate3d(0, -3px, 0) scale(1.014);
+      filter: blur(0);
+    }
+
+    76% {
+      transform: perspective(1200px) translate3d(0, 1px, 0) scale(0.997);
+      filter: blur(0);
+    }
+
+    100% {
+      opacity: 1;
+      transform: perspective(1200px) translate3d(0, 0, 0) scale(1);
+      filter: blur(0);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pageEnterSurface,
+  .pageEnterSurface--macOpen {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
 }
 
 [data-theme="light"] .pmWorkPage .photoPopup,
