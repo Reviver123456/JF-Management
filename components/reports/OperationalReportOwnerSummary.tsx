@@ -18,15 +18,15 @@ export function OperationalReportOwnerSummary({
     <section className="operationalDocOwnerSummary">
       {sets.map((set) => (
         <div className="operationalDocOwnerSummarySet" key={set.owner}>
-          <div className="operationalDocSummaryItem operationalDocOwnerSummaryLine">
+          <div className="operationalDocOwnerSummaryLine">
             <span>{t("common.owner")}</span>
             <strong>{set.owner}</strong>
           </div>
-          <div className="operationalDocSummaryItem operationalDocOwnerSummaryLine">
+          <div className="operationalDocOwnerSummaryLine">
             <span>{t("reports.siteTotal")}</span>
             <strong>{`${set.siteCount} ${t("reports.summarySiteUnit")}`}</strong>
           </div>
-          <div className="operationalDocSummaryItem operationalDocOwnerSummaryLine">
+          <div className="operationalDocOwnerSummaryLine">
             <span>{t("reports.totalDays")}</span>
             <strong>{`${set.dayCount} ${t("reports.summaryDayUnit")}`}</strong>
           </div>

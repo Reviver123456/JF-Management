@@ -6,7 +6,6 @@ import Image from "next/image";
 import { LockKeyhole, UserRound } from "lucide-react";
 import { FeedbackPopups } from "@/components/AppPopup";
 import { clearAppBrowserCache } from "@/lib/auth/clear-app-cache";
-import { ensureClientSession } from "@/lib/auth/ensure-client-session";
 import { syncAuthAfterLogin } from "@/lib/auth/sync-auth-after-login";
 import { readRememberedLogin, writeRememberedLogin } from "@/lib/auth/remember-login";
 import { useUi } from "@/lib/i18n";
@@ -26,11 +25,11 @@ export default function LoginPage() {
   const [rememberPassword, setRememberPassword] = useState(false);
   const supabaseReady = hasSupabaseConfig();
   const configErrorMessage = getSupabaseConfigMessage(lang);
+  const loginAlertMessage = message || (!supabaseReady ? configErrorMessage : "");
+  const loginAlertTone: "error" | "success" = !supabaseReady ? "error" : messageTone;
 
   useEffect(() => {
     if (!supabaseReady) {
-      setMessageTone("error");
-      setMessage(configErrorMessage);
       return;
     }
 
@@ -172,9 +171,9 @@ export default function LoginPage() {
     <main className="loginPage">
       <DarkThemeAnimatedBackdrop scope="login" />
       <FeedbackPopups
-        alertMessage={message}
-        alertTone={messageTone}
-        alertVariant={messageTone === "success" && message ? "status" : "default"}
+        alertMessage={loginAlertMessage}
+        alertTone={loginAlertTone}
+        alertVariant={loginAlertTone === "success" && loginAlertMessage ? "status" : "default"}
         loading={isSubmitting}
         loadingMessage={t("pm.loadingSubtitle")}
       />
@@ -246,8 +245,8 @@ export default function LoginPage() {
           <button className="button primary" type="submit" disabled={isSubmitting || !supabaseReady}>
             {resetMode ? "ส่งลิงก์รหัสผ่าน" : t("login.signIn")}
           </button>
-          {!resetMode && messageTone === "error" && message ? (
-            <p className="loginError" role="alert">{message}</p>
+          {!resetMode && loginAlertTone === "error" && loginAlertMessage ? (
+            <p className="loginError" role="alert">{loginAlertMessage}</p>
           ) : null}
         </form>
         <button

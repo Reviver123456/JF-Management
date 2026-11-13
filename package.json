@@ -19,6 +19,7 @@
     "cleanup:e2e": "node scripts/cleanup-e2e-test.mjs"
   },
   "dependencies": {
+    "@supabase/realtime-js": "^2.119.0",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.107.0",
     "lucide-react": "latest",
@@ -31,6 +32,7 @@
     "minimatch": "^11.0.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.1",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
@@ -38,7 +40,6 @@
     "eslint": "latest",
     "eslint-config-next": "^16.4.6",
     "typescript": "latest",
-    "@playwright/test": "^1.51.1",
     "vitest": "^5.1.0"
   }
 }

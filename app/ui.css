@@ -3138,55 +3138,6 @@
   padding-bottom: 0;
 }
 
-.reportsPage .operationalDocSummaryGrid {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-  padding: 6px 0 14px;
-  border-bottom: 1px solid #e3ebf8;
-}
-
-.reportsPage .operationalDocSummaryItem {
-  display: grid;
-  grid-template-columns: minmax(118px, 38%) minmax(0, 1fr);
-  align-items: baseline;
-  gap: 10px 16px;
-  text-align: left;
-  padding: 0;
-}
-
-.reportsPage .operationalDocSummaryItem span {
-  color: #5b6f8f;
-  font-size: 9px;
-  font-weight: 600;
-  line-height: 1.35;
-  letter-spacing: 0.01em;
-}
-
-.reportsPage .operationalDocSummaryItem strong {
-  color: #0b2f6d;
-  font-size: 11px;
-  line-height: 1.35;
-  font-weight: 700;
-  word-break: break-word;
-  justify-self: start;
-}
-
-.reportsPage .operationalDocSummaryItem.isMetric strong {
-  font-size: 13px;
-  line-height: 1.25;
-  font-weight: 800;
-}
-
-.reportsPage .operationalDocSummaryItem.success strong {
-  color: #15803d;
-}
-
-.reportsPage .operationalDocSummaryItem.warning strong {
-  color: #b91c1c;
-}
-
 .reportsPage .operationalDocSectionHead {
   display: flex;
   align-items: center;
@@ -5914,11 +5865,6 @@
   .reportsPage .operationalDocPeriodCard {
     align-items: flex-start;
     text-align: left;
-  }
-
-  .reportsPage .operationalDocSummaryItem {
-    grid-template-columns: 1fr;
-    gap: 4px;
   }
 
   .reportsPage .operationalDocOwnerSummary {

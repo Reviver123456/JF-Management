@@ -7,7 +7,6 @@ import {
   Building2,
   CalendarDays,
   ClipboardList,
-  FileText,
   History,
   LayoutDashboard,
   LogOut,
@@ -35,7 +34,6 @@ const navItems = [
   { href: "/sites", labelKey: "nav.sites", mobileKey: "navMobile.sites", icon: Building2 },
   { href: "/schedule", labelKey: "nav.schedule", mobileKey: "navMobile.schedule", icon: CalendarDays },
   { href: "/history", labelKey: "nav.history", mobileKey: "navMobile.history", icon: History },
-  { href: "/reports", labelKey: "nav.reports", mobileKey: "navMobile.reports", icon: FileText },
   { href: "/settings", labelKey: "nav.settings", mobileKey: "navMobile.settings", icon: Settings }
 ] as const;
 
@@ -100,7 +98,7 @@ export function AppShell({
 
         <nav className="nav" aria-label="Primary navigation">
           {navItems
-            .filter((item) => item.href !== "/reports" && item.href !== "/settings")
+            .filter((item) => item.href !== "/settings")
             .map((item) => {
               const Icon = item.icon;
               const active = pathname.startsWith(item.href);

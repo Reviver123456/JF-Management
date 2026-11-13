@@ -1845,10 +1845,12 @@ function Field({
   const localizedLabel = localizeLabel(label, lang);
   const localizedPlaceholder = localizeLabel(placeholder ?? label, lang);
   const [dateValue, setDateValue] = useState(value);
+  const [syncedValue, setSyncedValue] = useState(value);
 
-  useEffect(() => {
+  if (value !== syncedValue) {
+    setSyncedValue(value);
     setDateValue(value);
-  }, [value]);
+  }
 
   if (type === "date") {
     return (

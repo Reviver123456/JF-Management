@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Building2,
   CalendarRange,
@@ -36,22 +36,27 @@ export function ReportsNavMenu({
   const { t } = useUi();
   const onReportsPage = pathname.startsWith("/reports");
   const activeSection = parseReportSection(searchParams.get("section"));
-  const [open, setOpen] = useState(onReportsPage);
+  const [submenuCollapsed, setSubmenuCollapsed] = useState(false);
+  const [wasOnReportsPage, setWasOnReportsPage] = useState(onReportsPage);
 
-  useEffect(() => {
+  if (onReportsPage !== wasOnReportsPage) {
+    setWasOnReportsPage(onReportsPage);
+
     if (onReportsPage) {
-      setOpen(true);
+      setSubmenuCollapsed(false);
     }
-  }, [onReportsPage]);
+  }
+
+  const open = onReportsPage ? !submenuCollapsed : false;
 
   const toggleOpen = () => {
     if (!onReportsPage) {
       router.push(reportSectionHref(activeSection));
-      setOpen(true);
+      setSubmenuCollapsed(false);
       return;
     }
 
-    setOpen((current) => !current);
+    setSubmenuCollapsed((current) => !current);
   };
 
   return (

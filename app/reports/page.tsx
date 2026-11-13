@@ -1,7 +1,7 @@
 "use client";
 
 import { createElement, Suspense, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
   ArrowLeft,
@@ -84,7 +84,7 @@ import {
 } from "@/lib/pm-report-helpers";
 import { usePmData } from "@/lib/use-pm-data";
 import { useOwnerFromUrl } from "@/lib/hooks/use-owner-from-url";
-import { parseReportSection } from "@/lib/report-section-nav";
+import { parseReportSection, type ReportSection } from "@/lib/report-section-nav";
 import { ReportListPagination } from "@/components/reports/ReportListPagination";
 import { useReportListPagination } from "@/lib/use-report-list-pagination";
 import { ReportExportMenu } from "@/components/reports/ReportExportMenu";
@@ -113,6 +113,7 @@ type ChecklistTemplate = {
 type PreviewState = {
   contractIndex: number;
   row: ReportRow;
+  section: ReportSection;
   site: SiteCatalogRecord | null;
   title: string;
 };
@@ -171,10 +172,8 @@ const reportFieldIcons: Record<string, LucideIcon> = {
 
 function ReportsPageInner() {
   const { lang, t } = useUi();
-  const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const reportSectionParam = searchParams.get("section");
   const { email, signature, userName } = useCurrentUser();
   const ownerParam = useOwnerFromUrl();
   const { data, error } = usePmData();
@@ -236,19 +235,7 @@ function ReportsPageInner() {
     }
   }, [router, searchParams]);
 
-  useEffect(() => {
-    setPreview(null);
-  }, [pathname, reportSectionParam]);
-
-  useEffect(() => {
-    if (!pmOwnerFilter && userName) {
-      setPmOwnerFilter(userName);
-    }
-
-    if (!operationalOwnerFilter && userName) {
-      setOperationalOwnerFilter(userName);
-    }
-  }, [operationalOwnerFilter, pmOwnerFilter, userName]);
+  const activePreview = preview?.section === reportSection ? preview : null;
 
   const filteredReports = useMemo(() => (
     data.reportRows.filter((row) => rowMatchesFilters({
@@ -267,6 +254,7 @@ function ReportsPageInner() {
     setPreview({
       contractIndex: contractIndex ?? row.workDetails?.contractIndex ?? 0,
       row,
+      section: reportSection,
       site: data.siteCatalog.find((site) => site.id === row.siteId) ?? null,
       title: `รายงาน PM - ${row.site}`
     });
@@ -299,10 +287,10 @@ function ReportsPageInner() {
       <div className="reportsPage">
         <FeedbackPopups alertMessage={error} />
 
-        {preview ? (
+        {activePreview ? (
           <ReportPreviewPage
             pmJobs={data.pmJobs}
-            preview={preview}
+            preview={activePreview}
             responsibleName={responsibleName}
             responsibleSignature={responsibleSignature}
             onClose={() => setPreview(null)}
@@ -341,7 +329,7 @@ function ReportsPageInner() {
                   </label>
                   <label className="reportFilterField">
                     <span>{t("common.inspector")}</span>
-                    <AppSelect className="select" firstNameOnly value={pmOwnerFilter} onChange={(event) => setPmOwnerFilter(event.target.value)}>
+                    <AppSelect className="select" firstNameOnly value={pmOwnerFilter || userName} onChange={(event) => setPmOwnerFilter(event.target.value)}>
                       <option value={ALL_OWNERS_VALUE}>{t("common.all")}</option>
                       {ownerOptions.map((owner) => (
                         <option key={owner} value={owner}>{owner}</option>
@@ -440,18 +428,13 @@ function ReportPhotosPreview({ workDetails }: { workDetails?: PmWorkDetails }) {
   const [activePhotoCategory, setActivePhotoCategory] = useState<PhotoCategory>(
     categoriesWithContent[0]?.key ?? "device"
   );
-  const activePhotoItem = categoriesWithContent.find((item) => item.key === activePhotoCategory)
+  const resolvedPhotoCategory =
+    categoriesWithContent.length > 0
+    && categoriesWithContent.some((item) => item.key === activePhotoCategory)
+      ? activePhotoCategory
+      : (categoriesWithContent[0]?.key ?? activePhotoCategory);
+  const activePhotoItem = categoriesWithContent.find((item) => item.key === resolvedPhotoCategory)
     ?? categoriesWithContent[0];
-
-  useEffect(() => {
-    if (categoriesWithContent.length === 0) {
-      return;
-    }
-
-    if (!categoriesWithContent.some((item) => item.key === activePhotoCategory)) {
-      setActivePhotoCategory(categoriesWithContent[0].key);
-    }
-  }, [activePhotoCategory, categoriesWithContent]);
 
   if (categoriesWithContent.length === 0) {
     return <p className="reportPhotoPreviewEmpty">{t("reports.noPhotosToDownload")}</p>;
@@ -462,7 +445,7 @@ function ReportPhotosPreview({ workDetails }: { workDetails?: PmWorkDetails }) {
       <div className="tabs historyTabs reportPhotoTabs">
         {categoriesWithContent.map((item) => (
           <button
-            className={item.key === activePhotoCategory ? "activeTab" : "tab"}
+            className={item.key === resolvedPhotoCategory ? "activeTab" : "tab"}
             key={item.key}
             type="button"
             onClick={() => setActivePhotoCategory(item.key)}

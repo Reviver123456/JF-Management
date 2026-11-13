@@ -15,6 +15,7 @@ export default function LoadingPage() {
   const [error, setError] = useState("");
   const startedRef = useRef(false);
   const clearedStorageRef = useRef(false);
+  const runBootstrapRef = useRef<(options?: { clearStorage?: boolean }) => Promise<void>>(async () => {});
 
   const runBootstrap = useCallback(async (options?: { clearStorage?: boolean }) => {
     setError("");
@@ -52,7 +53,7 @@ export default function LoadingPage() {
         if (!clearedStorageRef.current) {
           clearedStorageRef.current = true;
           await clearAppBrowserCache({ includeLocalStorage: true, preserveAuth: true });
-          await runBootstrap();
+          await runBootstrapRef.current();
           return;
         }
 
@@ -70,6 +71,10 @@ export default function LoadingPage() {
       setProgress(0);
     }
   }, [lang, router, t]);
+
+  useEffect(() => {
+    runBootstrapRef.current = runBootstrap;
+  }, [runBootstrap]);
 
   useEffect(() => {
     if (startedRef.current) {

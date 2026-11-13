@@ -203,18 +203,12 @@ function HistoryDetailView({
     const keys = new Set(snapshot.map((item) => item.key));
     return checklistTabDefs.filter((tab) => keys.has(tab.key));
   }, [contractWorkDetails?.checklistSnapshot]);
-  const activeTabTitle = availableTabs.find((tab) => tab.key === activeTab)?.title ?? activeTab;
+  const resolvedActiveTab =
+    availableTabs.length > 0 && availableTabs.some((tab) => tab.key === activeTab)
+      ? activeTab
+      : (availableTabs[0]?.key ?? activeTab);
+  const activeTabTitle = availableTabs.find((tab) => tab.key === resolvedActiveTab)?.title ?? resolvedActiveTab;
   const statusClass = report.result === "ผิดปกติ" ? "danger" : "success";
-
-  useEffect(() => {
-    if (availableTabs.length === 0) {
-      return;
-    }
-
-    if (!availableTabs.some((tab) => tab.key === activeTab)) {
-      setActiveTab(availableTabs[0].key);
-    }
-  }, [activeTab, availableTabs]);
   const visitTotal = getSiteContractVisitTotal(site, selectedContractIndex, site.pmCycle);
   const visitRound = getVisitRound(pmJobs, site, report.jobId);
   const displayPmCycle = selectedContract.pmCycle ?? site.pmCycle;
@@ -310,7 +304,7 @@ function HistoryDetailView({
           <div className="tabs historyTabs">
             {availableTabs.map((tab) => (
               <button
-                className={tab.key === activeTab ? "activeTab" : "tab"}
+                className={tab.key === resolvedActiveTab ? "activeTab" : "tab"}
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
@@ -322,7 +316,7 @@ function HistoryDetailView({
           <div className="templateList">
             <section className="templateSet">
               <h3 className="checkSectionTitle">{activeTabTitle}</h3>
-              <HistoryChecklistDetails activeTab={activeTab} workDetails={contractWorkDetails} report={report} />
+              <HistoryChecklistDetails activeTab={resolvedActiveTab} workDetails={contractWorkDetails} report={report} />
             </section>
           </div>
         </section>
@@ -362,18 +356,13 @@ function HistoryPhotosSection({ report }: { report: ReportRow }) {
     categoriesWithContent[0]?.key ?? "device"
   );
   const totalPhotoCount = photoUploadItems.reduce((sum, item) => sum + photos[item.key].length, 0);
-  const activePhotoItem = categoriesWithContent.find((item) => item.key === activePhotoCategory)
+  const resolvedPhotoCategory =
+    categoriesWithContent.length > 0
+    && categoriesWithContent.some((item) => item.key === activePhotoCategory)
+      ? activePhotoCategory
+      : (categoriesWithContent[0]?.key ?? activePhotoCategory);
+  const activePhotoItem = categoriesWithContent.find((item) => item.key === resolvedPhotoCategory)
     ?? categoriesWithContent[0];
-
-  useEffect(() => {
-    if (categoriesWithContent.length === 0) {
-      return;
-    }
-
-    if (!categoriesWithContent.some((item) => item.key === activePhotoCategory)) {
-      setActivePhotoCategory(categoriesWithContent[0].key);
-    }
-  }, [activePhotoCategory, categoriesWithContent]);
 
   if (categoriesWithContent.length === 0) {
     return null;
@@ -399,7 +388,7 @@ function HistoryPhotosSection({ report }: { report: ReportRow }) {
           <div className="tabs historyTabs historyPhotoTabs">
             {categoriesWithContent.map((item) => (
               <button
-                className={item.key === activePhotoCategory ? "activeTab" : "tab"}
+                className={item.key === resolvedPhotoCategory ? "activeTab" : "tab"}
                 key={item.key}
                 type="button"
                 onClick={() => setActivePhotoCategory(item.key)}

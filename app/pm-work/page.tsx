@@ -582,7 +582,11 @@ function DetailView({
   const visitTotal = getSiteContractVisitTotal(site, selectedContractIndex, site.pmCycle);
   const displayPmCycle = selectedContract.pmCycle ?? site.pmCycle;
   const configuredGroups = useMemo(() => buildConfiguredChecklistGroups(checklistConfig, lang), [checklistConfig, lang]);
-  const group = configuredGroups.find((item) => item.key === activeTab) ?? configuredGroups[0];
+  const resolvedActiveTab =
+    configuredGroups.length > 0 && configuredGroups.some((item) => item.key === activeTab)
+      ? activeTab
+      : (configuredGroups[0]?.key ?? activeTab);
+  const group = configuredGroups.find((item) => item.key === resolvedActiveTab) ?? configuredGroups[0];
   const missingRequiredCount = useMemo(() => getMissingRequiredCount({
     fieldValues,
     finalStatus,
@@ -602,7 +606,6 @@ function DetailView({
   useEffect(() => {
     const refreshConfig = () => setChecklistConfig(readChecklistConfigForSite(site, selectedContractIndex));
 
-    refreshConfig();
     window.addEventListener("focus", refreshConfig);
     window.addEventListener("storage", refreshConfig);
     return () => {
@@ -637,12 +640,6 @@ function DetailView({
       [selectedContractIndex]: updater(current[selectedContractIndex] ?? emptyPmContractChecklistData())
     }));
   }, [selectedContractIndex]);
-
-  useEffect(() => {
-    if (configuredGroups.length > 0 && !configuredGroups.some((item) => item.key === activeTab)) {
-      setActiveTab(configuredGroups[0].key);
-    }
-  }, [activeTab, configuredGroups, setActiveTab]);
 
   const setCheckResult = (item: string, result: CheckResult) => {
     patchActiveChecklist((current) => {
@@ -1090,7 +1087,7 @@ function DetailView({
         </label>
         <div className="tabs">
           {configuredGroups.map((tab) => (
-            <button className={tab.key === activeTab ? "activeTab" : "tab"} type="button" key={tab.key} onClick={() => setActiveTab(tab.key)}>
+            <button className={tab.key === resolvedActiveTab ? "activeTab" : "tab"} type="button" key={tab.key} onClick={() => setActiveTab(tab.key)}>
               {tab.title}
             </button>
           ))}

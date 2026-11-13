@@ -89,7 +89,6 @@ export function getPeriodRange(period: ReportPeriodType, input: ReportPeriodInpu
       return null;
     }
 
-    const startYear = Number(startMatch[1]);
     const startMonth = Number(startMatch[2]);
     const endYear = Number(endMatch[1]);
     const endMonth = Number(endMatch[2]);

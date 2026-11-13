@@ -166,11 +166,6 @@ export function PeriodRangePicker({
     ? formatMonthRangeLabel(normalizedRange.start, normalizedRange.end, lang)
     : formatYearRangeLabel(normalizedRange.start, normalizedRange.end, lang);
 
-  const anchorYear = useMemo(
-    () => resolveVisibleYear(granularity, normalizedRange.start, normalizedRange.end),
-    [granularity, normalizedRange.end, normalizedRange.start]
-  );
-
   const [visibleYear, setVisibleYear] = useState(() => getCurrentYear());
   const [draftStart, setDraftStart] = useState(startValue);
   const [draftEnd, setDraftEnd] = useState(endValue);
@@ -234,12 +229,6 @@ export function PeriodRangePicker({
     setHoverValue("");
     setOpen(true);
   };
-
-  useEffect(() => {
-    if (!open) {
-      setVisibleYear(anchorYear);
-    }
-  }, [anchorYear, granularity, open]);
 
   const commitDraft = () => {
     onStartValueChange(draftRange.start);

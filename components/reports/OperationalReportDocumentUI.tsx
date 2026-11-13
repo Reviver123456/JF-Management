@@ -1,39 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { ReportStatItem } from "@/components/reports/ReportStatSummary";
 
 export function OperationalReportDocumentBody({ children }: { children: ReactNode }) {
   return <div className="templateBody operationalDocBody">{children}</div>;
-}
-
-export type OperationalDocSummaryItem = ReportStatItem & {
-  emphasis?: "metric" | "meta";
-};
-
-export function OperationalReportDocumentSummary({
-  items
-}: {
-  items: OperationalDocSummaryItem[];
-}) {
-  return (
-    <section className="operationalDocSummaryGrid">
-      {items.map((item) => (
-        <article
-          className={[
-            "operationalDocSummaryItem",
-            item.emphasis === "metric" ? "isMetric" : "",
-            item.tone === "success" ? "success" : "",
-            item.tone === "warning" ? "warning" : ""
-          ].filter(Boolean).join(" ")}
-          key={item.label}
-        >
-          <span>{item.label}</span>
-          <strong>{item.value}</strong>
-        </article>
-      ))}
-    </section>
-  );
 }
 
 export function OperationalReportSectionHead({

@@ -104,11 +104,6 @@ async function createDataClient() {
   return createClient();
 }
 
-function formatReportDate(date: string) {
-  const [year, month, day] = date.split("-");
-  return `${day}/${month}/${year}`;
-}
-
 export async function listSitesFromDb() {
   const supabase = await createDataClient();
   const { data, error } = await supabase.from("sites").select("*").order("site");

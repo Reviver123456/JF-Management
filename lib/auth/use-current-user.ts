@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { cacheUserProfile, readCachedUserProfile } from "@/lib/app-bootstrap-cache";
 import { readUserSignatureLocal, writeUserSignatureLocal } from "@/lib/auth/signature-local-storage";
 import { createClient } from "@/lib/supabase/client";
@@ -20,6 +20,22 @@ const emptyCurrentUserState: CurrentUserState = {
   signature: "",
   userName: ""
 };
+
+function readInitialCurrentUserState(): CurrentUserState {
+  const cachedProfile = readCachedUserProfile();
+
+  if (!cachedProfile) {
+    return emptyCurrentUserState;
+  }
+
+  return {
+    email: cachedProfile.email,
+    error: null,
+    isLoading: false,
+    signature: cachedProfile.signature,
+    userName: cachedProfile.userName
+  };
+}
 
 async function loadSignatureFromDb(localFallback: string) {
   const response = await fetch("/api/auth/signature", { cache: "no-store" });
@@ -49,23 +65,7 @@ async function loadSignatureFromDb(localFallback: string) {
 }
 
 export function useCurrentUser(): CurrentUserState {
-  const [state, setState] = useState<CurrentUserState>(emptyCurrentUserState);
-
-  useLayoutEffect(() => {
-    const cachedProfile = readCachedUserProfile();
-
-    if (!cachedProfile) {
-      return;
-    }
-
-    setState({
-      email: cachedProfile.email,
-      error: null,
-      isLoading: false,
-      signature: cachedProfile.signature,
-      userName: cachedProfile.userName
-    });
-  }, []);
+  const [state, setState] = useState<CurrentUserState>(readInitialCurrentUserState);
 
   useEffect(() => {
     let isCurrent = true;

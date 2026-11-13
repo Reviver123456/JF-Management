@@ -76,7 +76,7 @@ function LoadingPopupContent({
   );
 }
 
-export function LoadingPopup({
+function LoadingPopup({
   message,
   open,
   progress

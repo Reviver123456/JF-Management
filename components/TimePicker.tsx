@@ -149,9 +149,10 @@ export function TimePicker({
     });
   };
 
+  const renderedMenuStyle = open ? menuStyle : null;
+
   useLayoutEffect(() => {
     if (!open) {
-      setMenuStyle(null);
       return;
     }
 
@@ -242,7 +243,7 @@ export function TimePicker({
         <Clock3 aria-hidden="true" className="timePickerIcon" size={16} />
       </button>
 
-      {open && isClient && menuStyle ? createPortal(
+      {open && isClient && renderedMenuStyle ? createPortal(
         <div
           aria-label={ariaLabel}
           className="timePickerMenu"
@@ -250,9 +251,9 @@ export function TimePicker({
           ref={menuRef}
           role="dialog"
           style={{
-            top: menuStyle.top,
-            left: menuStyle.left,
-            width: menuStyle.width
+            top: renderedMenuStyle.top,
+            left: renderedMenuStyle.left,
+            width: renderedMenuStyle.width
           }}
         >
           <div className="timePickerColumns">
