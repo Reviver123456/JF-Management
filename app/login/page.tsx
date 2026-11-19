@@ -44,9 +44,10 @@ function LoginPageContent() {
   const loginAlertMessage = message || queryNotice || (!supabaseReady ? configErrorMessage : "");
   const loginAlertTone: "error" | "success" = !supabaseReady || queryNotice ? "error" : messageTone;
 
+  const showLoginReady = loginBootReady || !supabaseReady;
+
   useEffect(() => {
     if (!supabaseReady) {
-      setLoginBootReady(true);
       return;
     }
 
@@ -237,7 +238,7 @@ function LoginPageContent() {
         <p>{t("app.fullName")}</p>
         <form
           className="form"
-          data-login-ready={loginBootReady ? "true" : "false"}
+          data-login-ready={showLoginReady ? "true" : "false"}
           noValidate
           onSubmit={(event) => {
             event.preventDefault();

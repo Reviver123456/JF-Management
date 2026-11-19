@@ -17,6 +17,7 @@ import { useUi } from "@/lib/i18n";
 import {
   ALL_OWNERS_VALUE,
   buildUniqueOwnerOptions,
+  isAllOwners,
   resolveActiveOwner
 } from "@/lib/owner-filter";
 import type { ReportRow } from "@/lib/pm-data";
@@ -96,21 +97,26 @@ function ReportsPageInner() {
     ),
     [data.owners, data.pmJobs, data.reportRows, data.siteCatalog, userName]
   );
+  const currentCalendarYear = String(new Date().getFullYear());
   const operationalPeriodTypeForRange = reportSection === "site" ? "yearly" : operationalPeriodType;
+  const siteReportAnchorStart = operationalAnchorStart || currentCalendarYear;
+  const siteReportAnchorEnd = operationalAnchorEnd || currentCalendarYear;
+  const periodAnchorStart = reportSection === "site" ? siteReportAnchorStart : operationalAnchorStart;
+  const periodAnchorEnd = reportSection === "site" ? siteReportAnchorEnd : operationalAnchorEnd;
   const periodRange = useMemo(
     () => getPeriodRange(operationalPeriodTypeForRange, {
       anchor: "",
-      anchorEnd: operationalAnchorEnd,
-      anchorStart: operationalAnchorStart,
+      anchorEnd: periodAnchorEnd,
+      anchorStart: periodAnchorStart,
       dailyEndDate: operationalEndDate,
       dailyStartDate: operationalStartDate
     }),
     [
-      operationalAnchorEnd,
-      operationalAnchorStart,
       operationalEndDate,
       operationalPeriodTypeForRange,
-      operationalStartDate
+      operationalStartDate,
+      periodAnchorEnd,
+      periodAnchorStart
     ]
   );
 
@@ -119,22 +125,6 @@ function ReportsPageInner() {
       router.replace("/reports?section=pm", { scroll: false });
     }
   }, [router, searchParams]);
-
-  useEffect(() => {
-    if (reportSection !== "site") {
-      return;
-    }
-
-    if (operationalPeriodType !== "yearly") {
-      setOperationalPeriodType("yearly");
-    }
-
-    if (!operationalAnchorStart && !operationalAnchorEnd) {
-      const currentYear = String(new Date().getFullYear());
-      setOperationalAnchorStart(currentYear);
-      setOperationalAnchorEnd(currentYear);
-    }
-  }, [operationalAnchorEnd, operationalAnchorStart, operationalPeriodType, reportSection]);
 
   const activePreview = preview?.section === reportSection ? preview : null;
 
@@ -276,8 +266,8 @@ function ReportsPageInner() {
             {reportSection === "site" ? (
               <SiteInventoryReportPanel
                 filterProps={{
-                  anchorEnd: operationalAnchorEnd,
-                  anchorStart: operationalAnchorStart,
+                  anchorEnd: siteReportAnchorEnd,
+                  anchorStart: siteReportAnchorStart,
                   endDate: operationalEndDate,
                   ownerFilter: operationalOwnerFilter || (
                     isAllOwners(operationalOwner) ? ALL_OWNERS_VALUE : operationalOwner
