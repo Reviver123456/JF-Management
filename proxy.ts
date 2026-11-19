@@ -1,13 +1,17 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { resolveProxyAccess } from "@/lib/auth/resolve-proxy-access";
+import type { Database } from "@/lib/supabase/database.types";
 import { supabaseCookieOptions, supabaseSsrCookieMethods } from "@/lib/supabase/ssr-options";
 
 const publicPaths = [
   "/login",
   "/reset-password",
+  "/auth/callback",
   "/api/db/health",
   "/api/auth/cleanup-metadata",
+  "/api/auth/access",
   "/manifest.webmanifest",
   "/sw.js",
   "/videos"
@@ -23,7 +27,7 @@ export async function proxy(request: NextRequest) {
   }
 
   let supabaseResponse = NextResponse.next({ request });
-  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+  const supabase = createServerClient<Database>(supabaseUrl, supabaseKey, {
     cookieOptions: supabaseCookieOptions,
     cookies: {
       ...supabaseSsrCookieMethods,
@@ -51,6 +55,15 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
+    return NextResponse.redirect(url);
+  }
+
+  const access = await resolveProxyAccess(supabase, user);
+
+  if (!access.allowed) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("access", access.status === "rejected" ? "rejected" : "pending");
     return NextResponse.redirect(url);
   }
 

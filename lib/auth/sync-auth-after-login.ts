@@ -23,4 +23,16 @@ export async function syncAuthAfterLogin(supabase: SupabaseClient) {
 
   await supabase.auth.refreshSession();
   await ensureClientSession(supabase);
+
+  const accessResponse = await fetch("/api/auth/access", { method: "POST", cache: "no-store" });
+  const accessPayload = await accessResponse.json() as { ok?: boolean; allowed?: boolean; message?: string };
+
+  if (!accessResponse.ok || !accessPayload.ok) {
+    throw new Error(accessPayload.message ?? "Cannot verify account access.");
+  }
+
+  if (!accessPayload.allowed) {
+    await supabase.auth.signOut();
+    throw new Error("ACCOUNT_PENDING_APPROVAL");
+  }
 }

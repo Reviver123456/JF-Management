@@ -160,7 +160,14 @@ const dictionaries: Record<Lang, Dictionary> = {
       username: "ชื่อผู้ใช้งาน",
       fieldReady: "พร้อมใช้งานภาคสนาม",
       secure: "ยืนยันตัวตนแบบปลอดภัย",
-      device: "ออกแบบสำหรับ Web, iPad และโทรศัพท์"
+      device: "ออกแบบสำหรับ Web, iPad และโทรศัพท์",
+      signInWithGoogle: "เข้าสู่ระบบด้วย Google",
+      orContinueWith: "หรือ",
+      pendingApproval:
+        "บัญชีของคุณรอการอนุมัติจากผู้ดูแลระบบ กรุณาติดต่อแอดมินเพื่อเปิดสิทธิ์ในระบบ",
+      rejectedAccess: "บัญชีนี้ถูกปฏิเสธการเข้าใช้งาน กรุณาติดต่อผู้ดูแลระบบ",
+      oauthError: "ไม่สามารถเข้าสู่ระบบด้วย Google ได้ กรุณาลองใหม่",
+      accessSyncError: "ไม่สามารถบันทึกข้อมูลการเข้าใช้งานได้ กรุณาลองใหม่"
     },
     bootstrap: {
       loading: "กำลังเตรียมข้อมูลระบบ",
@@ -624,10 +631,19 @@ const dictionaries: Record<Lang, Dictionary> = {
       password: "Password",
       remember: "Remember password",
       signIn: "Sign in",
+      showPassword: "Show password",
+      hidePassword: "Hide password",
       username: "Username",
       fieldReady: "Field-ready workflow",
       secure: "Secure authentication",
-      device: "Designed for web, iPad, and phones"
+      device: "Designed for web, iPad, and phones",
+      signInWithGoogle: "Sign in with Google",
+      orContinueWith: "or",
+      pendingApproval:
+        "Your account is waiting for administrator approval. Please contact an admin to enable access.",
+      rejectedAccess: "This account was denied access. Please contact an administrator.",
+      oauthError: "Google sign-in failed. Please try again.",
+      accessSyncError: "Could not save your access record. Please try again."
     },
     bootstrap: {
       loading: "Preparing your workspace",

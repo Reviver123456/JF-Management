@@ -62,8 +62,9 @@ export default function LoadingPage() {
         return;
       }
 
-      if (/auth session missing/i.test(message)) {
-        window.location.replace("/login");
+      if (/auth session missing/i.test(message) || /ACCOUNT_PENDING_APPROVAL/i.test(message)) {
+        const pendingSuffix = /ACCOUNT_PENDING_APPROVAL/i.test(message) ? "?access=pending" : "";
+        window.location.replace(`/login${pendingSuffix}`);
         return;
       }
 

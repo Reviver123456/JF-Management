@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Eye, EyeOff, LockKeyhole, UserRound } from "lucide-react";
 import { FeedbackPopups } from "@/components/AppPopup";
@@ -11,10 +11,12 @@ import { readRememberedLogin, writeRememberedLogin } from "@/lib/auth/remember-l
 import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { DarkThemeAnimatedBackdrop } from "@/components/DarkThemeAnimatedBackdrop";
+import { fetchAppAccessState } from "@/lib/auth/ensure-app-access";
 import { getSupabaseConfigMessage, hasSupabaseConfig } from "@/lib/supabase/env";
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { lang, t } = useUi();
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -26,8 +28,19 @@ export default function LoginPage() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const supabaseReady = hasSupabaseConfig();
   const configErrorMessage = getSupabaseConfigMessage(lang);
-  const loginAlertMessage = message || (!supabaseReady ? configErrorMessage : "");
-  const loginAlertTone: "error" | "success" = !supabaseReady ? "error" : messageTone;
+  const accessQuery = searchParams.get("access");
+  const oauthQueryError = searchParams.get("error");
+  const queryNotice = accessQuery === "pending"
+    ? t("login.pendingApproval")
+    : accessQuery === "rejected"
+      ? t("login.rejectedAccess")
+      : oauthQueryError === "oauth"
+        ? t("login.oauthError")
+        : oauthQueryError === "access"
+          ? t("login.accessSyncError")
+          : "";
+  const loginAlertMessage = message || queryNotice || (!supabaseReady ? configErrorMessage : "");
+  const loginAlertTone: "error" | "success" = !supabaseReady || queryNotice ? "error" : messageTone;
 
   useEffect(() => {
     if (!supabaseReady) {
@@ -43,8 +56,18 @@ export default function LoginPage() {
       } = await supabase.auth.getSession();
 
       if (session?.access_token) {
-        router.replace("/loading");
-        return;
+        try {
+          const access = await fetchAppAccessState();
+
+          if (access.allowed) {
+            router.replace("/loading");
+            return;
+          }
+
+          await supabase.auth.signOut();
+        } catch {
+          await supabase.auth.signOut();
+        }
       }
 
       await clearAppBrowserCache({ includeLocalStorage: "heavy", preserveAuth: true });
@@ -65,6 +88,42 @@ export default function LoginPage() {
       isCurrent = false;
     };
   }, [configErrorMessage, router, supabaseReady]);
+
+  const signInWithGoogle = async () => {
+    if (!supabaseReady) {
+      setMessageTone("error");
+      setMessage(configErrorMessage);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage("");
+    setMessageTone("error");
+
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    await clearAppBrowserCache({ includeLocalStorage: "heavy" });
+
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo,
+        scopes: "openid email profile",
+        queryParams: {
+          access_type: "online",
+          prompt: "select_account"
+        }
+      }
+    });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      setMessageTone("error");
+      setMessage(error.message || t("login.oauthError"));
+    }
+  };
 
   const signIn = async () => {
     if (!supabaseReady) {
@@ -120,6 +179,12 @@ export default function LoginPage() {
       await syncAuthAfterLogin(supabase);
     } catch (sessionError) {
       setMessageTone("error");
+
+      if (sessionError instanceof Error && sessionError.message === "ACCOUNT_PENDING_APPROVAL") {
+        setMessage(t("login.pendingApproval"));
+        return;
+      }
+
       setMessage(
         sessionError instanceof Error
           ? sessionError.message
@@ -269,7 +334,50 @@ export default function LoginPage() {
         >
           {resetMode ? "กลับไปเข้าสู่ระบบ" : "ลืมรหัสผ่าน?"}
         </button>
+        {!resetMode ? (
+          <>
+            <p className="loginDivider" role="presentation">
+              <span>{t("login.orContinueWith")}</span>
+            </p>
+            <button
+              className="button loginGoogleButton"
+              type="button"
+              disabled={isSubmitting || !supabaseReady}
+              onClick={() => {
+                void signInWithGoogle();
+              }}
+            >
+              <svg className="loginGoogleLogo" width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.56 2.95-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+              </svg>
+              {t("login.signInWithGoogle")}
+            </button>
+          </>
+        ) : null}
       </section>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  const { t } = useUi();
+
+  return (
+    <Suspense
+      fallback={(
+        <main className="loginPage">
+          <DarkThemeAnimatedBackdrop scope="login" />
+          <section className="card">
+            <h1>{t("login.signIn")}</h1>
+            <p>{t("bootstrap.loading")}</p>
+          </section>
+        </main>
+      )}
+    >
+      <LoginPageContent />
+    </Suspense>
   );
 }

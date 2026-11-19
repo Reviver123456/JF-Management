@@ -131,11 +131,45 @@ export type Database = {
         };
         Relationships: [];
       };
+      user_access: {
+        Row: {
+          user_id: string;
+          email: string;
+          full_name: string | null;
+          avatar_url: string | null;
+          openid_sub: string | null;
+          status: Database["public"]["Enums"]["user_access_status"];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          email: string;
+          full_name?: string | null;
+          avatar_url?: string | null;
+          openid_sub?: string | null;
+          status?: Database["public"]["Enums"]["user_access_status"];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          email?: string;
+          full_name?: string | null;
+          avatar_url?: string | null;
+          openid_sub?: string | null;
+          status?: Database["public"]["Enums"]["user_access_status"];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
     Enums: {
       work_status: "completed" | "inProgress" | "pending" | "abnormal";
+      user_access_status: "pending" | "approved" | "rejected";
     };
     CompositeTypes: Record<string, never>;
   };

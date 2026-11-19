@@ -50,6 +50,17 @@ export async function bootstrapAppData(onProgress?: (value: number) => void) {
 
   onProgress?.(68);
 
+  const accessResponse = await fetch("/api/auth/access", { cache: "no-store" });
+  const accessPayload = await accessResponse.json() as { ok?: boolean; allowed?: boolean; message?: string };
+
+  if (!accessResponse.ok || !accessPayload.ok) {
+    throw new Error(accessPayload.message ?? "Cannot verify account access.");
+  }
+
+  if (!accessPayload.allowed) {
+    throw new Error("ACCOUNT_PENDING_APPROVAL");
+  }
+
   const userEmail = user.email ?? "";
   if (!userEmail) {
     throw new Error("Cannot verify signed-in user.");
