@@ -12,6 +12,7 @@ import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { DarkThemeAnimatedBackdrop } from "@/components/DarkThemeAnimatedBackdrop";
 import { fetchAppAccessState } from "@/lib/auth/ensure-app-access";
+import { resolveAuthCallbackUrl, resolveResetPasswordUrl } from "@/lib/app-url";
 import { getSupabaseConfigMessage, hasSupabaseConfig } from "@/lib/supabase/env";
 
 function LoginPageContent() {
@@ -112,7 +113,7 @@ function LoginPageContent() {
     await supabase.auth.signOut();
     await clearAppBrowserCache({ includeLocalStorage: "heavy" });
 
-    const redirectTo = `${window.location.origin}/auth/callback`;
+    const redirectTo = resolveAuthCallbackUrl();
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
@@ -225,7 +226,7 @@ function LoginPageContent() {
 
     const supabase = createClient();
     const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-      redirectTo: `${window.location.origin}/reset-password`
+      redirectTo: resolveResetPasswordUrl()
     });
 
     setIsSubmitting(false);

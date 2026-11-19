@@ -77,6 +77,22 @@ npm run check:env
 4. Deploy. The build runs `npm run check:env` first and fails fast if any key is missing.
 5. After deploy, open `https://<your-domain>/api/db/health` — expect `"ok": true`.
 6. Create users in **Supabase → Authentication → Users**, then sign in at `/login`.
+7. On Render/Vercel set `NEXT_PUBLIC_APP_URL` to your public origin (e.g. `https://jf-management.onrender.com`) so Google OAuth never falls back to a wrong host from a bad build env.
+
+### Google OAuth (Gmail login)
+
+**Supabase → Authentication → URL Configuration**
+
+- Site URL: your production origin (e.g. `https://jf-management.onrender.com`)
+- Redirect URLs: include `https://<your-domain>/auth/callback` and `http://localhost:3000/auth/callback` for local dev
+
+**Google Cloud → OAuth client → Authorized redirect URIs** — use **only**:
+
+`https://<project-ref>.supabase.co/auth/v1/callback`
+
+Remove bare `http://localhost:3000` from redirect URIs (keep `http://localhost:3000` under **JavaScript origins** for local dev only).
+
+Approve first-time Google users in `user_access` (`status = approved`).
 
 `DATABASE_URL`, `GOOGLE_*`, and `AUTH_SECRET` are **not used** by this app; only the Supabase keys above are required.
 
