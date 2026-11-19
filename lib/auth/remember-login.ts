@@ -20,6 +20,16 @@ export function readRememberedLogin() {
   };
 }
 
+export function clearRememberedLogin() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(REMEMBER_KEY);
+  window.localStorage.removeItem(EMAIL_KEY);
+  window.localStorage.removeItem(PASSWORD_KEY);
+}
+
 export function writeRememberedLogin(remember: boolean, email: string, password: string) {
   if (typeof window === "undefined") {
     return;

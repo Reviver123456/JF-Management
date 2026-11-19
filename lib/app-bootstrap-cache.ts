@@ -105,6 +105,11 @@ export function cacheUserProfile(profile: CachedUserProfile) {
   safeSessionSetItem(USER_CACHE_KEY, JSON.stringify(sessionProfile), 64_000);
 }
 
+export function resetBootstrapCaches() {
+  memoryPmData = null;
+  memoryUserProfile = null;
+}
+
 export function readCachedUserProfile(): CachedUserProfile | null {
   if (memoryUserProfile) {
     return memoryUserProfile;

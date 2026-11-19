@@ -1,105 +1,65 @@
 # JF-Management
 
-PM Site Management is a Next.js application for planning preventive maintenance jobs, managing sites, recording field work, and reviewing reports.
+Next.js app for PM site planning, field work, sites, schedule, history, and reports.
 
-## Tech Stack
-
-- Next.js
-- React
-- TypeScript
-- ESLint
-
-## Getting Started
-
-Install dependencies:
+## Local development
 
 ```bash
 npm install
-```
-
-Run the development server:
-
-```bash
+cp .env.example .env.local   # then fill in Supabase keys
 npm run dev
 ```
 
-Open `http://localhost:3000` in your browser.
+Open **http://localhost:3000** (avoid mixing `127.0.0.1` and `localhost` during dev).
 
-## Tests
+## Environment variables
 
-After `npm install`, run unit tests and TypeScript checks:
+| Variable | Required |
+|----------|----------|
+| `NEXT_PUBLIC_SUPABASE_URL` | yes |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | yes |
+| `SUPABASE_SECRET_KEY` | yes (server only) |
+| `NEXT_PUBLIC_APP_URL` | production (e.g. `https://jf-management.onrender.com`) |
 
-```bash
-npm test
-npm run verify   # test + typecheck
-npm run test:all # same as verify
-```
+See `.env.example`. After changes, restart dev server. Check DB: `GET /api/db/health` → `"ok": true`.
 
-## Supabase Setup
+## Supabase
 
-Create a Supabase project, then open the Supabase SQL editor and run the SQL in `supabase/schema.sql`.
+1. Run `supabase/schema.sql` and `supabase/user_access.sql` in the SQL editor.
+2. Create users in Authentication; set `full_name` in user metadata when needed.
+3. First Google sign-in stays **pending** until you set `user_access.status = 'approved'`.
 
-Create `.env.local` from `.env.example` and fill in your project values:
+## Deploy (Render)
 
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-or-anon-key
-```
+1. Connect repo `Reviver123456/JF-Management` on [Render](https://render.com).
+2. Build: `npm install && npm run check:env && npm run build` — start: `npm start`.
+3. Set the env vars above; **`NEXT_PUBLIC_APP_URL`** must match your Render URL.
+4. Redeploy after env or auth changes.
 
-For server-side admin operations, add a server-only Supabase service role key:
+### Google login
 
-```bash
-SUPABASE_SECRET_KEY=sb_secret_or_service_role_key
-```
+**Supabase → URL Configuration**
 
-Create users in Supabase Auth and set each user's `full_name` and `phone` metadata when needed by the app.
+- Site URL: `https://jf-management.onrender.com`
+- Redirect URLs: `https://jf-management.onrender.com/auth/callback`, `http://localhost:3000/auth/callback`
 
-Restart the dev server after changing env values. You can test the database connection at:
+**Google Cloud → OAuth client**
 
-```bash
-http://localhost:3000/api/db/health
-```
+- **JavaScript origins:** `https://jf-management.onrender.com`, `http://localhost:3000`
+- **Redirect URIs (only):** `https://<project-ref>.supabase.co/auth/v1/callback` — do not list bare `http://localhost:3000` here.
 
-Verify required variables before building:
-
-```bash
-npm run check:env
-```
-
-## Deploy to Vercel
-
-1. Push this repository to GitHub (`origin` is already configured).
-2. Import the repo in [Vercel](https://vercel.com/new) and select the `JF-Management` project.
-3. Add these **Environment Variables** for Production (and Preview):
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-   - `SUPABASE_SECRET_KEY`
-4. Deploy. The build runs `npm run check:env` first and fails fast if any key is missing.
-5. After deploy, open `https://<your-domain>/api/db/health` — expect `"ok": true`.
-6. Create users in **Supabase → Authentication → Users**, then sign in at `/login`.
-7. On Render/Vercel set `NEXT_PUBLIC_APP_URL` to your public origin (e.g. `https://jf-management.onrender.com`) so Google OAuth never falls back to a wrong host from a bad build env.
-
-### Google OAuth (Gmail login)
-
-**Supabase → Authentication → URL Configuration**
-
-- Site URL: your production origin (e.g. `https://jf-management.onrender.com`)
-- Redirect URLs: include `https://<your-domain>/auth/callback` and `http://localhost:3000/auth/callback` for local dev
-
-**Google Cloud → OAuth client → Authorized redirect URIs** — use **only**:
-
-`https://<project-ref>.supabase.co/auth/v1/callback`
-
-Remove bare `http://localhost:3000` from redirect URIs (keep `http://localhost:3000` under **JavaScript origins** for local dev only).
-
-Approve first-time Google users in `user_access` (`status = approved`).
-
-`DATABASE_URL`, `GOOGLE_*`, and `AUTH_SECRET` are **not used** by this app; only the Supabase keys above are required.
-
-## Quality Checks
+## Scripts
 
 ```bash
-npm run lint
-npm run typecheck
+npm run verify    # unit tests + typecheck
 npm run build
+npm run lint
+npm run clean     # remove .next build output
+npm run fresh     # clean + verify + build
 ```
+
+## ล้างแคช
+
+- **แอป:** ออกจากระบบ (ล้าง cookie / session / cache ข้อมูล)
+- **เครื่อง dev:** `npm run clean` แล้วรัน `npm run dev` ใหม่
+- **Production:** Incognito หรือ hard refresh หลัง deploy

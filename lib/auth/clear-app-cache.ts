@@ -1,3 +1,6 @@
+import { resetBootstrapCaches } from "@/lib/app-bootstrap-cache";
+import { clearRememberedLogin } from "@/lib/auth/remember-login";
+
 const authCookiePrefixes = ["sb-", "sb-auth"];
 const preservedLocalStorageKeys = new Set(["pm-site-lang", "pm-site-theme"]);
 const signatureStoragePrefix = "pm-site-user-signature:";
@@ -130,8 +133,11 @@ export type ClearAppBrowserCacheOptions = {
 };
 
 export async function clearAppBrowserCache(options?: ClearAppBrowserCacheOptions) {
+  resetBootstrapCaches();
+
   if (!options?.preserveAuth) {
     clearSupabaseAuthCookies();
+    clearRememberedLogin();
   }
 
   clearSessionStorage();

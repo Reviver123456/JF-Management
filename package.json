@@ -12,7 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify": "npm run test && npm run typecheck",
-    "test:all": "npm run verify"
+    "test:all": "npm run verify",
+    "clean": "node scripts/clean-local.mjs",
+    "fresh": "npm run clean && npm run verify && npm run build"
   },
   "dependencies": {
     "@supabase/realtime-js": "^2.119.0",
