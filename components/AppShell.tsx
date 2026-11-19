@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Building2,
   CalendarDays,
@@ -13,7 +13,6 @@ import {
   LogOut,
   Menu,
   Moon,
-  PanelLeftClose,
   Settings,
   Sun,
   Wrench,
@@ -41,7 +40,6 @@ const navItems = [
 ] as const;
 
 const settingsNavItem = navItems.find((item) => item.href === "/settings");
-const SIDEBAR_AUTO_COLLAPSE_MS = 5000;
 
 function isDesktopSidebarLayout() {
   return typeof window !== "undefined" && window.matchMedia("(min-width: 901px)").matches;
@@ -80,45 +78,31 @@ export function AppShell({
   );
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const sidebarCollapseTimerRef = useRef<number | null>(null);
   const closeMobileMenu = () => setMobileMenuOpen(false);
 
-  const clearSidebarCollapseTimer = useCallback(() => {
-    if (sidebarCollapseTimerRef.current) {
-      window.clearTimeout(sidebarCollapseTimerRef.current);
-      sidebarCollapseTimerRef.current = null;
+  const collapseSidebar = useCallback(() => {
+    if (!isDesktopSidebarLayout()) {
+      return;
     }
+
+    setCollapsed(true);
   }, []);
 
-  const scheduleSidebarCollapse = useCallback(() => {
-    clearSidebarCollapseTimer();
-
+  const expandSidebar = useCallback(() => {
     if (!isDesktopSidebarLayout()) {
       return;
     }
 
-    sidebarCollapseTimerRef.current = window.setTimeout(() => {
-      setCollapsed(true);
-    }, SIDEBAR_AUTO_COLLAPSE_MS);
-  }, [clearSidebarCollapseTimer]);
+    setCollapsed(false);
+  }, []);
 
   const handleSidebarPointerEnter = useCallback(() => {
-    if (!isDesktopSidebarLayout()) {
-      return;
-    }
-
-    clearSidebarCollapseTimer();
-    setCollapsed(false);
-  }, [clearSidebarCollapseTimer]);
+    expandSidebar();
+  }, [expandSidebar]);
 
   const handleSidebarPointerLeave = useCallback(() => {
-    scheduleSidebarCollapse();
-  }, [scheduleSidebarCollapse]);
-
-  const toggleSidebarCollapsed = useCallback(() => {
-    clearSidebarCollapseTimer();
-    setCollapsed((current) => !current);
-  }, [clearSidebarCollapseTimer]);
+    collapseSidebar();
+  }, [collapseSidebar]);
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -148,12 +132,10 @@ export function AppShell({
   }, [pathname]);
 
   useEffect(() => {
-    scheduleSidebarCollapse();
-
-    return () => {
-      clearSidebarCollapseTimer();
-    };
-  }, [clearSidebarCollapseTimer, scheduleSidebarCollapse]);
+    if (isDesktopSidebarLayout()) {
+      setCollapsed(true);
+    }
+  }, []);
 
   return (
     <div className={`${collapsed ? "shell shellCollapsed" : "shell"}${mobileMenuOpen ? " mobileMenuOpen" : ""}`}>
@@ -171,7 +153,7 @@ export function AppShell({
         onFocusCapture={handleSidebarPointerEnter}
         onBlurCapture={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
-            scheduleSidebarCollapse();
+            collapseSidebar();
           }
         }}
       >
@@ -224,10 +206,6 @@ export function AppShell({
         ) : null}
 
         <div className="sidebarFooter">
-          <button className="footerButton" type="button" onClick={toggleSidebarCollapsed}>
-            <PanelLeftClose size={17} />
-            <span>{collapsed ? t("common.expandMenu") : t("common.collapseMenu")}</span>
-          </button>
           <button className="footerButton" type="button" onClick={handleLogout}>
             <LogOut size={17} />
             <span>{t("common.logout")}</span>
