@@ -427,8 +427,8 @@ export default function SchedulePage() {
                     <strong>{day}</strong>
                     {initialJobs.length > 0 ? (
                       <span className="dayEvents">
-                        {initialJobs.map((job) => (
-                          <span className="eventPill" key={job}>{job}</span>
+                        {initialJobs.map((job, jobIndex) => (
+                          <span className="eventPill" key={`${day}-${jobIndex}-${job}`}>{job}</span>
                         ))}
                       </span>
                     ) : null}

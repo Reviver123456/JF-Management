@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useLayoutEffect, useState } from "react";
-import { cachePmData, readCachedPmData } from "@/lib/app-bootstrap-cache";
+import {
+  cachePmData,
+  consumeBootstrapComplete,
+  isPmDataCacheFresh,
+  readCachedPmData
+} from "@/lib/app-bootstrap-cache";
 import { emptyPmAppData, type PmAppData } from "@/lib/pm-data";
 
 type PmDataState = {
@@ -69,7 +74,12 @@ export function usePmData(): PmDataState {
         error: null,
         isLoading: false
       });
-      void loadData(() => isCurrent, { background: true });
+
+      const justBootstrapped = consumeBootstrapComplete();
+
+      if (!justBootstrapped && !isPmDataCacheFresh()) {
+        void loadData(() => isCurrent, { background: true });
+      }
     } else {
       void loadData(() => isCurrent);
     }

@@ -21,22 +21,6 @@ const emptyCurrentUserState: CurrentUserState = {
   userName: ""
 };
 
-function readInitialCurrentUserState(): CurrentUserState {
-  const cachedProfile = readCachedUserProfile();
-
-  if (!cachedProfile) {
-    return emptyCurrentUserState;
-  }
-
-  return {
-    email: cachedProfile.email,
-    error: null,
-    isLoading: false,
-    signature: cachedProfile.signature,
-    userName: cachedProfile.userName
-  };
-}
-
 async function loadSignatureFromDb(localFallback: string) {
   const response = await fetch("/api/auth/signature", { cache: "no-store" });
   const payload = await response.json() as { ok?: boolean; signature?: string; message?: string };
@@ -65,7 +49,8 @@ async function loadSignatureFromDb(localFallback: string) {
 }
 
 export function useCurrentUser(): CurrentUserState {
-  const [state, setState] = useState<CurrentUserState>(readInitialCurrentUserState);
+  // Always start empty so SSR HTML matches the client's first paint (sessionStorage is client-only).
+  const [state, setState] = useState<CurrentUserState>(emptyCurrentUserState);
 
   useEffect(() => {
     let isCurrent = true;
@@ -73,7 +58,21 @@ export function useCurrentUser(): CurrentUserState {
     const cachedProfile = readCachedUserProfile();
 
     async function loadCurrentUser() {
-      if (isCurrent && !cachedProfile) {
+      await Promise.resolve();
+
+      if (!isCurrent) {
+        return;
+      }
+
+      if (cachedProfile) {
+        setState({
+          email: cachedProfile.email,
+          error: null,
+          isLoading: false,
+          signature: cachedProfile.signature,
+          userName: cachedProfile.userName
+        });
+      } else {
         setState((current) => ({
           ...current,
           error: null,
@@ -97,7 +96,12 @@ export function useCurrentUser(): CurrentUserState {
           : user?.email ?? "";
         const userEmail = user?.email ?? "";
         const localSignature = userEmail ? readUserSignatureLocal(userEmail) : "";
-        const signature = user ? await loadSignatureFromDb(localSignature) : "";
+        const cachedSignature = cachedProfile?.email === userEmail ? cachedProfile.signature.trim() : "";
+        const signature = !user
+          ? ""
+          : cachedSignature
+            ? cachedSignature
+            : await loadSignatureFromDb(localSignature);
 
         if (userEmail && signature && signature !== localSignature) {
           writeUserSignatureLocal(userEmail, signature);

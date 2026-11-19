@@ -45,7 +45,6 @@ export default function LoadingPage() {
       }
 
       router.replace("/dashboard");
-      router.refresh();
     } catch (bootstrapError) {
       const message = bootstrapError instanceof Error ? bootstrapError.message : t("bootstrap.error");
 

@@ -9,7 +9,7 @@ import {
   prepareOfficeExportContentSync,
   sanitizeExportFileName
 } from "@/lib/report-export";
-import { REPORT_EMAIL_RECIPIENT, sendReportByEmail } from "@/lib/report-delivery";
+import { deliverReportByEmail } from "@/lib/report-email-client";
 import { buildOfficeExportHtml, printReportPdf } from "@/lib/report-print-dialog";
 
 export type OperationalReportFileType = "pdf" | "word" | "excel";
@@ -74,22 +74,13 @@ export function useOperationalReportExport({
       return;
     }
 
-    setExportHint(false);
-
-    try {
-      const result = await sendReportByEmail({ title: fileStem, htmlContent: content });
-
-      if (result === "sent") {
-        setExportHint(true);
-        setExportMessage(t("reports.sendEmailSuccess").replace("{email}", REPORT_EMAIL_RECIPIENT));
-        return;
-      }
-
-      setExportHint(true);
-      setExportMessage(t("reports.sendEmailComingSoon").replace("{email}", REPORT_EMAIL_RECIPIENT));
-    } catch {
-      setExportMessage(t("reports.sendEmailFailed"));
-    }
+    await deliverReportByEmail({
+      htmlContent: content,
+      setExportHint,
+      setExportMessage,
+      t,
+      title: fileStem
+    });
   }, [disabled, fileStem, getExportContent, t]);
 
   const downloadReport = useCallback((downloadType: OperationalReportFileType) => {

@@ -132,9 +132,11 @@ export function AppShell({
   }, [pathname]);
 
   useEffect(() => {
-    if (isDesktopSidebarLayout()) {
-      setCollapsed(true);
-    }
+    queueMicrotask(() => {
+      if (isDesktopSidebarLayout()) {
+        setCollapsed(true);
+      }
+    });
   }, []);
 
   return (

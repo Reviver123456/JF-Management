@@ -26,6 +26,7 @@ function LoginPageContent() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [rememberPassword, setRememberPassword] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [loginBootReady, setLoginBootReady] = useState(false);
   const supabaseReady = hasSupabaseConfig();
   const configErrorMessage = getSupabaseConfigMessage(lang);
   const accessQuery = searchParams.get("access");
@@ -44,42 +45,49 @@ function LoginPageContent() {
 
   useEffect(() => {
     if (!supabaseReady) {
+      setLoginBootReady(true);
       return;
     }
 
     let isCurrent = true;
 
     async function prepareLoginPage() {
-      const supabase = createClient();
-      const {
-        data: { session }
-      } = await supabase.auth.getSession();
+      try {
+        const supabase = createClient();
+        const {
+          data: { session }
+        } = await supabase.auth.getSession();
 
-      if (session?.access_token) {
-        try {
-          const access = await fetchAppAccessState();
+        if (session?.access_token) {
+          try {
+            const access = await fetchAppAccessState();
 
-          if (access.allowed) {
-            router.replace("/loading");
-            return;
+            if (access.allowed) {
+              router.replace("/loading");
+              return;
+            }
+
+            await supabase.auth.signOut();
+          } catch {
+            await supabase.auth.signOut();
           }
+        }
 
-          await supabase.auth.signOut();
-        } catch {
-          await supabase.auth.signOut();
+        await clearAppBrowserCache({ includeLocalStorage: "heavy", preserveAuth: true });
+
+        if (!isCurrent) {
+          return;
+        }
+
+        const remembered = readRememberedLogin();
+        setRememberPassword(remembered.remember);
+        setEmail((current) => current || remembered.email);
+        setPassword((current) => current || remembered.password);
+      } finally {
+        if (isCurrent) {
+          setLoginBootReady(true);
         }
       }
-
-      await clearAppBrowserCache({ includeLocalStorage: "heavy", preserveAuth: true });
-
-      if (!isCurrent) {
-        return;
-      }
-
-      const remembered = readRememberedLogin();
-      setRememberPassword(remembered.remember);
-      setEmail(remembered.email);
-      setPassword(remembered.password);
     }
 
     void prepareLoginPage();
@@ -251,6 +259,7 @@ function LoginPageContent() {
         <p>{t("app.fullName")}</p>
         <form
           className="form"
+          data-login-ready={loginBootReady ? "true" : "false"}
           noValidate
           onSubmit={(event) => {
             event.preventDefault();
@@ -261,11 +270,12 @@ function LoginPageContent() {
             }
           }}
         >
-          <label className="label">
+          <label className="label" htmlFor="login-email">
             {t("fields.email")}
             <span className="inputWrap">
               <UserRound size={16} />
               <input
+                id="login-email"
                 className="field"
                 type="email"
                 autoComplete="username"
@@ -280,11 +290,12 @@ function LoginPageContent() {
           </label>
           {resetMode ? null : (
             <>
-              <label className="label">
+              <label className="label" htmlFor="login-password">
                 {t("login.password")}
                 <span className="inputWrap inputWrapPassword">
                   <LockKeyhole size={16} />
                   <input
+                    id="login-password"
                     className="field"
                     type={passwordVisible ? "text" : "password"}
                     autoComplete="current-password"

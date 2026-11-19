@@ -55,17 +55,6 @@ export function isDateWithinRange(date: Date, startDate: string, endDate: string
   return compareDateValues(date, min) >= 0 && compareDateValues(date, max) <= 0;
 }
 
-export function getMonthStarts(anchor: Date, pastMonths = 18, futureMonths = 6) {
-  const months: Date[] = [];
-  const start = new Date(anchor.getFullYear(), anchor.getMonth() - pastMonths, 1);
-
-  for (let index = 0; index <= pastMonths + futureMonths; index += 1) {
-    months.push(new Date(start.getFullYear(), start.getMonth() + index, 1));
-  }
-
-  return months;
-}
-
 export function formatDateRangeLabel(startDate: string, endDate: string, lang: "th" | "en") {
   const start = parseDateValue(startDate);
   const end = parseDateValue(endDate);
@@ -92,31 +81,6 @@ export function formatMonthTitle(date: Date, lang: "th" | "en") {
     month: "long",
     year: "numeric"
   }).format(date);
-}
-
-export function formatMonthShort(date: Date, lang: "th" | "en") {
-  return new Intl.DateTimeFormat(lang === "th" ? "th-TH" : "en-US", {
-    month: "short"
-  }).format(date);
-}
-
-export function getCalendarDays(visibleMonth: Date) {
-  const year = visibleMonth.getFullYear();
-  const month = visibleMonth.getMonth();
-  const firstWeekday = new Date(year, month, 1).getDay();
-  const days: Array<{ date: Date; isCurrentMonth: boolean }> = [];
-
-  for (let index = 0; index < 42; index += 1) {
-    const dayNumber = index - firstWeekday + 1;
-    const date = new Date(year, month, dayNumber);
-
-    days.push({
-      date,
-      isCurrentMonth: date.getMonth() === month
-    });
-  }
-
-  return days;
 }
 
 export function getMonthOptions(lang: "th" | "en") {

@@ -38,18 +38,6 @@ function resolveAnchors(input: ReportPeriodInput) {
   return { start, end };
 }
 
-export function getDefaultPeriodAnchor(period: ReportPeriodType, todayIso = new Date().toISOString().slice(0, 10)) {
-  if (period === "monthly") {
-    return todayIso.slice(0, 7);
-  }
-
-  if (period === "yearly") {
-    return todayIso.slice(0, 4);
-  }
-
-  return todayIso;
-}
-
 export function getPeriodRange(period: ReportPeriodType, input: ReportPeriodInput): ReportPeriodRange | null {
   if (period === "daily") {
     const start = input.dailyStartDate.trim();
