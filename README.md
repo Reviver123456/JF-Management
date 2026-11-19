@@ -43,6 +43,8 @@ See `.env.example`. After changes, restart dev server. Check DB: `GET /api/db/he
 - Site URL: `https://jf-management.onrender.com`
 - Redirect URLs: `https://jf-management.onrender.com/auth/callback`, `http://localhost:3000/auth/callback`
 
+Google sign-in starts at **`/auth/google`** (server-side) so the OAuth `redirect_to` always matches Render, even if a build accidentally baked in `localhost`.
+
 **Google Cloud → OAuth client**
 
 - **JavaScript origins:** `https://jf-management.onrender.com`, `http://localhost:3000`

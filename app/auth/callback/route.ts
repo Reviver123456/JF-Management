@@ -1,13 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { resolveAppOriginFromRequest } from "@/lib/app-url";
 import { canEnterApp, syncUserAccessForSession } from "@/lib/auth/sync-user-access-server";
 import type { Database } from "@/lib/supabase/database.types";
 import { getSupabaseConfig } from "@/lib/supabase/env";
 import { supabaseCookieOptions, supabaseSsrCookieMethods } from "@/lib/supabase/ssr-options";
 
 function redirectWithCookies(request: NextRequest, path: string, cookiesToSet: { name: string; value: string; options?: Parameters<NextResponse["cookies"]["set"]>[2] }[]) {
-  const destination = new URL(path, request.url);
+  const destination = new URL(path, resolveAppOriginFromRequest(request));
   const redirect = NextResponse.redirect(destination);
 
   cookiesToSet.forEach(({ name, value, options }) => {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
   const code = requestUrl.searchParams.get("code");
 
   if (!code) {
-    return NextResponse.redirect(new URL("/login?error=oauth", request.url));
+    return NextResponse.redirect(new URL("/login?error=oauth", resolveAppOriginFromRequest(request)));
   }
 
   const { url, publishableKey } = getSupabaseConfig();

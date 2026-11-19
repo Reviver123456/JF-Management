@@ -62,4 +62,17 @@ if (missing.length > 0) {
   process.exit(1);
 }
 
+const productionHint =
+  process.env.NODE_ENV === "production"
+  || process.env.RENDER === "true"
+  || process.env.CI === "true";
+
+const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? env.NEXT_PUBLIC_APP_URL ?? "").trim();
+
+if (productionHint && !appUrl) {
+  console.warn(
+    "Warning: NEXT_PUBLIC_APP_URL is not set. Google OAuth still works via /auth/google, but set it to your public URL (e.g. https://jf-management.onrender.com)."
+  );
+}
+
 console.log("Environment check passed.");

@@ -1,3 +1,56 @@
+function readConfiguredProductionOrigin() {
+  const envUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+
+  if (!envUrl) {
+    return "";
+  }
+
+  try {
+    const origin = new URL(envUrl).origin;
+    const host = new URL(origin).hostname;
+
+    if (host === "localhost" || host === "127.0.0.1") {
+      return "";
+    }
+
+    return origin;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Prefer configured production URL, else infer from proxy headers (Render, etc.).
+ */
+export type AppOriginRequest = {
+  headers: Pick<Headers, "get">;
+  nextUrl: { origin: string };
+};
+
+export function resolveAppOriginFromRequest(request: AppOriginRequest) {
+  const configured = readConfiguredProductionOrigin();
+
+  if (configured) {
+    return configured;
+  }
+
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const host = forwardedHost ?? request.headers.get("host")?.trim();
+  const protocol = forwardedProto
+    ?? (host && /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test(host) ? "http" : "https");
+
+  if (host) {
+    return `${protocol}://${host}`;
+  }
+
+  return request.nextUrl.origin;
+}
+
+export function resolveAuthCallbackUrlFromRequest(request: AppOriginRequest) {
+  return `${resolveAppOriginFromRequest(request)}/auth/callback`;
+}
+
 /**
  * OAuth / email redirects must match the tab the user is on.
  * On Render, a mistaken NEXT_PUBLIC_APP_URL=http://localhost:3000 at build time
@@ -46,6 +99,12 @@ export function resolveAppOrigin() {
 }
 
 export function resolveAuthCallbackUrl() {
+  const configured = readConfiguredProductionOrigin();
+
+  if (configured && typeof window === "undefined") {
+    return `${configured}/auth/callback`;
+  }
+
   return `${resolveAppOrigin()}/auth/callback`;
 }
 

@@ -12,7 +12,7 @@ import { useUi } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
 import { DarkThemeAnimatedBackdrop } from "@/components/DarkThemeAnimatedBackdrop";
 import { fetchAppAccessState } from "@/lib/auth/ensure-app-access";
-import { resolveAuthCallbackUrl, resolveResetPasswordUrl } from "@/lib/app-url";
+import { resolveResetPasswordUrl } from "@/lib/app-url";
 import { getSupabaseConfigMessage, hasSupabaseConfig } from "@/lib/supabase/env";
 
 function LoginPageContent() {
@@ -98,7 +98,7 @@ function LoginPageContent() {
     };
   }, [configErrorMessage, router, supabaseReady]);
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = () => {
     if (!supabaseReady) {
       setMessageTone("error");
       setMessage(configErrorMessage);
@@ -108,30 +108,7 @@ function LoginPageContent() {
     setIsSubmitting(true);
     setMessage("");
     setMessageTone("error");
-
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    await clearAppBrowserCache({ includeLocalStorage: "heavy" });
-
-    const redirectTo = resolveAuthCallbackUrl();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo,
-        scopes: "openid email profile",
-        queryParams: {
-          access_type: "online",
-          prompt: "select_account"
-        }
-      }
-    });
-
-    setIsSubmitting(false);
-
-    if (error) {
-      setMessageTone("error");
-      setMessage(error.message || t("login.oauthError"));
-    }
+    window.location.assign("/auth/google");
   };
 
   const signIn = async () => {
