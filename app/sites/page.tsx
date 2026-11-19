@@ -36,7 +36,6 @@ import {
 } from "@/lib/pm-checklist-config";
 import {
   checklistTabs,
-  configurationBackup,
   diagChecks,
   diagDevices,
   environmentMain,
@@ -53,6 +52,7 @@ import {
   filterSitesByOwner,
   getContractCount,
   getSiteContractItems,
+  OPERATING_SYSTEM_OPTIONS,
   getVisitCountForPmCycle,
   type SiteCatalogRecord,
   type SiteContractDetails,
@@ -66,6 +66,7 @@ import {
   isAllOwners,
   resolveActiveOwner
 } from "@/lib/owner-filter";
+import { syncContractDetailsPmScores } from "@/lib/site-pm-score";
 type SiteTab = "customer" | "contract" | "synapse" | "server" | "switch" | "storage" | "environment" | "diag";
 type InspectionTab = PmChecklistKey;
 
@@ -104,7 +105,7 @@ function createDiagSet(id: number): DiagSet {
 }
 
 const checklistItemsByInspectionTab: Record<InspectionTab, string[]> = {
-  synapse: [...synapseSystem, ...configurationBackup],
+  synapse: [...synapseSystem],
   server: serverChecklist,
   switch: switchChecklist,
   storage: storageChecklist,
@@ -219,9 +220,12 @@ function writeContractDetailsRoot(contractDetails: SiteContractDetails, contract
     contractStartDate: primaryContract.contractStartDate ?? "",
     contracts,
     pmCycle: primaryContract.pmCycle ?? "ครึ่งปี",
+    operatingSystem: primaryContract.operatingSystem ?? "",
     projectName: primaryContract.projectName ?? "",
     visitCount: primaryContract.visitCount ?? "",
-    visitMonths: primaryContract.visitMonths ?? []
+    visitMonths: primaryContract.visitMonths ?? [],
+    pmScore: primaryContract.pmScore,
+    pmScoreBreakdown: primaryContract.pmScoreBreakdown
   };
 }
 
@@ -834,10 +838,13 @@ function SiteModal({
         )
       }));
       const primaryChecklistConfig = normalizePmChecklistConfig(normalizedContractsWithConfigs[0]?.checklistConfig);
-      const normalizedContractDetailsWithList: SiteContractDetails = {
-        ...writeContractDetailsRoot(contractDetails, normalizedContractsWithConfigs),
-        checklistConfig: primaryChecklistConfig
-      };
+      const normalizedContractDetailsWithList = syncContractDetailsPmScores(
+        {
+          ...writeContractDetailsRoot(contractDetails, normalizedContractsWithConfigs),
+          checklistConfig: primaryChecklistConfig
+        },
+        normalizedContractsWithConfigs[0]?.contractNumber ?? contractNumber
+      );
       const normalizedContractNumber = normalizedContractsWithConfigs[0]?.contractNumber ?? contractNumber;
 
       writeSitePmChecklistConfig(site.id, primaryChecklistConfig);
@@ -1387,6 +1394,20 @@ function ContractTab({
         <textarea className="textarea" value={contract.contractNote ?? ""} onChange={(event) => updateContractDetails("contractNote", event.target.value)} />
       </label>
 
+      <label className="label">
+        {t("fields.operatingSystem")}
+        <AppSelect
+          className="select"
+          value={contract.operatingSystem ?? ""}
+          onChange={(event) => updateContractDetails("operatingSystem", event.target.value)}
+        >
+          <option value="">{t("fields.selectOperatingSystem")}</option>
+          {OPERATING_SYSTEM_OPTIONS.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </AppSelect>
+      </label>
+
       <section className="sectionCard">
         <h3>{t("sites.inspectionCategories")}</h3>
         <div className="checkCategoryGrid">
@@ -1495,7 +1516,6 @@ function SynapseSetPanel({
       </section>
 
       <ChecklistSection customItems={customItemsBySection.synapseSystem ?? []} itemLabels={itemLabelsBySection.synapseSystem ?? {}} removedDefaultItems={removedDefaultItemsBySection.synapseSystem ?? []} title={`SYNAPSE SYSTEM CHECKLIST #${setId}`} items={synapseSystem} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("synapseSystem", item)} onRemoveItem={(item) => onRemoveCustomItem("synapseSystem", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("synapseSystem", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("synapseSystem", item, nextItem)} onRemoveDefaultItem={(item) => onRemoveDefaultItem("synapseSystem", item)} onToggleItem={onToggleItem} />
-      <ChecklistSection customItems={customItemsBySection.configurationBackup ?? []} itemLabels={itemLabelsBySection.configurationBackup ?? {}} removedDefaultItems={removedDefaultItemsBySection.configurationBackup ?? []} title={`CONFIGURATION BACKUP CHECKLIST #${setId}`} items={configurationBackup} selectedItems={selectedItems} onAddItem={(item) => onAddCustomItem("configurationBackup", item)} onRemoveItem={(item) => onRemoveCustomItem("configurationBackup", item)} onUpdateItem={(item, nextItem) => onUpdateCustomItem("configurationBackup", item, nextItem)} onUpdateDefaultItem={(item, nextItem) => onUpdateDefaultItem("configurationBackup", item, nextItem)} onRemoveDefaultItem={(item) => onRemoveDefaultItem("configurationBackup", item)} onToggleItem={onToggleItem} />
       <Field label="Configuration Backup Path" placeholder="Configuration Backup Path" />
 
       <section className="sectionCard">

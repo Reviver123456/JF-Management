@@ -4,6 +4,16 @@ type StatusClassName = "success" | "info" | "warning" | "danger";
 export type CheckResult = "ok" | "bad";
 export type FinalStatus = "normal" | "abnormal";
 
+export const OPERATING_SYSTEM_OPTIONS = ["VM Ware ESXI", "Proxmox", "Hyper V"] as const;
+
+export type OperatingSystem = (typeof OPERATING_SYSTEM_OPTIONS)[number];
+
+export type PmScoreBreakdown = {
+  operatingSystem: number;
+  categories: Record<string, number>;
+  total: number;
+};
+
 export type SiteContractDetails = {
   contractEndDate?: string;
   contractEndMonth?: string;
@@ -13,19 +23,25 @@ export type SiteContractDetails = {
   contractCount?: string;
   contractNumber?: string;
   contracts?: SiteContractItem[];
+  operatingSystem?: string;
   projectName?: string;
   pmCycle?: string;
   visitCount?: string;
   visitMonths?: string[];
   checklistConfig?: unknown;
+  pmScore?: number;
+  pmScoreBreakdown?: PmScoreBreakdown;
 };
 
 export type SiteContractItem = {
   checklistConfig?: unknown;
+  pmScore?: number;
+  pmScoreBreakdown?: PmScoreBreakdown;
   contractEndDate?: string;
   contractNote?: string;
   contractNumber?: string;
   contractStartDate?: string;
+  operatingSystem?: string;
   pmCycle?: string;
   projectName?: string;
   visitCount?: string;
@@ -387,7 +403,10 @@ export function getSiteContractItems(site: Pick<SiteCatalogRecord, "contract" | 
     contractNote: details?.contractNote,
     contractNumber: details?.contractNumber ?? site?.contract,
     contractStartDate: details?.contractStartDate,
+    operatingSystem: details?.operatingSystem,
     pmCycle: details?.pmCycle,
+    pmScore: details?.pmScore,
+    pmScoreBreakdown: details?.pmScoreBreakdown,
     projectName: details?.projectName,
     visitCount: details?.visitCount,
     visitMonths: details?.visitMonths

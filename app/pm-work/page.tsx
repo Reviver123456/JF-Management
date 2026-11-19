@@ -41,7 +41,6 @@ import {
 import { getPmOrderNoFromWorkDetails } from "@/lib/pm-order-no";
 import {
   checklistTabs,
-  configurationBackup,
   diagColumns,
   diagDevices,
   environmentMain,
@@ -1864,7 +1863,6 @@ function buildChecklistSet(key: PmChecklistKey, setId: number, config: PmCheckli
             ]
           },
           { type: "checks", title: "SYNAPSE SYSTEM CHECKLIST", items: getSelectedItems(config, "synapse", "synapseSystem", synapseSystem, true) },
-          { type: "checks", title: "CONFIGURATION BACKUP CHECKLIST", items: getSelectedItems(config, "synapse", "configurationBackup", configurationBackup) },
           { type: "fields", title: "CONFIGURATION BACKUP PATH", fields: [{ label: "Configuration Backup Path" }] },
           { type: "radios", label: "Backup Type", items: ["DR Site", "NAS", "Other"] },
           { type: "fields", title: "BACKUP DEVICE / DATA BACKUP CHECKING", fields: [{ label: "Location" }] },

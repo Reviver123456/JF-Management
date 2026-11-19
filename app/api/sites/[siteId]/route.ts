@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Database, Json } from "@/lib/supabase/database.types";
+import type { SiteContractDetails } from "@/lib/pm-data";
+import { syncContractDetailsPmScores } from "@/lib/site-pm-score";
 
 type SiteUpdate = Database["public"]["Tables"]["sites"]["Update"];
 
@@ -35,7 +37,13 @@ export async function PATCH(
   }
 
   if ("contractDetails" in body) {
-    updatePayload.contract_details = readJsonObject(body.contractDetails);
+    const contractDetails = readJsonObject(body.contractDetails) as SiteContractDetails;
+    const contractNumber = "contract" in body ? readOptionalString(body.contract) : "";
+
+    updatePayload.contract_details = syncContractDetailsPmScores(
+      contractDetails,
+      contractNumber || contractDetails.contractNumber || ""
+    ) as Json;
   }
 
   try {

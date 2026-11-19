@@ -1,5 +1,4 @@
 import {
-  configurationBackup,
   environmentMain,
   environmentPower,
   environmentSecurity,
@@ -34,10 +33,7 @@ export const standardTemplatePages: StandardTemplatePage[] = [
       ["Synapse Version :", "Host Name :"],
       ["License Studies :", "Current studies Per year :"]
     ],
-    sections: [
-      { title: "SYNAPSE SYSTEM CHECKLIST", items: synapseSystem },
-      { title: "CONFIGURATION BACKUP CHECKLIST", items: configurationBackup }
-    ],
+    sections: [{ title: "SYNAPSE SYSTEM CHECKLIST", items: synapseSystem }],
     variant: "synapse"
   },
   {

@@ -10,7 +10,7 @@ create table public.sites (
   region text not null default '',
   owner text not null default '',
   contract text not null default '',
-  contract_details jsonb not null default '{}'::jsonb,
+  contract_details jsonb not null default '{}'::jsonb, -- includes pmScore, pmScoreBreakdown per contract
   address text not null default '',
   department text not null default '',
   email text not null default '',

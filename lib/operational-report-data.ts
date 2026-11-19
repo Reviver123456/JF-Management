@@ -8,10 +8,12 @@ import {
   normalizeOwnerName,
   type PmJobRecord,
   type SiteCatalogRecord,
+  type SiteContractItem,
   type WorkStatus
 } from "@/lib/pm-data";
 import { isAllOwners } from "@/lib/owner-filter";
 import { isDateWithinPeriod, type ReportPeriodRange } from "@/lib/report-period";
+import { calculateContractPmScore } from "@/lib/site-pm-score";
 
 export function getPlanReportJobs({
   ownerFilter,
@@ -116,29 +118,43 @@ export function getPlanOwnerSummarySets(jobs: PmJobRecord[]): OperationalOwnerSu
 export function getSiteOwnerSummarySets(
   rows: SiteReportRow[],
   pmJobs: PmJobRecord[],
-  periodRange: ReportPeriodRange | null
+  periodRange: ReportPeriodRange | null,
+  ownerFilter?: string
 ): OperationalOwnerSummarySet[] {
   const jobsInPeriod = periodRange
     ? getUniquePmJobs(pmJobs).filter((job) => isDateWithinPeriod(job.visitDate, periodRange))
     : [];
 
+  const normalizedFilter = isAllOwners(ownerFilter) ? "" : normalizeOwnerName(ownerFilter);
+  const scopedJobs = normalizedFilter
+    ? jobsInPeriod.filter((job) => normalizeOwnerName(job.owner) === normalizedFilter)
+    : jobsInPeriod;
+
   const ownerNames = new Set<string>();
 
-  const addOwner = (value: string) => {
-    const owner = normalizeOwnerName(value);
+  rows.forEach((row) => {
+    const owner = normalizeOwnerName(row.site.owner);
 
-    if (owner) {
+    if (!owner) {
+      return;
+    }
+
+    if (!normalizedFilter || owner === normalizedFilter) {
       ownerNames.add(owner);
     }
-  };
-
-  rows.forEach((row) => {
-    addOwner(row.site.owner);
   });
 
-  jobsInPeriod.forEach((job) => {
-    addOwner(job.owner);
-  });
+  if (!normalizedFilter) {
+    scopedJobs.forEach((job) => {
+      const owner = normalizeOwnerName(job.owner);
+
+      if (owner) {
+        ownerNames.add(owner);
+      }
+    });
+  } else if (ownerNames.size === 0) {
+    ownerNames.add(normalizedFilter);
+  }
 
   return [...ownerNames]
     .sort((first, second) => first.localeCompare(second, "th"))
@@ -150,12 +166,12 @@ export function getSiteOwnerSummarySets(
       );
 
       const days = new Set(
-        jobsInPeriod
+        scopedJobs
           .filter((job) => normalizeOwnerName(job.owner) === owner)
           .map((job) => job.visitDate.trim().slice(0, 10))
       );
 
-      jobsInPeriod
+      scopedJobs
         .filter((job) => normalizeOwnerName(job.owner) === owner)
         .forEach((job) => siteIds.add(job.siteId));
 
@@ -194,7 +210,16 @@ export type SiteReportRow = {
   contractStartDate: string;
   contractEndDate: string;
   visitTotal: number;
+  pmScore: number;
 };
+
+function resolveContractPmScore(contract: SiteContractItem) {
+  if (typeof contract.pmScore === "number" && Number.isFinite(contract.pmScore)) {
+    return contract.pmScore;
+  }
+
+  return calculateContractPmScore(contract.operatingSystem, contract.checklistConfig).total;
+}
 
 export function getSiteReportRows({
   ownerFilter,
@@ -228,7 +253,8 @@ export function getSiteReportRows({
         contractNumber,
         contractStartDate: contract.contractStartDate ?? "",
         contractEndDate: contract.contractEndDate ?? "",
-        visitTotal: getSiteContractVisitTotal(site, contractIndex, contract.pmCycle)
+        visitTotal: getSiteContractVisitTotal(site, contractIndex, contract.pmCycle),
+        pmScore: resolveContractPmScore(contract)
       });
     });
   });
@@ -250,4 +276,12 @@ export function summarizeSiteRows(rows: SiteReportRow[]) {
 
 export function formatSiteVisitTotal(value: number) {
   return value > 0 ? String(value) : "-";
+}
+
+export function formatSitePmScore(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "-";
+  }
+
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }

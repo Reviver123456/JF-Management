@@ -7674,6 +7674,10 @@
   text-transform: uppercase;
 }
 
+.sitesPage .sectionCard > .formGrid + .sectionCard {
+  margin-top: 18px;
+}
+
 .sitesPage .sectionTitleRow,
 .sitesPage .checklistHeader {
   display: flex;

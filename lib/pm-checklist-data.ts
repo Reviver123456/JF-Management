@@ -22,14 +22,6 @@ export const synapseSystem = [
   "Antivirus Definition"
 ];
 
-export const configurationBackup = [
-  "Oracle Listener",
-  "Oracle Database Password",
-  "Reading Protocol",
-  "Configuration Folder",
-  "HIIS Folder"
-];
-
 export const serverChecklist = [
   "System-Error LED Status",
   "CPU Status",

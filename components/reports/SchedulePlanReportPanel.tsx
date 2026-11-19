@@ -171,7 +171,9 @@ export function SchedulePlanReportPanel({
 
   const ownerLabel = isAllOwners(ownerFilter) ? t("common.all") : ownerFilter;
   const headerSubtitle = `${periodRange?.label ?? "-"} · ${t("common.owner")}: ${ownerLabel}`;
-  const exportFileTitle = `${t("reports.sections.plan")}-${periodRange?.label ?? "report"}`;
+  const exportFileTitle = isAllOwners(ownerFilter)
+    ? `${t("reports.sections.plan")}-${periodRange?.label ?? "report"}`
+    : `${t("reports.sections.plan")}-${normalizeOwnerName(ownerFilter)}-${periodRange?.label ?? "report"}`;
   const generatedAt = formatOperationalReportDate(lang);
 
   const documentNode = (

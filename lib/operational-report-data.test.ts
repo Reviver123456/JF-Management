@@ -3,6 +3,7 @@ import {
   getPlanJobVisitRoundText,
   getPlanOwnerSummarySets,
   getPlanReportJobs,
+  getSiteOwnerSummarySets,
   getSiteReportRows,
   summarizePlanJobs,
   summarizeSiteRows
@@ -99,6 +100,31 @@ describe("operational-report-data", () => {
         dayCount: 1
       }
     ]);
+  });
+
+  it("limits site owner summary to the selected owner", () => {
+    const periodRange = getPeriodRange("yearly", {
+      anchor: "",
+      anchorEnd: "2026",
+      anchorStart: "2026",
+      dailyEndDate: "",
+      dailyStartDate: ""
+    });
+    const rows = getSiteReportRows({
+      ownerFilter: "Owner One",
+      periodRange,
+      siteCatalog: [site]
+    });
+    const summary = getSiteOwnerSummarySets(
+      rows,
+      jobs,
+      periodRange,
+      "Owner One"
+    );
+
+    expect(summary).toHaveLength(1);
+    expect(summary[0]?.owner).toBe("owner one");
+    expect(summary[0]?.dayCount).toBe(2);
   });
 
   it("lists site contracts for the report", () => {

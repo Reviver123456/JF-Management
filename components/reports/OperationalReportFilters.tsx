@@ -7,6 +7,8 @@ import { useUi } from "@/lib/i18n";
 import { ALL_OWNERS_VALUE } from "@/lib/owner-filter";
 import type { ReportPeriodType } from "@/lib/report-period";
 
+const defaultPeriodTypes: ReportPeriodType[] = ["daily", "monthly", "yearly"];
+
 export type OperationalReportFilterProps = {
   anchorEnd: string;
   anchorStart: string;
@@ -20,6 +22,7 @@ export type OperationalReportFilterProps = {
   ownerFilter: string;
   ownerOptions: string[];
   periodType: ReportPeriodType;
+  periodTypes?: ReportPeriodType[];
   startDate: string;
 };
 
@@ -37,16 +40,19 @@ export function OperationalReportFilters({
   ownerFilter,
   ownerOptions,
   periodType,
+  periodTypes = defaultPeriodTypes,
   startDate
 }: OperationalReportFilterProps & {
   embedded?: boolean;
 }) {
   const { t } = useUi();
+  const allowedPeriodTypes = periodTypes.length > 0 ? periodTypes : defaultPeriodTypes;
+  const activePeriodType = allowedPeriodTypes.includes(periodType) ? periodType : allowedPeriodTypes[0]!;
 
   const rangeField = (
     <label className="reportFilterField reportDateRangeField">
       <span>{t("common.dateRange")}</span>
-      {periodType === "daily" ? (
+      {activePeriodType === "daily" ? (
         <DateRangePicker
           endDate={endDate}
           startDate={startDate}
@@ -56,7 +62,7 @@ export function OperationalReportFilters({
       ) : (
         <PeriodRangePicker
           endValue={anchorEnd}
-          granularity={periodType === "monthly" ? "month" : "year"}
+          granularity={activePeriodType === "monthly" ? "month" : "year"}
           startValue={anchorStart}
           onEndValueChange={onAnchorEndChange}
           onStartValueChange={onAnchorStartChange}
@@ -71,12 +77,13 @@ export function OperationalReportFilters({
         <span>{t("reports.periodType")}</span>
         <AppSelect
           className="select"
-          value={periodType}
+          disabled={allowedPeriodTypes.length === 1}
+          value={activePeriodType}
           onChange={(event) => onPeriodTypeChange(event.target.value as ReportPeriodType)}
         >
-          <option value="daily">{t("reports.period.daily")}</option>
-          <option value="monthly">{t("reports.period.monthly")}</option>
-          <option value="yearly">{t("reports.period.yearly")}</option>
+          {allowedPeriodTypes.includes("daily") ? <option value="daily">{t("reports.period.daily")}</option> : null}
+          {allowedPeriodTypes.includes("monthly") ? <option value="monthly">{t("reports.period.monthly")}</option> : null}
+          {allowedPeriodTypes.includes("yearly") ? <option value="yearly">{t("reports.period.yearly")}</option> : null}
         </AppSelect>
       </label>
 

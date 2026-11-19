@@ -96,8 +96,9 @@ function ReportsPageInner() {
     ),
     [data.owners, data.pmJobs, data.reportRows, data.siteCatalog, userName]
   );
+  const operationalPeriodTypeForRange = reportSection === "site" ? "yearly" : operationalPeriodType;
   const periodRange = useMemo(
-    () => getPeriodRange(operationalPeriodType, {
+    () => getPeriodRange(operationalPeriodTypeForRange, {
       anchor: "",
       anchorEnd: operationalAnchorEnd,
       anchorStart: operationalAnchorStart,
@@ -108,7 +109,7 @@ function ReportsPageInner() {
       operationalAnchorEnd,
       operationalAnchorStart,
       operationalEndDate,
-      operationalPeriodType,
+      operationalPeriodTypeForRange,
       operationalStartDate
     ]
   );
@@ -118,6 +119,22 @@ function ReportsPageInner() {
       router.replace("/reports?section=pm", { scroll: false });
     }
   }, [router, searchParams]);
+
+  useEffect(() => {
+    if (reportSection !== "site") {
+      return;
+    }
+
+    if (operationalPeriodType !== "yearly") {
+      setOperationalPeriodType("yearly");
+    }
+
+    if (!operationalAnchorStart && !operationalAnchorEnd) {
+      const currentYear = String(new Date().getFullYear());
+      setOperationalAnchorStart(currentYear);
+      setOperationalAnchorEnd(currentYear);
+    }
+  }, [operationalAnchorEnd, operationalAnchorStart, operationalPeriodType, reportSection]);
 
   const activePreview = preview?.section === reportSection ? preview : null;
 
@@ -236,7 +253,9 @@ function ReportsPageInner() {
                   anchorEnd: operationalAnchorEnd,
                   anchorStart: operationalAnchorStart,
                   endDate: operationalEndDate,
-                  ownerFilter: operationalOwnerFilter,
+                  ownerFilter: operationalOwnerFilter || (
+                    isAllOwners(operationalOwner) ? ALL_OWNERS_VALUE : operationalOwner
+                  ),
                   ownerOptions,
                   onAnchorEndChange: setOperationalAnchorEnd,
                   onAnchorStartChange: setOperationalAnchorStart,
@@ -260,7 +279,9 @@ function ReportsPageInner() {
                   anchorEnd: operationalAnchorEnd,
                   anchorStart: operationalAnchorStart,
                   endDate: operationalEndDate,
-                  ownerFilter: operationalOwnerFilter,
+                  ownerFilter: operationalOwnerFilter || (
+                    isAllOwners(operationalOwner) ? ALL_OWNERS_VALUE : operationalOwner
+                  ),
                   ownerOptions,
                   onAnchorEndChange: setOperationalAnchorEnd,
                   onAnchorStartChange: setOperationalAnchorStart,
@@ -268,7 +289,8 @@ function ReportsPageInner() {
                   onOwnerFilterChange: setOperationalOwnerFilter,
                   onPeriodTypeChange: handleOperationalPeriodTypeChange,
                   onStartDateChange: setOperationalStartDate,
-                  periodType: operationalPeriodType,
+                  periodType: "yearly",
+                  periodTypes: ["yearly"],
                   startDate: operationalStartDate
                 }}
                 ownerFilter={operationalOwner}

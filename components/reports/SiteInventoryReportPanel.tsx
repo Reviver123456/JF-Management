@@ -3,9 +3,10 @@
 import { useMemo, useRef, type RefObject } from "react";
 import { MapPin, UserRound } from "lucide-react";
 import { useUi } from "@/lib/i18n";
-import { normalizeOwnerName, type PmJobRecord, type SiteCatalogRecord } from "@/lib/pm-data";
+import { filterPmJobsByParticipant, normalizeOwnerName, type PmJobRecord, type SiteCatalogRecord } from "@/lib/pm-data";
 import {
   formatOperationalDisplayDate,
+  formatSitePmScore,
   formatSiteVisitTotal,
   getSiteOwnerSummarySets,
   getSiteReportRows
@@ -51,6 +52,7 @@ function SiteRowsTable({
       <th>{t("reports.siteContractStart")}</th>
       <th>{t("reports.siteContractEnd")}</th>
       <th>{t("reports.pmCycle")}</th>
+      <th>{t("reports.pmScore")}</th>
     </tr>
   );
 
@@ -71,6 +73,7 @@ function SiteRowsTable({
       <td>{formatOperationalDisplayDate(row.contractStartDate)}</td>
       <td>{formatOperationalDisplayDate(row.contractEndDate)}</td>
       <td className={isDocument ? "operationalDocMetric" : undefined}>{formatSiteVisitTotal(row.visitTotal)}</td>
+      <td className={isDocument ? "operationalDocMetric" : undefined}>{formatSitePmScore(row.pmScore)}</td>
     </tr>
   ));
 
@@ -134,15 +137,22 @@ export function SiteInventoryReportPanel({
   }), [ownerFilter, periodRange, pmJobs, siteCatalog]);
 
   const listTopRef = useRef<HTMLDivElement>(null);
+  const scopedPmJobs = useMemo(() => (
+    isAllOwners(ownerFilter)
+      ? pmJobs
+      : filterPmJobsByParticipant(pmJobs, siteCatalog, ownerFilter)
+  ), [ownerFilter, pmJobs, siteCatalog]);
   const ownerSummarySets = useMemo(
-    () => getSiteOwnerSummarySets(rows, pmJobs, periodRange),
-    [periodRange, pmJobs, rows]
+    () => getSiteOwnerSummarySets(rows, scopedPmJobs, periodRange, ownerFilter),
+    [ownerFilter, periodRange, rows, scopedPmJobs]
   );
   const listPagination = useReportListPagination(rows);
 
   const ownerLabel = isAllOwners(ownerFilter) ? t("common.all") : ownerFilter;
   const headerSubtitle = `${periodRange?.label ?? "-"} · ${t("common.owner")}: ${ownerLabel}`;
-  const exportFileTitle = `${t("reports.sections.site")}-${periodRange?.label ?? "report"}`;
+  const exportFileTitle = isAllOwners(ownerFilter)
+    ? `${t("reports.sections.site")}-${periodRange?.label ?? "report"}`
+    : `${t("reports.sections.site")}-${normalizeOwnerName(ownerFilter)}-${periodRange?.label ?? "report"}`;
   const generatedAt = formatOperationalReportDate(lang);
 
   const documentNode = (
